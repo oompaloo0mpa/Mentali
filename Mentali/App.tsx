@@ -1,21 +1,64 @@
 import { useState } from "react";
+import ForgetPasswordPage from "./src/pages/ForgetPasswordPage";
 import LoginPage from "./src/pages/LoginPage";
+import ResetPasswordPage from "./src/pages/ResetPasswordPage";
 import SignupPage from "./src/pages/SignupPage";
+import VerifyCodePage from "./src/pages/VerifyCodePage";
 
-type AuthScreen = "login-phone" | "login-email" | "signup";
+type AuthMode = "phone" | "email";
+type AuthScreen = "login" | "signup" | "forgot" | "verify" | "reset";
 
 export default function App() {
-  const [screen, setScreen] = useState<AuthScreen>("login-phone");
+  const [screen, setScreen] = useState<AuthScreen>("login");
+  const [loginMode, setLoginMode] = useState<AuthMode>("phone");
+  const [recoveryMode, setRecoveryMode] = useState<AuthMode>("email");
 
   if (screen === "signup") {
-    return <SignupPage onSignInPress={() => setScreen("login-phone")} />;
+    return <SignupPage onBackPress={() => setScreen("login")} onSignInPress={() => setScreen("login")} />;
+  }
+
+  if (screen === "forgot") {
+    return (
+      <ForgetPasswordPage
+        mode={recoveryMode}
+        onToggleMode={() => setRecoveryMode((current) => (current === "phone" ? "email" : "phone"))}
+        onNextPress={() => setScreen("verify")}
+        onBackPress={() => setScreen("login")}
+      />
+    );
+  }
+
+  if (screen === "verify") {
+    return (
+      <VerifyCodePage
+        mode={recoveryMode}
+        onNextPress={() => setScreen("reset")}
+        onBackPress={() => setScreen("forgot")}
+      />
+    );
+  }
+
+  if (screen === "reset") {
+    return (
+      <ResetPasswordPage
+        onDonePress={() => {
+          setLoginMode(recoveryMode);
+          setScreen("login");
+        }}
+        onBackPress={() => setScreen("verify")}
+      />
+    );
   }
 
   return (
     <LoginPage
-      mode={screen === "login-phone" ? "phone" : "email"}
-      onToggleMode={() => setScreen((current) => (current === "login-phone" ? "login-email" : "login-phone"))}
+      mode={loginMode}
+      onToggleMode={() => setLoginMode((current) => (current === "phone" ? "email" : "phone"))}
       onSignupPress={() => setScreen("signup")}
+      onForgotPasswordPress={() => {
+        setRecoveryMode(loginMode);
+        setScreen("forgot");
+      }}
     />
   );
 }

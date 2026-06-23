@@ -8,6 +8,10 @@ export function isValidPhone(value: string, countryCode: PhoneCountryCode) {
     return isValidPhoneNumber(value, countryCode);
 }
 
+export function isValidVerificationCode(value: string) {
+    return /^\d{6}$/.test(value.trim());
+}
+
 export function getPasswordRequirements(value: string) {
     return {
         hasLength: value.length >= 8,

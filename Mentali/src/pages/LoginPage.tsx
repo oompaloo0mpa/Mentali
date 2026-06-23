@@ -29,6 +29,7 @@ type LoginPageProps = {
   mode: "phone" | "email";
   onToggleMode: () => void;
   onSignupPress: () => void;
+  onForgotPasswordPress: () => void;
 };
 
 function Mascot() {
@@ -61,7 +62,7 @@ function SocialButton({ label, iconSource }: { label: string; iconSource: number
   );
 }
 
-export default function LoginPage({ mode, onToggleMode, onSignupPress }: LoginPageProps) {
+export default function LoginPage({ mode, onToggleMode, onSignupPress, onForgotPasswordPress }: LoginPageProps) {
   const [phoneNumber, setPhoneNumber] = useState("");
   const [emailAddress, setEmailAddress] = useState("");
   const [password, setPassword] = useState("");
@@ -69,15 +70,13 @@ export default function LoginPage({ mode, onToggleMode, onSignupPress }: LoginPa
   const [countryCode, setCountryCode] = useState<CountryCode>("SG");
   const [callingCode, setCallingCode] = useState("65");
   const [countryPickerVisible, setCountryPickerVisible] = useState(false);
-    const [touched, setTouched] = useState({ identifier: false, password: false });
+  const [touched, setTouched] = useState({ identifier: false, password: false });
   const phoneCountryCode = countryCode as PhoneCountryCode;
 
   const isPhoneMode = mode === "phone";
 
   const phoneDigits = phoneNumber.replace(/\D/g, "");
   const isPhoneValid = phoneDigits.length > 0 && isValidPhoneNumber(phoneNumber, phoneCountryCode);
-  const showPhoneError = isPhoneMode && phoneDigits.length > 0 && !isPhoneValid;
-
   const subtitleText = useMemo(() => {
     if (isPhoneMode) {
       return {
@@ -217,7 +216,10 @@ export default function LoginPage({ mode, onToggleMode, onSignupPress }: LoginPa
               {touched.password && passwordError ? <Text style={styles.phoneErrorText}>{passwordError}</Text> : null}
             </View>
 
-            <Pressable style={({ pressed }) => [styles.forgotRow, pressed && styles.pressedButton]}>
+            <Pressable
+              onPress={onForgotPasswordPress}
+              style={({ pressed }) => [styles.forgotRow, pressed && styles.pressedButton]}
+            >
               <Text style={styles.forgotText}>Forgot password?</Text>
             </Pressable>
 
@@ -451,7 +453,7 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   forgotText: {
-    color: "#111111",
+    color: "#2D7FEF",
     fontSize: 16,
     lineHeight: 20,
     fontWeight: "700",

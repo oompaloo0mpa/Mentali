@@ -50,10 +50,11 @@ function SocialButton({ label, iconSource }: { label: string; iconSource: number
 }
 
 type SignupPageProps = {
+  onBackPress: () => void;
   onSignInPress: () => void;
 };
 
-export default function SignupPage({ onSignInPress }: SignupPageProps) {
+export default function SignupPage({ onBackPress, onSignInPress }: SignupPageProps) {
   const [phoneNumber, setPhoneNumber] = useState("");
   const [emailAddress, setEmailAddress] = useState("");
   const [password, setPassword] = useState("");
@@ -80,6 +81,15 @@ export default function SignupPage({ onSignInPress }: SignupPageProps) {
     : "";
   const confirmPasswordError =
     confirmPassword.length > 0 && confirmPassword !== password ? "Passwords do not match." : "";
+  const isFormValid =
+    phoneDigits.length > 0 &&
+    isPhoneValid &&
+    emailAddress.length > 0 &&
+    isValidEmail(emailAddress) &&
+    password.length > 0 &&
+    isStrongPassword(password) &&
+    confirmPassword.length > 0 &&
+    confirmPassword === password;
 
   const formatPhoneDisplay = (text: string, nextCountryCode = phoneCountryCode) => {
     const digits = text.replace(/\D/g, "").slice(0, 15);
@@ -109,6 +119,15 @@ export default function SignupPage({ onSignInPress }: SignupPageProps) {
           showsVerticalScrollIndicator={false}
         >
           <View style={styles.content}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Go back"
+              onPress={onBackPress}
+              style={({ pressed }) => [styles.backButton, pressed && styles.pressedButton]}
+            >
+              <Text style={styles.backButtonText}>‹</Text>
+            </Pressable>
+
             <Mascot />
 
             <Text style={styles.title}>Create a new Mentali!</Text>
@@ -212,7 +231,14 @@ export default function SignupPage({ onSignInPress }: SignupPageProps) {
               ) : null}
             </View>
 
-            <Pressable style={({ pressed }) => [styles.loginButton, pressed && styles.loginButtonPressed]}>
+            <Pressable
+              disabled={!isFormValid}
+              style={({ pressed }) => [
+                styles.loginButton,
+                !isFormValid && styles.buttonDisabled,
+                pressed && isFormValid && styles.loginButtonPressed,
+              ]}
+            >
               <Text style={styles.loginButtonText}>REGISTER</Text>
             </Pressable>
 
@@ -268,6 +294,25 @@ const styles = StyleSheet.create({
     maxWidth: 420,
     alignSelf: "center",
     alignItems: "center",
+  },
+  backButton: {
+    position: "absolute",
+    top: 6,
+    left: 2,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 2,
+  },
+  backButtonText: {
+    color: "#111111",
+    fontSize: 36,
+    lineHeight: 36,
+    fontWeight: "700",
+    fontFamily: "Nunito",
+    marginTop: -4,
   },
   subtitleRow: {
     width: "100%",
@@ -438,6 +483,9 @@ const styles = StyleSheet.create({
   loginButtonPressed: {
     transform: [{ translateY: 2 }],
     borderBottomWidth: 3,
+  },
+  buttonDisabled: {
+    opacity: 0.45,
   },
   loginButtonText: {
     color: "#FFFFFF",
