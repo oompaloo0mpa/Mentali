@@ -1,5 +1,4 @@
-import { isStrongPassword, isValidEmail } from "../utils/authValidation";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import {
   Image,
   KeyboardAvoidingView,
@@ -13,23 +12,12 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import CountryPicker, { Country, CountryCode } from "react-native-country-picker-modal";
-import {
-  AsYouType,
-  CountryCode as PhoneCountryCode,
-  isValidPhoneNumber,
-} from "libphonenumber-js";
+import { AsYouType, CountryCode as PhoneCountryCode, isValidPhoneNumber } from "libphonenumber-js";
+import { isStrongPassword, isValidEmail } from "../utils/authValidation";
 
 const mascotSource = require("../../assets/images/LoginMascot.png");
 const googleIconSource = require("../../assets/images/GoogleIcon.png");
 const appleIconSource = require("../../assets/images/AppleIcon.png");
-
-export type AuthScreen = "login-phone" | "login-email" | "signup";
-
-type LoginPageProps = {
-  mode: "phone" | "email";
-  onToggleMode: () => void;
-  onSignupPress: () => void;
-};
 
 function Mascot() {
   return (
@@ -61,54 +49,37 @@ function SocialButton({ label, iconSource }: { label: string; iconSource: number
   );
 }
 
-export default function LoginPage({ mode, onToggleMode, onSignupPress }: LoginPageProps) {
+type SignupPageProps = {
+  onSignInPress: () => void;
+};
+
+export default function SignupPage({ onSignInPress }: SignupPageProps) {
   const [phoneNumber, setPhoneNumber] = useState("");
   const [emailAddress, setEmailAddress] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [countryCode, setCountryCode] = useState<CountryCode>("SG");
   const [callingCode, setCallingCode] = useState("65");
   const [countryPickerVisible, setCountryPickerVisible] = useState(false);
-    const [touched, setTouched] = useState({ identifier: false, password: false });
+  const [touched, setTouched] = useState({
+    phone: false,
+    email: false,
+    password: false,
+    confirmPassword: false,
+  });
   const phoneCountryCode = countryCode as PhoneCountryCode;
-
-  const isPhoneMode = mode === "phone";
 
   const phoneDigits = phoneNumber.replace(/\D/g, "");
   const isPhoneValid = phoneDigits.length > 0 && isValidPhoneNumber(phoneNumber, phoneCountryCode);
-  const showPhoneError = isPhoneMode && phoneDigits.length > 0 && !isPhoneValid;
-
-  const subtitleText = useMemo(() => {
-    if (isPhoneMode) {
-      return {
-        prefix: "Enter your mobile number or ",
-        highlight: "email",
-        suffix: "",
-      };
-    }
-
-    return {
-      prefix: "Enter your ",
-      highlight: "mobile number",
-      suffix: " or email",
-    };
-  }, [isPhoneMode]);
-
-  const inputPlaceholder = isPhoneMode ? "99999999" : "banana12@gmail.com";
-  const inputValue = isPhoneMode ? phoneNumber : emailAddress;
-  const onChangeInput = isPhoneMode ? setPhoneNumber : setEmailAddress;
-  const keyboardType = isPhoneMode ? "phone-pad" : "email-address";
-  const autoComplete = isPhoneMode ? "tel" : "email";
-  const identifierError = isPhoneMode
-    ? phoneDigits.length > 0 && !isPhoneValid
-      ? "Enter a valid phone number for the selected country."
-      : ""
-    : emailAddress.length > 0 && !isValidEmail(emailAddress)
-      ? "Enter a valid email address."
-      : "";
+  const phoneError = phoneDigits.length > 0 && !isPhoneValid ? "Enter a valid phone number for the selected country." : "";
+  const emailError = emailAddress.length > 0 && !isValidEmail(emailAddress) ? "Enter a valid email address." : "";
   const passwordError = password.length > 0 && !isStrongPassword(password)
     ? "Use at least 8 characters with a number, capital letter, and special symbol."
     : "";
+  const confirmPasswordError =
+    confirmPassword.length > 0 && confirmPassword !== password ? "Passwords do not match." : "";
 
   const formatPhoneDisplay = (text: string, nextCountryCode = phoneCountryCode) => {
     const digits = text.replace(/\D/g, "").slice(0, 15);
@@ -130,10 +101,7 @@ export default function LoginPage({ mode, onToggleMode, onSignupPress }: LoginPa
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <KeyboardAvoidingView
-        style={styles.flexFill}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-      >
+      <KeyboardAvoidingView style={styles.flexFill} behavior={Platform.OS === "ios" ? "padding" : undefined}>
         <ScrollView
           contentContainerStyle={styles.page}
           keyboardShouldPersistTaps="handled"
@@ -143,53 +111,53 @@ export default function LoginPage({ mode, onToggleMode, onSignupPress }: LoginPa
           <View style={styles.content}>
             <Mascot />
 
-            <Text style={styles.title}>Welcome</Text>
-            <Text style={styles.title}>to Mentali!</Text>
+            <Text style={styles.title}>Create a new Mentali!</Text>
 
-            <View style={styles.subtitleRow}>
-              <Text style={styles.subtitle}>{subtitleText.prefix}</Text>
-              <Text
-                onPress={onToggleMode}
-                style={styles.linkText}
-                suppressHighlighting
-              >
-                {subtitleText.highlight}
-              </Text>
-              <Text style={styles.subtitle}>{subtitleText.suffix}</Text>
+            <View style={styles.fieldBlock}>
+              <Text style={styles.fieldLabel}>Enter your mobile number</Text>
+              <View style={styles.inputShell}>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Select country code"
+                  onPress={() => setCountryPickerVisible(true)}
+                  style={({ pressed }) => [styles.countryCodeButton, pressed && styles.pressedButton]}
+                >
+                  <Text style={styles.countryCodeText}>+{callingCode}</Text>
+                  <Text style={styles.countryCodeChevron}>⌄</Text>
+                </Pressable>
+                <View style={styles.phoneDivider} />
+                <TextInput
+                  value={phoneNumber}
+                  onChangeText={handlePhoneChange}
+                  onBlur={() => setTouched((current) => ({ ...current, phone: true }))}
+                  placeholder="99999999"
+                  placeholderTextColor="#B8B8B8"
+                  style={styles.input}
+                  keyboardType="phone-pad"
+                  autoComplete="tel"
+                  autoCapitalize="none"
+                  maxLength={25}
+                />
+              </View>
+              {touched.phone && phoneError ? <Text style={styles.phoneErrorText}>{phoneError}</Text> : null}
             </View>
 
             <View style={styles.fieldBlock}>
+              <Text style={styles.fieldLabel}>Enter your email</Text>
               <View style={styles.inputShell}>
-                {isPhoneMode ? (
-                  <>
-                    <Pressable
-                      accessibilityRole="button"
-                      accessibilityLabel="Select country code"
-                      onPress={() => setCountryPickerVisible(true)}
-                      style={({ pressed }) => [styles.countryCodeButton, pressed && styles.pressedButton]}
-                    >
-                      <Text style={styles.countryCodeText}>+{callingCode}</Text>
-                      <Text style={styles.countryCodeChevron}>⌄</Text>
-                    </Pressable>
-                    <View style={styles.phoneDivider} />
-                  </>
-                ) : null}
                 <TextInput
-                  value={inputValue}
-                  onChangeText={isPhoneMode ? handlePhoneChange : onChangeInput}
-                  onBlur={() => setTouched((current) => ({ ...current, identifier: true }))}
-                  placeholder={inputPlaceholder}
+                  value={emailAddress}
+                  onChangeText={setEmailAddress}
+                  onBlur={() => setTouched((current) => ({ ...current, email: true }))}
+                  placeholder="banana12@gmail.com"
                   placeholderTextColor="#B8B8B8"
                   style={styles.input}
-                  keyboardType={keyboardType}
-                  autoComplete={autoComplete}
+                  keyboardType="email-address"
+                  autoComplete="email"
                   autoCapitalize="none"
-                  maxLength={isPhoneMode ? 25 : undefined}
                 />
               </View>
-              {touched.identifier && identifierError ? (
-                <Text style={styles.phoneErrorText}>{identifierError}</Text>
-              ) : null}
+              {touched.email && emailError ? <Text style={styles.phoneErrorText}>{emailError}</Text> : null}
             </View>
 
             <View style={styles.fieldBlock}>
@@ -217,18 +185,41 @@ export default function LoginPage({ mode, onToggleMode, onSignupPress }: LoginPa
               {touched.password && passwordError ? <Text style={styles.phoneErrorText}>{passwordError}</Text> : null}
             </View>
 
-            <Pressable style={({ pressed }) => [styles.forgotRow, pressed && styles.pressedButton]}>
-              <Text style={styles.forgotText}>Forgot password?</Text>
-            </Pressable>
+            <View style={styles.fieldBlock}>
+              <Text style={styles.fieldLabel}>Re-Enter your password</Text>
+              <View style={styles.inputShell}>
+                <TextInput
+                  value={confirmPassword}
+                  onChangeText={setConfirmPassword}
+                  onBlur={() => setTouched((current) => ({ ...current, confirmPassword: true }))}
+                  placeholder="banana123"
+                  placeholderTextColor="#B8B8B8"
+                  secureTextEntry={!showConfirmPassword}
+                  style={styles.input}
+                  autoCapitalize="none"
+                />
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={showConfirmPassword ? "Hide password" : "Show password"}
+                  onPress={() => setShowConfirmPassword((current) => !current)}
+                  style={({ pressed }) => [styles.eyeButton, pressed && styles.pressedButton]}
+                >
+                  <EyeIcon hidden={!showConfirmPassword} />
+                </Pressable>
+              </View>
+              {touched.confirmPassword && confirmPasswordError ? (
+                <Text style={styles.phoneErrorText}>{confirmPasswordError}</Text>
+              ) : null}
+            </View>
 
             <Pressable style={({ pressed }) => [styles.loginButton, pressed && styles.loginButtonPressed]}>
-              <Text style={styles.loginButtonText}>LOGIN</Text>
+              <Text style={styles.loginButtonText}>REGISTER</Text>
             </Pressable>
 
             <Text style={styles.signupText}>
-              Don’t have an account?{" "}
-              <Text onPress={onSignupPress} style={styles.linkText} suppressHighlighting>
-                Sign Up
+              Already have an account?{" "}
+              <Text onPress={onSignInPress} style={styles.linkText} suppressHighlighting>
+                Sign In
               </Text>
             </Text>
 
@@ -240,20 +231,18 @@ export default function LoginPage({ mode, onToggleMode, onSignupPress }: LoginPa
         </ScrollView>
       </KeyboardAvoidingView>
 
-      {isPhoneMode ? (
-        <CountryPicker
-          countryCode={countryCode}
-          withCallingCode
-          withFilter
-          withFlag={false}
-          withEmoji={false}
-          withAlphaFilter={false}
-          withFlagButton={false}
-          visible={countryPickerVisible}
-          onClose={() => setCountryPickerVisible(false)}
-          onSelect={handleCountrySelect}
-        />
-      ) : null}
+      <CountryPicker
+        countryCode={countryCode}
+        withCallingCode
+        withFilter
+        withFlag={false}
+        withEmoji={false}
+        withAlphaFilter={false}
+        withFlagButton={false}
+        visible={countryPickerVisible}
+        onClose={() => setCountryPickerVisible(false)}
+        onSelect={handleCountrySelect}
+      />
     </SafeAreaView>
   );
 }
@@ -297,15 +286,6 @@ const styles = StyleSheet.create({
     height: 170,
     alignSelf: "center",
   },
-  signupTitle: {
-    color: "#111111",
-    fontSize: 32,
-    lineHeight: 36,
-    fontWeight: "700",
-    textAlign: "center",
-    fontFamily: "Nunito",
-    marginTop: 2,
-  },
   title: {
     color: "#111111",
     fontSize: 34,
@@ -321,13 +301,6 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     fontWeight: "700",
     textAlign: "left",
-    fontFamily: "Nunito",
-  },
-  subtitleAccent: {
-    color: "#2D7FEF",
-    fontSize: 16,
-    lineHeight: 20,
-    fontWeight: "700",
     fontFamily: "Nunito",
   },
   linkText: {
@@ -445,17 +418,6 @@ const styles = StyleSheet.create({
     borderRadius: 1,
     backgroundColor: "#A8A8A8",
     transform: [{ rotate: "-38deg" }],
-  },
-  forgotRow: {
-    alignSelf: "flex-end",
-    marginTop: 10,
-  },
-  forgotText: {
-    color: "#111111",
-    fontSize: 16,
-    lineHeight: 20,
-    fontWeight: "700",
-    fontFamily: "Nunito",
   },
   loginButton: {
     marginTop: 14,

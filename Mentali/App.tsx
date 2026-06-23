@@ -1,13 +1,21 @@
 import { useState } from "react";
-import LoginPage, { LoginMode } from "./src/pages/LoginPage";
+import LoginPage from "./src/pages/LoginPage";
+import SignupPage from "./src/pages/SignupPage";
+
+type AuthScreen = "login-phone" | "login-email" | "signup";
 
 export default function App() {
-  const [mode, setMode] = useState<LoginMode>("phone");
+  const [screen, setScreen] = useState<AuthScreen>("login-phone");
+
+  if (screen === "signup") {
+    return <SignupPage onSignInPress={() => setScreen("login-phone")} />;
+  }
 
   return (
     <LoginPage
-      mode={mode}
-      onToggleMode={() => setMode((current) => (current === "phone" ? "email" : "phone"))}
+      mode={screen === "login-phone" ? "phone" : "email"}
+      onToggleMode={() => setScreen((current) => (current === "login-phone" ? "login-email" : "login-phone"))}
+      onSignupPress={() => setScreen("signup")}
     />
   );
 }
