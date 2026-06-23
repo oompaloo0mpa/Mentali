@@ -1,3 +1,3 @@
-import Welcome from './Welcome';
+import OnboardingPage_1 from './OnboardingPage_1';
 
-export default Welcome;
+export default OnboardingPage_1;
