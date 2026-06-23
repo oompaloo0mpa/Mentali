@@ -54,41 +54,64 @@ export default function FriendChatScreen() {
     scrollToEnd();
   };
 
+  const runAttachmentAction = (action: () => Promise<void>) => {
+    setAttachVisible(false);
+    // Keep a tiny delay so the sheet visually dismisses before native UI opens.
+    setTimeout(() => {
+      void action();
+    }, 80);
+  };
+
   // Pick an image from the library and send it as an attachment message.
   const pickPhotos = async () => {
-    setAttachVisible(false);
-    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!permission.granted) {
-      Alert.alert('Permission needed', 'Allow photo library access to attach images.');
-      return;
-    }
+    try {
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permission.granted) {
+        Alert.alert('Permission needed', 'Allow photo library access to attach images.');
+        return;
+      }
 
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      quality: 0.8,
-    });
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        quality: 0.8,
+      });
 
-    if (!result.canceled && result.assets.length > 0) {
-      const uri = result.assets[0].uri;
-      setMessages((prev) => [...prev, { id: `m${messageCounter++}`, text: '', imageUri: uri, sender: 'me' }]);
-      scrollToEnd();
+      if (!result.canceled && result.assets.length > 0) {
+        const uri = result.assets[0].uri;
+        setMessages((prev) => [
+          ...prev,
+          { id: `m${messageCounter++}`, text: '', imageUri: uri, sender: 'me' },
+        ]);
+        scrollToEnd();
+      }
+    } catch (error) {
+      Alert.alert('Unable to open photos', String(error ?? 'Please try again.'));
     }
   };
 
   // Pick a document/file and send it as an attachment message.
   const pickFiles = async () => {
-    setAttachVisible(false);
-    const result = await DocumentPicker.getDocumentAsync({ copyToCacheDirectory: true });
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        copyToCacheDirectory: true,
+        multiple: false,
+        type: '*/*',
+      });
 
-    if (!result.canceled && result.assets.length > 0) {
-      const asset = result.assets[0];
-      setMessages((prev) => [
-        ...prev,
-        { id: `m${messageCounter++}`, text: '', fileName: asset.name, fileUri: asset.uri, sender: 'me' },
-      ]);
-      scrollToEnd();
+      if (!result.canceled && result.assets.length > 0) {
+        const asset = result.assets[0];
+        setMessages((prev) => [
+          ...prev,
+          { id: `m${messageCounter++}`, text: '', fileName: asset.name, fileUri: asset.uri, sender: 'me' },
+        ]);
+        scrollToEnd();
+      }
+    } catch (error) {
+      Alert.alert('Unable to open files', String(error ?? 'Please try again.'));
     }
   };
+
+  const openAttachmentOptions = () => setAttachVisible(true);
 
   const refreshSuggestion = () => {
     setSuggestionIndex((i) => (i + 1) % MOTIVATIONAL_SUGGESTIONS.length);
@@ -159,15 +182,20 @@ export default function FriendChatScreen() {
             onUse={() => setDraft(suggestion)}
             onRefresh={refreshSuggestion}
           />
-          <ChatInput value={draft} onChangeText={setDraft} onSend={sendMessage} onAttach={() => setAttachVisible(true)} />
+          <ChatInput
+            value={draft}
+            onChangeText={setDraft}
+            onSend={sendMessage}
+            onAttach={openAttachmentOptions}
+          />
         </View>
       </KeyboardAvoidingView>
 
       <AttachmentSheet
         visible={attachVisible}
         onClose={() => setAttachVisible(false)}
-        onPickPhotos={pickPhotos}
-        onPickFiles={pickFiles}
+        onPickPhotos={() => runAttachmentAction(pickPhotos)}
+        onPickFiles={() => runAttachmentAction(pickFiles)}
       />
 
       <FriendOptionsModal

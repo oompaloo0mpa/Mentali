@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Brand, Radius, Spacing } from '@/constants/theme';
@@ -14,45 +14,46 @@ type Props = {
 /** Bottom sheet shown when tapping the chat "+": Add photos or files. */
 export function AttachmentSheet({ visible, onClose, onPickPhotos, onPickFiles }: Props) {
   const insets = useSafeAreaInsets();
+  if (!visible) return null;
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <Pressable style={styles.backdrop} onPress={onClose}>
-        <Pressable style={[styles.sheet, { paddingBottom: insets.bottom + Spacing.three }]} onPress={() => {}}>
-          <View style={styles.handle} />
-          <Text style={styles.title}>Add photos or files</Text>
+    <View style={styles.root} pointerEvents="box-none">
+      <Pressable style={styles.backdrop} onPress={onClose} />
+      <View style={[styles.sheet, { paddingBottom: insets.bottom + Spacing.three }]}>
+        <View style={styles.handle} />
+        <Text style={styles.title}>Add photos or files</Text>
 
-          <Pressable
-            style={({ pressed }) => [styles.option, pressed && styles.pressed]}
-            onPress={onPickPhotos}>
-            <View style={styles.iconCircle}>
-              <Ionicons name="image" size={22} color="#FFFFFF" />
-            </View>
-            <Text style={styles.optionLabel}>Add photos</Text>
-          </Pressable>
-
-          <Pressable
-            style={({ pressed }) => [styles.option, pressed && styles.pressed]}
-            onPress={onPickFiles}>
-            <View style={styles.iconCircle}>
-              <Ionicons name="document" size={22} color="#FFFFFF" />
-            </View>
-            <Text style={styles.optionLabel}>Add files</Text>
-          </Pressable>
-
-          <Pressable
-            style={({ pressed }) => [styles.cancel, pressed && styles.pressed]}
-            onPress={onClose}>
-            <Text style={styles.cancelLabel}>Cancel</Text>
-          </Pressable>
+        <Pressable
+          style={({ pressed }) => [styles.option, pressed && styles.pressed]}
+          onPress={onPickPhotos}>
+          <View style={styles.iconCircle}>
+            <Ionicons name="image" size={22} color="#FFFFFF" />
+          </View>
+          <Text style={styles.optionLabel}>Add photos</Text>
         </Pressable>
-      </Pressable>
-    </Modal>
+
+        <Pressable
+          style={({ pressed }) => [styles.option, pressed && styles.pressed]}
+          onPress={onPickFiles}>
+          <View style={styles.iconCircle}>
+            <Ionicons name="document" size={22} color="#FFFFFF" />
+          </View>
+          <Text style={styles.optionLabel}>Add files</Text>
+        </Pressable>
+
+        <Pressable
+          style={({ pressed }) => [styles.cancel, pressed && styles.pressed]}
+          onPress={onClose}>
+          <Text style={styles.cancelLabel}>Cancel</Text>
+        </Pressable>
+      </View>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  root: { ...StyleSheet.absoluteFillObject, justifyContent: 'flex-end' },
+  backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.5)' },
   sheet: {
     backgroundColor: Brand.surface,
     borderTopLeftRadius: Radius.lg,
