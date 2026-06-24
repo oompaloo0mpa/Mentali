@@ -18,6 +18,7 @@ import {
   CountryCode as PhoneCountryCode,
   isValidPhoneNumber,
 } from "libphonenumber-js";
+import { SocialAuthResult, useSocialAuth } from "../hooks/useSocialAuth";
 
 const mascotSource = require("../../assets/images/LoginMascot.png");
 const googleIconSource = require("../../assets/images/GoogleIcon.png");
@@ -30,6 +31,7 @@ type LoginPageProps = {
   onToggleMode: () => void;
   onSignupPress: () => void;
   onForgotPasswordPress: () => void;
+  onSocialAuthSuccess: (session: SocialAuthResult) => void;
 };
 
 function Mascot() {
@@ -51,9 +53,23 @@ function EyeIcon({ hidden }: { hidden: boolean }) {
   );
 }
 
-function SocialButton({ label, iconSource }: { label: string; iconSource: number }) {
+function SocialButton({
+  label,
+  iconSource,
+  onPress,
+  disabled,
+}: {
+  label: string;
+  iconSource: number;
+  onPress: () => void;
+  disabled?: boolean;
+}) {
   return (
-    <Pressable style={({ pressed }) => [styles.socialButton, pressed && styles.pressedButton]}>
+    <Pressable
+      disabled={disabled}
+      onPress={onPress}
+      style={({ pressed }) => [styles.socialButton, pressed && styles.pressedButton]}
+    >
       <View style={styles.socialIcon}>
         <Image source={iconSource} resizeMode="contain" style={styles.socialIconImage} />
       </View>
@@ -62,7 +78,13 @@ function SocialButton({ label, iconSource }: { label: string; iconSource: number
   );
 }
 
-export default function LoginPage({ mode, onToggleMode, onSignupPress, onForgotPasswordPress }: LoginPageProps) {
+export default function LoginPage({
+  mode,
+  onToggleMode,
+  onSignupPress,
+  onForgotPasswordPress,
+  onSocialAuthSuccess,
+}: LoginPageProps) {
   const [phoneNumber, setPhoneNumber] = useState("");
   const [emailAddress, setEmailAddress] = useState("");
   const [password, setPassword] = useState("");
@@ -72,6 +94,9 @@ export default function LoginPage({ mode, onToggleMode, onSignupPress, onForgotP
   const [countryPickerVisible, setCountryPickerVisible] = useState(false);
   const [touched, setTouched] = useState({ identifier: false, password: false });
   const phoneCountryCode = countryCode as PhoneCountryCode;
+  const { signInWithGoogle, signInWithApple, loadingProvider, googleAvailable } = useSocialAuth({
+    onSuccess: onSocialAuthSuccess,
+  });
 
   const isPhoneMode = mode === "phone";
 
@@ -236,8 +261,18 @@ export default function LoginPage({ mode, onToggleMode, onSignupPress, onForgotP
 
             <Text style={styles.orText}>or</Text>
 
-            <SocialButton label="Continue with Google" iconSource={googleIconSource} />
-            <SocialButton label="Continue with Apple" iconSource={appleIconSource} />
+            <SocialButton
+              label="Continue with Google"
+              iconSource={googleIconSource}
+              onPress={signInWithGoogle}
+              disabled={loadingProvider !== null || !googleAvailable}
+            />
+            <SocialButton
+              label="Continue with Apple"
+              iconSource={appleIconSource}
+              onPress={signInWithApple}
+              disabled={loadingProvider !== null}
+            />
           </View>
         </ScrollView>
       </KeyboardAvoidingView>

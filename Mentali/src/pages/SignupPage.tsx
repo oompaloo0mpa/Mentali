@@ -14,6 +14,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import CountryPicker, { Country, CountryCode } from "react-native-country-picker-modal";
 import { AsYouType, CountryCode as PhoneCountryCode, isValidPhoneNumber } from "libphonenumber-js";
 import { isStrongPassword, isValidEmail } from "../utils/authValidation";
+import { SocialAuthResult, useSocialAuth } from "../hooks/useSocialAuth";
 
 const mascotSource = require("../../assets/images/LoginMascot.png");
 const googleIconSource = require("../../assets/images/GoogleIcon.png");
@@ -38,9 +39,23 @@ function EyeIcon({ hidden }: { hidden: boolean }) {
   );
 }
 
-function SocialButton({ label, iconSource }: { label: string; iconSource: number }) {
+function SocialButton({
+  label,
+  iconSource,
+  onPress,
+  disabled,
+}: {
+  label: string;
+  iconSource: number;
+  onPress: () => void;
+  disabled?: boolean;
+}) {
   return (
-    <Pressable style={({ pressed }) => [styles.socialButton, pressed && styles.pressedButton]}>
+    <Pressable
+      disabled={disabled}
+      onPress={onPress}
+      style={({ pressed }) => [styles.socialButton, pressed && styles.pressedButton]}
+    >
       <View style={styles.socialIcon}>
         <Image source={iconSource} resizeMode="contain" style={styles.socialIconImage} />
       </View>
@@ -52,9 +67,10 @@ function SocialButton({ label, iconSource }: { label: string; iconSource: number
 type SignupPageProps = {
   onBackPress: () => void;
   onSignInPress: () => void;
+  onSocialAuthSuccess: (session: SocialAuthResult) => void;
 };
 
-export default function SignupPage({ onBackPress, onSignInPress }: SignupPageProps) {
+export default function SignupPage({ onBackPress, onSignInPress, onSocialAuthSuccess }: SignupPageProps) {
   const [phoneNumber, setPhoneNumber] = useState("");
   const [emailAddress, setEmailAddress] = useState("");
   const [password, setPassword] = useState("");
@@ -71,6 +87,9 @@ export default function SignupPage({ onBackPress, onSignInPress }: SignupPagePro
     confirmPassword: false,
   });
   const phoneCountryCode = countryCode as PhoneCountryCode;
+  const { signInWithGoogle, signInWithApple, loadingProvider, googleAvailable } = useSocialAuth({
+    onSuccess: onSocialAuthSuccess,
+  });
 
   const phoneDigits = phoneNumber.replace(/\D/g, "");
   const isPhoneValid = phoneDigits.length > 0 && isValidPhoneNumber(phoneNumber, phoneCountryCode);
@@ -251,8 +270,18 @@ export default function SignupPage({ onBackPress, onSignInPress }: SignupPagePro
 
             <Text style={styles.orText}>or</Text>
 
-            <SocialButton label="Continue with Google" iconSource={googleIconSource} />
-            <SocialButton label="Continue with Apple" iconSource={appleIconSource} />
+            <SocialButton
+              label="Continue with Google"
+              iconSource={googleIconSource}
+              onPress={signInWithGoogle}
+              disabled={loadingProvider !== null || !googleAvailable}
+            />
+            <SocialButton
+              label="Continue with Apple"
+              iconSource={appleIconSource}
+              onPress={signInWithApple}
+              disabled={loadingProvider !== null}
+            />
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
