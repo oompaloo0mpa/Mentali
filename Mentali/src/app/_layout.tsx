@@ -5,6 +5,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { Brand } from '@/constants/theme';
+import { SocialProvider } from '@/store/socialStore';
 
 // Dark-first: align the navigation theme with our background.
 const navTheme = {
@@ -16,17 +17,19 @@ export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
-        <ThemeProvider value={navTheme}>
-          <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: Brand.background } }}>
-            <Stack.Screen name="(tabs)" />
-            <Stack.Screen name="chat/[friendId]" />
-            <Stack.Screen
-              name="streak-guide"
-              options={{ presentation: 'transparentModal', animation: 'fade' }}
-            />
-          </Stack>
-          <StatusBar style="light" />
-        </ThemeProvider>
+        <SocialProvider>
+          <ThemeProvider value={navTheme}>
+            <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: Brand.background } }}>
+              <Stack.Screen name="(tabs)" />
+              <Stack.Screen name="chat/[friendId]" />
+              <Stack.Screen
+                name="streak-guide"
+                options={{ presentation: 'transparentModal', animation: 'fade' }}
+              />
+            </Stack>
+            <StatusBar style="light" />
+          </ThemeProvider>
+        </SocialProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );

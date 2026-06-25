@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   Alert,
   KeyboardAvoidingView,
@@ -23,22 +23,27 @@ import { StreakPet } from '@/components/chat/StreakPet';
 import { SuggestionBar } from '@/components/chat/SuggestionBar';
 import { FriendOptionsModal } from '@/components/social/FriendOptionsModal';
 import { Brand, MaxContentWidth, Radius, Spacing } from '@/constants/theme';
-import {
-  INITIAL_MESSAGES,
-  MOTIVATIONAL_SUGGESTIONS,
-  getFriendById,
-  type ChatMessage,
-} from '@/constants/mockData';
-
-let messageCounter = 100;
+import { MOTIVATIONAL_SUGGESTIONS } from '@/constants/mockData';
+import { friendMood, useSocial } from '@/store/socialStore';
 
 export default function FriendChatScreen() {
   const router = useRouter();
-  const { friendId } = useLocalSearchParams<{ friendId: string }>();
-  const friend = getFriendById(friendId);
+  const { friendId, prefill } = useLocalSearchParams<{ friendId: string; prefill?: string }>();
+  const {
+    friendById,
+    chatFor,
+    sendMessage,
+    markChatRead,
+    togglePin,
+    muteFriend,
+    unmuteFriend,
+    removeFriend,
+  } = useSocial();
+
+  const friend = friendById(friendId);
+  const messages = friendId ? chatFor(friendId) : [];
 
   const scrollRef = useRef<ScrollView>(null);
-  const [messages, setMessages] = useState<ChatMessage[]>(INITIAL_MESSAGES);
   const [draft, setDraft] = useState('');
   const [suggestionIndex, setSuggestionIndex] = useState(0);
   const [optionsVisible, setOptionsVisible] = useState(false);
@@ -46,11 +51,21 @@ export default function FriendChatScreen() {
 
   const suggestion = MOTIVATIONAL_SUGGESTIONS[suggestionIndex];
 
+  useEffect(() => {
+    if (friendId) markChatRead(friendId);
+  }, [friendId, markChatRead]);
+
+  // Pre-fill the composer with a suggestion when launched from the "Send motivation" shortcut.
+  useEffect(() => {
+    if (prefill) setDraft(MOTIVATIONAL_SUGGESTIONS[0]);
+  }, [prefill]);
+
   const scrollToEnd = () =>
     requestAnimationFrame(() => scrollRef.current?.scrollToEnd({ animated: true }));
 
-  const sendMessage = (text: string) => {
-    setMessages((prev) => [...prev, { id: `m${messageCounter++}`, text, sender: 'me' }]);
+  const send = (text: string) => {
+    if (!friendId) return;
+    sendMessage(friendId, { text });
     scrollToEnd();
   };
 
@@ -63,6 +78,7 @@ export default function FriendChatScreen() {
   };
 
   const pickPhotos = async () => {
+    if (!friendId) return;
     try {
       const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (!permission.granted) {
@@ -76,11 +92,7 @@ export default function FriendChatScreen() {
       });
 
       if (!result.canceled && result.assets.length > 0) {
-        const uri = result.assets[0].uri;
-        setMessages((prev) => [
-          ...prev,
-          { id: `m${messageCounter++}`, text: '', imageUri: uri, sender: 'me' },
-        ]);
+        sendMessage(friendId, { text: '', imageUri: result.assets[0].uri });
         scrollToEnd();
       }
     } catch (error) {
@@ -89,6 +101,7 @@ export default function FriendChatScreen() {
   };
 
   const pickFiles = async () => {
+    if (!friendId) return;
     try {
       const result = await DocumentPicker.getDocumentAsync({
         copyToCacheDirectory: true,
@@ -98,18 +111,13 @@ export default function FriendChatScreen() {
 
       if (!result.canceled && result.assets.length > 0) {
         const asset = result.assets[0];
-        setMessages((prev) => [
-          ...prev,
-          { id: `m${messageCounter++}`, text: '', fileName: asset.name, fileUri: asset.uri, sender: 'me' },
-        ]);
+        sendMessage(friendId, { text: '', fileName: asset.name, fileUri: asset.uri });
         scrollToEnd();
       }
     } catch (error) {
       Alert.alert('Unable to open files', String(error ?? 'Please try again.'));
     }
   };
-
-  const openAttachmentOptions = () => setAttachVisible(true);
 
   const refreshSuggestion = () => {
     setSuggestionIndex((i) => (i + 1) % MOTIVATIONAL_SUGGESTIONS.length);
@@ -121,7 +129,9 @@ export default function FriendChatScreen() {
         <Pressable
           style={({ pressed }) => [styles.backBtn, pressed && styles.pressed]}
           onPress={() => router.back()}
-          hitSlop={8}>
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel="Go back">
           <Text style={styles.backText}>Back</Text>
         </Pressable>
 
@@ -131,7 +141,7 @@ export default function FriendChatScreen() {
             <>
               <AppIcon name="fire" size={16} />
               <Text style={styles.headerStreak}>{friend.streak}</Text>
-              <Text style={styles.headerMood}>{friend.mood}</Text>
+              <Text style={styles.headerMood}>{friendMood(friend)}</Text>
             </>
           )}
         </View>
@@ -139,7 +149,9 @@ export default function FriendChatScreen() {
         <Pressable
           style={({ pressed }) => [styles.menuBtn, pressed && styles.pressed]}
           onPress={() => setOptionsVisible(true)}
-          hitSlop={8}>
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel="Friend options">
           <Ionicons name="ellipsis-vertical" size={20} color={Brand.text} />
         </Pressable>
       </View>
@@ -181,8 +193,8 @@ export default function FriendChatScreen() {
           <ChatInput
             value={draft}
             onChangeText={setDraft}
-            onSend={sendMessage}
-            onAttach={openAttachmentOptions}
+            onSend={send}
+            onAttach={() => setAttachVisible(true)}
           />
         </View>
       </KeyboardAvoidingView>
@@ -198,7 +210,15 @@ export default function FriendChatScreen() {
         visible={optionsVisible}
         friend={friend ?? null}
         onClose={() => setOptionsVisible(false)}
-        onSelect={(_option) => {
+        onTogglePin={(f) => togglePin(f.id)}
+        onMute={(f, duration) => muteFriend(f.id, duration)}
+        onUnmute={(f) => unmuteFriend(f.id)}
+        onRemove={(f) => {
+          removeFriend(f.id);
+          router.back();
+        }}
+        onBlock={(f) => {
+          removeFriend(f.id);
           router.back();
         }}
       />
