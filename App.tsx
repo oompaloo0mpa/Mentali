@@ -11,10 +11,14 @@ import { applyCheckIn, dateKey, emptyStreak, hasCheckedInToday } from '@/logic/s
 import {
   addHistoryRecord,
   clearCheckInData,
+  loadHistory,
   loadStreak,
+  loadTodaySnapshot,
   saveStreak,
+  saveTodaySnapshot,
 } from '@/storage/checkInStorage';
 import type {
+  CheckInRecord,
   MoodOption,
   RecordedAnswer,
   ScreenId,
@@ -32,9 +36,19 @@ export default function App() {
   const [phq4Result, setPhq4Result] = useState<WellbeingResult | null>(null);
   const [k10Result, setK10Result] = useState<WellbeingResult | null>(null);
   const [streak, setStreak] = useState<StreakState>(emptyStreak);
+  const [history, setHistory] = useState<CheckInRecord[]>([]);
 
   useEffect(() => {
     loadStreak().then(setStreak);
+    loadHistory().then(setHistory);
+
+    // Restore today's result so the summary stays available after a restart.
+    loadTodaySnapshot(dateKey()).then((snapshot) => {
+      if (!snapshot) return;
+      setMood(snapshot.mood);
+      setPhq4Result(snapshot.phq4);
+      setK10Result(snapshot.k10);
+    });
   }, []);
 
   const checkedInToday = useMemo(() => hasCheckedInToday(streak), [streak]);
@@ -52,26 +66,42 @@ export default function App() {
   };
 
   const handleComplete = async (answers: RecordedAnswer[]) => {
+    const today = dateKey();
+
     if (mode === 'phq4') {
       const result = scorePhq4(answers);
       setPhq4Result(result);
 
-      // Update streak once per day, then persist streak + a history record.
-      const today = dateKey();
+      // Update streak once per day, then persist streak, history, and snapshot.
       const nextStreak = applyCheckIn(streak, today);
       setStreak(nextStreak);
       saveStreak(nextStreak);
       if (mood) {
-        addHistoryRecord({
+        const next = await addHistoryRecord({
           date: today,
           moodId: mood.id,
           moodValue: mood.value,
           phq4Total: result.total,
           band: result.band.level,
         });
+        setHistory(next);
+        saveTodaySnapshot({ date: today, mood, phq4: result, k10: null });
       }
     } else {
-      setK10Result(scoreK10(answers));
+      const result = scoreK10(answers);
+      setK10Result(result);
+      if (mood && phq4Result) {
+        const next = await addHistoryRecord({
+          date: today,
+          moodId: mood.id,
+          moodValue: mood.value,
+          phq4Total: phq4Result.total,
+          band: phq4Result.band.level,
+          k10Total: result.total,
+        });
+        setHistory(next);
+        saveTodaySnapshot({ date: today, mood, phq4: phq4Result, k10: result });
+      }
     }
     setScreen('summary');
   };
@@ -79,6 +109,7 @@ export default function App() {
   const resetStreak = async () => {
     await clearCheckInData();
     setStreak(emptyStreak);
+    setHistory([]);
     setPhq4Result(null);
     setK10Result(null);
     setScreen('home');
@@ -95,6 +126,7 @@ export default function App() {
           streak={streak}
           checkedInToday={checkedInToday}
           hasResult={!!phq4Result}
+          history={history}
           onStart={startCheckIn}
           onViewSummary={() => setScreen('summary')}
           onResetStreak={resetStreak}

@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { Animated, Easing, StyleSheet, Text, View } from 'react-native';
 
+import { useReducedMotion } from '@/hooks/useReducedMotion';
 import { colors, radius, spacing, typography } from '@/theme/colors';
 
 export type BubbleRole = 'bot' | 'user';
@@ -15,17 +16,22 @@ interface Props {
 
 export function ChatBubble({ role, text, helper, animate = true }: Props) {
   const isBot = role === 'bot';
-  const enter = useRef(new Animated.Value(animate ? 0 : 1)).current;
+  const reducedMotion = useReducedMotion();
+  const shouldAnimate = animate && !reducedMotion;
+  const enter = useRef(new Animated.Value(shouldAnimate ? 0 : 1)).current;
 
   useEffect(() => {
-    if (!animate) return;
+    if (!shouldAnimate) {
+      enter.setValue(1);
+      return;
+    }
     Animated.timing(enter, {
       toValue: 1,
       duration: 260,
       easing: Easing.out(Easing.cubic),
       useNativeDriver: true,
     }).start();
-  }, [animate, enter]);
+  }, [shouldAnimate, enter]);
 
   const translateY = enter.interpolate({ inputRange: [0, 1], outputRange: [8, 0] });
 

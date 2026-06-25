@@ -114,6 +114,7 @@ function reducer(state: State, action: Action): State {
         dimension: q.dimension,
         value: action.option.value,
         label: action.option.label,
+        skipped: action.option.skip,
       };
 
       const isLast = state.step >= state.questions.length - 1;
@@ -177,8 +178,11 @@ export interface UseCheckInChat {
   totalQuestions: number;
   answerOptions: AnswerOption[];
   selectOption: (option: AnswerOption) => void;
+  skipQuestion: () => void;
   sendNote: (text: string) => void;
 }
+
+const SKIP_OPTION: AnswerOption = { label: 'Prefer not to say', value: 0, skip: true };
 
 export function useCheckInChat(mood: MoodOption, questions: CheckInQuestion[]): UseCheckInChat {
   const [state, dispatch] = useReducer(reducer, { mood, questions }, init);
@@ -207,6 +211,7 @@ export function useCheckInChat(mood: MoodOption, questions: CheckInQuestion[]): 
     totalQuestions: state.questions.length,
     answerOptions: currentQuestion ? currentQuestion.options : [],
     selectOption: (option) => dispatch({ type: 'ANSWER', option }),
+    skipQuestion: () => dispatch({ type: 'ANSWER', option: SKIP_OPTION }),
     sendNote: (text) => dispatch({ type: 'NOTE', text }),
   };
 }

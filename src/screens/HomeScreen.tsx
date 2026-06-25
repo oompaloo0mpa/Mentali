@@ -4,9 +4,10 @@ import { SafeAreaView } from 'react-native';
 
 import { EmojiPicker } from '@/components/mood/EmojiPicker';
 import { StreakBadge } from '@/components/streak/StreakBadge';
+import { TrendMiniView } from '@/components/wellbeing/TrendMiniView';
 import { PrimaryButton } from '@/components/common/PrimaryButton';
 import { COPY, USER_NAME } from '@/data/checkInContent';
-import type { MoodOption, StreakState } from '@/types/wellbeing';
+import type { CheckInRecord, MoodOption, StreakState } from '@/types/wellbeing';
 import { colors, radius, spacing, typography } from '@/theme/colors';
 
 interface Props {
@@ -16,6 +17,7 @@ interface Props {
   onViewSummary: () => void;
   onResetStreak: () => void;
   hasResult: boolean;
+  history: CheckInRecord[];
 }
 
 function todayLabel(): string {
@@ -33,6 +35,7 @@ export function HomeScreen({
   onViewSummary,
   onResetStreak,
   hasResult,
+  history,
 }: Props) {
   const [selected, setSelected] = useState<MoodOption | null>(null);
 
@@ -82,6 +85,10 @@ export function HomeScreen({
           )}
         </View>
 
+        <View style={styles.trend}>
+          <TrendMiniView history={history} />
+        </View>
+
         <Text style={styles.footer}>{COPY.disclaimer}</Text>
       </ScrollView>
     </SafeAreaView>
@@ -104,5 +111,6 @@ const styles = StyleSheet.create({
   cardTitle: { ...typography.heading, color: colors.textPrimary },
   cardHint: { ...typography.body, color: colors.textSecondary, marginTop: -spacing.sm },
   picker: { marginVertical: spacing.sm },
+  trend: { marginTop: spacing.sm },
   footer: { ...typography.caption, color: colors.textMuted, textAlign: 'center', marginTop: spacing.md },
 });

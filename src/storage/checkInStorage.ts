@@ -1,12 +1,13 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-import type { CheckInRecord, StreakState } from '@/types/wellbeing';
+import type { CheckInRecord, StreakState, TodaySnapshot } from '@/types/wellbeing';
 import { emptyStreak } from '@/logic/streak';
 
 /** AsyncStorage persistence for streak and check-in history. */
 
 const STREAK_KEY = 'mentali.streak.v1';
 const HISTORY_KEY = 'mentali.history.v1';
+const TODAY_KEY = 'mentali.today.v1';
 
 export async function loadStreak(): Promise<StreakState> {
   try {
@@ -34,10 +35,31 @@ export async function loadHistory(): Promise<CheckInRecord[]> {
   }
 }
 
-/** Clears streak and history (used by reset/testing flows). */
+/** Stores the full result for today so the summary survives an app restart. */
+export async function saveTodaySnapshot(snapshot: TodaySnapshot): Promise<void> {
+  try {
+    await AsyncStorage.setItem(TODAY_KEY, JSON.stringify(snapshot));
+  } catch {
+    // Non-fatal.
+  }
+}
+
+/** Returns the stored snapshot only when it belongs to `today`. */
+export async function loadTodaySnapshot(today: string): Promise<TodaySnapshot | null> {
+  try {
+    const raw = await AsyncStorage.getItem(TODAY_KEY);
+    if (!raw) return null;
+    const snapshot = JSON.parse(raw) as TodaySnapshot;
+    return snapshot.date === today ? snapshot : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Clears streak, history, and today's snapshot (used by reset/testing flows). */
 export async function clearCheckInData(): Promise<void> {
   try {
-    await AsyncStorage.multiRemove([STREAK_KEY, HISTORY_KEY]);
+    await AsyncStorage.multiRemove([STREAK_KEY, HISTORY_KEY, TODAY_KEY]);
   } catch {
     // Non-fatal.
   }

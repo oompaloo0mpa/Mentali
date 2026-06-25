@@ -1,12 +1,19 @@
 import React, { useEffect, useRef } from 'react';
 import { Animated, Easing, StyleSheet, View } from 'react-native';
 
+import { useReducedMotion } from '@/hooks/useReducedMotion';
 import { colors, radius, spacing } from '@/theme/colors';
 
 export function TypingIndicator() {
+  const reducedMotion = useReducedMotion();
   const dots = [useRef(new Animated.Value(0.3)).current, useRef(new Animated.Value(0.3)).current, useRef(new Animated.Value(0.3)).current];
 
   useEffect(() => {
+    if (reducedMotion) {
+      // Show steady dots instead of a pulsing loop.
+      dots.forEach((dot) => dot.setValue(0.7));
+      return;
+    }
     const animations = dots.map((dot, i) =>
       Animated.loop(
         Animated.sequence([
@@ -29,10 +36,10 @@ export function TypingIndicator() {
     animations.forEach((a) => a.start());
     return () => animations.forEach((a) => a.stop());
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [reducedMotion]);
 
   return (
-    <View style={styles.row}>
+    <View style={styles.row} accessibilityRole="text" accessibilityLabel="Typing">
       <View style={styles.bubble}>
         {dots.map((dot, i) => (
           <Animated.View key={i} style={[styles.dot, { opacity: dot, transform: [{ scale: dot }] }]} />

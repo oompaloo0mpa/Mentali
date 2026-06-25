@@ -1,4 +1,9 @@
-import type { AnswerOption, CheckInQuestion, MoodOption } from '@/types/wellbeing';
+import type {
+  AnswerOption,
+  CheckInQuestion,
+  MoodOption,
+  SupportResource,
+} from '@/types/wellbeing';
 
 /** Centralized copy and question content for the check-in flow. */
 
@@ -101,9 +106,28 @@ export const COPY = {
   beforeSummary: "That's everything — let me put together a gentle summary for you.",
   deeperInvite:
     'If you have another minute, we can do a slightly longer check-in. Totally optional.',
+  deeperInviteStrong:
+    'A few answers stood out today. A slightly longer check-in can give a clearer picture — only if you feel up to it.',
   disclaimer:
     'This is a supportive wellbeing check-in, not a diagnosis. If anything here worries you, please talk to someone you trust or a professional.',
 } as const;
 
 /** Quick replies shown as suggestion chips. */
 export const QUICK_REPLIES = ['Thank you!', 'Goodbye!', 'Actually...'] as const;
+
+/**
+ * Crisis and support contacts shown on the escalation card.
+ * Numbers vary by region — replace these defaults with local services.
+ */
+export const SUPPORT_RESOURCES: SupportResource[] = [
+  {
+    label: 'Emergency services',
+    description: 'If you feel unsafe or in danger right now.',
+    phone: '112',
+  },
+  {
+    label: 'Find a helpline',
+    description: 'Free, confidential support lines worldwide.',
+    url: 'https://findahelpline.com',
+  },
+];

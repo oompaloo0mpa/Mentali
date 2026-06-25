@@ -14,6 +14,8 @@ export interface AnswerOption {
   label: string;
   /** Numeric weight contributed to scoring. */
   value: number;
+  /** Marks a "prefer not to say" choice that is excluded from scoring. */
+  skip?: boolean;
 }
 
 export type ScaleKind = 'phq4' | 'k10';
@@ -36,6 +38,8 @@ export interface RecordedAnswer {
   dimension: Dimension;
   value: number;
   label: string;
+  /** True when the user chose not to answer; excluded from scoring. */
+  skipped?: boolean;
 }
 
 export type BandLevel = 'calm' | 'mild' | 'moderate' | 'high';
@@ -57,6 +61,10 @@ export interface WellbeingResult {
   moodScore?: number;
   /** Whether to surface additional support guidance. */
   suggestSupport: boolean;
+  /** How many items were answered (skipped items are excluded). */
+  answeredCount: number;
+  /** Total number of items in the scale. */
+  itemCount: number;
 }
 
 export interface CheckInRecord {
@@ -74,4 +82,25 @@ export interface StreakState {
   current: number;
   longest: number;
   lastCheckInDate: string | null;
+}
+
+/**
+ * Full snapshot of a day's check-in, persisted so the summary can be
+ * reopened after the app restarts.
+ */
+export interface TodaySnapshot {
+  date: string;
+  mood: MoodOption;
+  phq4: WellbeingResult;
+  k10: WellbeingResult | null;
+}
+
+/** A support contact shown on the escalation card. */
+export interface SupportResource {
+  label: string;
+  description?: string;
+  /** Phone number for a tel: link (digits and a leading + only). */
+  phone?: string;
+  /** Web address to open in the browser. */
+  url?: string;
 }

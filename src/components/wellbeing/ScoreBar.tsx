@@ -15,7 +15,11 @@ export function ScoreBar({ label, value, max, hint, color }: Props) {
   const pct = max === 0 ? 0 : Math.min(1, value / max);
 
   return (
-    <View style={styles.wrap}>
+    <View
+      style={styles.wrap}
+      accessibilityRole="progressbar"
+      accessibilityLabel={`${label}: ${hint}, ${value} out of ${max}`}
+    >
       <View style={styles.topRow}>
         <Text style={styles.label}>{label}</Text>
         <Text style={styles.hint}>{hint}</Text>

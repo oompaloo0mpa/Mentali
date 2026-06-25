@@ -43,10 +43,22 @@ export function CheckInChatScreen({
     return () => clearTimeout(id);
   }, [chat.messages.length, chat.typing, chat.awaiting, chat.finished]);
 
-  const chips: Chip[] = chat.answerOptions.map((opt, i) => ({
-    key: `${opt.label}-${i}`,
-    label: opt.label,
-  }));
+  const SKIP_KEY = 'skip';
+  const chips: Chip[] = [
+    ...chat.answerOptions.map((opt, i) => ({ key: `opt-${i}`, label: opt.label })),
+    { key: SKIP_KEY, label: 'Prefer not to say', muted: true },
+  ];
+
+  const handleChip = (chip: Chip) => {
+    if (chip.key === SKIP_KEY) {
+      chat.skipQuestion();
+      return;
+    }
+    const idx = Number(chip.key.replace('opt-', ''));
+    if (!Number.isNaN(idx) && chat.answerOptions[idx]) {
+      chat.selectOption(chat.answerOptions[idx]);
+    }
+  };
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -84,14 +96,8 @@ export function CheckInChatScreen({
           ) : null}
         </ScrollView>
 
-        {chat.awaiting && chips.length > 0 ? (
-          <SuggestionChips
-            chips={chips}
-            onSelect={(chip) => {
-              const idx = chips.findIndex((c) => c.key === chip.key);
-              if (idx >= 0) chat.selectOption(chat.answerOptions[idx]);
-            }}
-          />
+        {chat.awaiting && chat.answerOptions.length > 0 ? (
+          <SuggestionChips chips={chips} onSelect={handleChip} />
         ) : null}
 
         <ChatInput onSend={chat.sendNote} disabled={chat.typing} />

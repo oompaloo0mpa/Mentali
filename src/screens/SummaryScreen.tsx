@@ -9,7 +9,7 @@ import { Disclaimer } from '@/components/wellbeing/Disclaimer';
 import { PrimaryButton } from '@/components/common/PrimaryButton';
 import { bandColor } from '@/components/wellbeing/bandColor';
 import { COPY } from '@/data/checkInContent';
-import { subscaleLabel } from '@/logic/wellbeing';
+import { reflectionLine, shouldRecommendDeeper, subscaleLabel } from '@/logic/wellbeing';
 import type { MoodOption, StreakState, WellbeingResult } from '@/types/wellbeing';
 import { colors, radius, spacing, typography } from '@/theme/colors';
 
@@ -26,6 +26,8 @@ interface Props {
 
 export function SummaryScreen({ mood, streak, phq4, k10, onDeeper, onDone }: Props) {
   const suggestSupport = phq4.suggestSupport || (k10?.suggestSupport ?? false);
+  const recommendDeeper = shouldRecommendDeeper(phq4);
+  const reflection = reflectionLine(mood, phq4, k10);
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -43,7 +45,15 @@ export function SummaryScreen({ mood, streak, phq4, k10, onDeeper, onDone }: Pro
           </View>
         </View>
 
+        <Text style={styles.reflection}>{reflection}</Text>
+
         <BandCard result={phq4} />
+
+        {phq4.answeredCount < phq4.itemCount ? (
+          <Text style={styles.partial}>
+            Based on {phq4.answeredCount} of {phq4.itemCount} answers.
+          </Text>
+        ) : null}
 
         <View style={styles.bars}>
           <ScoreBar
@@ -68,12 +78,24 @@ export function SummaryScreen({ mood, streak, phq4, k10, onDeeper, onDone }: Pro
 
         <View style={styles.actions}>
           {!k10 ? (
-            <PrimaryButton label="Do a deeper check-in (optional)" variant="ghost" onPress={onDeeper} />
+            <PrimaryButton
+              label={recommendDeeper ? 'Take a deeper check-in' : 'Do a deeper check-in (optional)'}
+              variant={recommendDeeper ? 'solid' : 'ghost'}
+              onPress={onDeeper}
+            />
           ) : null}
-          <PrimaryButton label="Done for today" onPress={onDone} />
+          <PrimaryButton
+            label="Done for today"
+            variant={!k10 && recommendDeeper ? 'soft' : 'solid'}
+            onPress={onDone}
+          />
         </View>
 
-        {!k10 ? <Text style={styles.deeperHint}>{COPY.deeperInvite}</Text> : null}
+        {!k10 ? (
+          <Text style={styles.deeperHint}>
+            {recommendDeeper ? COPY.deeperInviteStrong : COPY.deeperInvite}
+          </Text>
+        ) : null}
 
         <Disclaimer />
       </ScrollView>
@@ -97,6 +119,8 @@ const styles = StyleSheet.create({
   content: { padding: spacing.lg, paddingBottom: spacing.xxl, gap: spacing.lg },
   flex: { flex: 1 },
   title: { ...typography.title, color: colors.textPrimary },
+  reflection: { ...typography.body, color: colors.textSecondary },
+  partial: { ...typography.caption, color: colors.textMuted, marginTop: -spacing.sm },
   todayRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   todayEmoji: { fontSize: 40 },
   todayMood: { ...typography.subheading, color: colors.textPrimary },

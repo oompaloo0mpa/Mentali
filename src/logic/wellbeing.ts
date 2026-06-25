@@ -1,5 +1,6 @@
 import type {
   BandLevel,
+  MoodOption,
   RecordedAnswer,
   WellbeingBand,
   WellbeingResult,
@@ -65,12 +66,18 @@ const K10_BANDS: Record<BandLevel, WellbeingBand> = {
 /** PHQ-4 style scoring: 4 items, 0-3 each, total 0-12. */
 export function scorePhq4(answers: RecordedAnswer[]): WellbeingResult {
   const phq = answers.filter((a) => a.scale === 'phq4');
-  const total = sum(phq.map((a) => a.value));
-  const anxietyScore = sum(
-    phq.filter((a) => a.dimension === 'anxiety').map((a) => a.value),
+  const itemCount = phq.length;
+  const answered = phq.filter((a) => !a.skipped);
+
+  // Prorate over the full item set so skipped answers do not deflate the score.
+  const total = prorate(answered.map((a) => a.value), itemCount);
+  const anxietyScore = prorate(
+    answered.filter((a) => a.dimension === 'anxiety').map((a) => a.value),
+    phq.filter((a) => a.dimension === 'anxiety').length,
   );
-  const moodScore = sum(
-    phq.filter((a) => a.dimension === 'mood').map((a) => a.value),
+  const moodScore = prorate(
+    answered.filter((a) => a.dimension === 'mood').map((a) => a.value),
+    phq.filter((a) => a.dimension === 'mood').length,
   );
 
   // PHQ-4 cut points: 0-2, 3-5, 6-8, 9-12.
@@ -91,13 +98,17 @@ export function scorePhq4(answers: RecordedAnswer[]): WellbeingResult {
     anxietyScore,
     moodScore,
     suggestSupport,
+    answeredCount: answered.length,
+    itemCount,
   };
 }
 
 /** K10 style scoring: 10 items, 1-5 each, total 10-50. */
 export function scoreK10(answers: RecordedAnswer[]): WellbeingResult {
   const k10 = answers.filter((a) => a.scale === 'k10');
-  const total = sum(k10.map((a) => a.value));
+  const itemCount = k10.length;
+  const answered = k10.filter((a) => !a.skipped);
+  const total = prorate(answered.map((a) => a.value), itemCount);
 
   // Common K10 bands: 10-19, 20-24, 25-29, 30-50.
   let level: BandLevel = 'calm';
@@ -111,7 +122,38 @@ export function scoreK10(answers: RecordedAnswer[]): WellbeingResult {
     maxTotal: 50,
     band: K10_BANDS[level],
     suggestSupport: level === 'moderate' || level === 'high',
+    answeredCount: answered.length,
+    itemCount,
   };
+}
+
+/** Whether the PHQ-4 result warrants strongly recommending the K10 flow. */
+export function shouldRecommendDeeper(phq4: WellbeingResult): boolean {
+  return phq4.suggestSupport;
+}
+
+/** A short, personalized summary line combining mood and the leading concern. */
+export function reflectionLine(
+  mood: MoodOption,
+  phq4: WellbeingResult,
+  k10: WellbeingResult | null,
+): string {
+  const level = (k10 ?? phq4).band.level;
+  const anxiety = phq4.anxietyScore ?? 0;
+  const low = phq4.moodScore ?? 0;
+
+  let focus = '';
+  if (anxiety > low && anxiety >= 3) focus = ', and worry seems to be the louder part today';
+  else if (low > anxiety && low >= 3) focus = ', and low mood seems to be weighing on you';
+
+  const suggestion: Record<BandLevel, string> = {
+    calm: 'Keep doing what works — a quick check-in tomorrow keeps the momentum.',
+    mild: 'A small reset, like a short walk or a chat, can help.',
+    moderate: 'Sharing how you feel with someone you trust could lighten the load.',
+    high: 'Please consider reaching out to someone you trust or a professional soon.',
+  };
+
+  return `You checked in feeling ${mood.label.toLowerCase()}${focus}. ${suggestion[level]}`;
 }
 
 /** Plain-language label for a 0-6 sub-score. */
@@ -122,6 +164,9 @@ export function subscaleLabel(score: number): string {
   return 'Minimal';
 }
 
-function sum(values: number[]): number {
-  return values.reduce((acc, n) => acc + n, 0);
+/** Mean of answered values scaled to the full item count, rounded. */
+function prorate(values: number[], itemCount: number): number {
+  if (values.length === 0 || itemCount === 0) return 0;
+  const mean = values.reduce((acc, n) => acc + n, 0) / values.length;
+  return Math.round(mean * itemCount);
 }
