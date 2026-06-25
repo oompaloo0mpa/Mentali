@@ -1,30 +1,22 @@
 import { Platform } from 'react-native';
 
-/**
- * Mentali brand palette.
- * The Social + Chat screens use a fixed dark theme with magenta accents,
- * matching the product mockups, so these tokens are referenced directly.
- */
+/** Brand palette for the dark Social and Chat screens. */
 export const Brand = {
-  // Surfaces
   background: '#262626',
   surface: '#1F1F1F',
   surfaceElevated: '#171717',
   divider: '#3A3A3A',
 
-  // Magenta / pink family
-  magenta: '#D81B9C', // friend code border, search, bottom bar
-  magentaDeep: '#A8228F', // outgoing chat bubble
-  pink: '#F178AE', // send buttons, "Back" button
-  pinkBubble: '#EE8FB8', // incoming chat bubble
+  magenta: '#D81B9C',
+  magentaDeep: '#A8228F',
+  pink: '#F178AE',
+  pinkBubble: '#EE8FB8',
 
-  // Text
   text: '#FFFFFF',
   textSecondary: '#B8B8B8',
   textMuted: '#8A8A8A',
   textOnBubble: '#FFFFFF',
 
-  // Status / accents
   fire: '#FF7A1A',
   diamond: '#E0119D',
   gem: '#34B7F1',
@@ -33,12 +25,11 @@ export const Brand = {
   danger: '#E53935',
 } as const;
 
-/** Streak-pet flame colours, unlocked at a 10-day streak. */
 export const StreakColors = {
-  orange: '#FF7A1A', // 10-99
-  blue: '#34B7F1', // 100-249
-  purple: '#9B59B6', // 250-499
-  rainbow: '#FF4FD8', // 500+ (rendered with a glow as a stand-in for the rainbow flame)
+  orange: '#FF7A1A',
+  blue: '#34B7F1',
+  purple: '#9B59B6',
+  rainbow: '#FF4FD8',
 } as const;
 
 export function getStreakColor(streak: number): string {
@@ -48,7 +39,6 @@ export function getStreakColor(streak: number): string {
   return StreakColors.orange;
 }
 
-/** Consistent spacing scale (in px). */
 export const Spacing = {
   half: 4,
   one: 8,
@@ -90,11 +80,7 @@ export const Fonts = Platform.select({
   },
 });
 
-/**
- * Light/Dark token sets consumed by the generic ThemedText / ThemedView
- * components. The app is dark-first, so both schemes lean dark to match the
- * mockups while keeping the themed components fully functional.
- */
+/** Light/dark tokens for ThemedText and ThemedView. Both schemes use the dark palette. */
 export const Colors = {
   light: {
     text: Brand.text,

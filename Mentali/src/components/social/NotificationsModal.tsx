@@ -10,7 +10,6 @@ type Props = {
   onClose: () => void;
 };
 
-/** Notifications panel opened from the top-bar bell button. */
 export function NotificationsModal({ visible, onClose }: Props) {
   const insets = useSafeAreaInsets();
 

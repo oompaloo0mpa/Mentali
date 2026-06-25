@@ -5,17 +5,12 @@ import { getStreakColor } from '@/constants/theme';
 
 type Props = {
   streak: number;
-  /** Today's streak task done → happy face, otherwise sad. */
   done?: boolean;
   onPress?: () => void;
   size?: number;
 };
 
-/**
- * Streak pet flame. Unlocks at a 10-day streak; colour scales with the streak,
- * and the mood face reflects whether today's streak is done. Tapping it opens
- * the streak guide.
- */
+/** Unlocks at 10 days; colour scales with streak. Tap opens the streak guide. */
 export function StreakPet({ streak, done = true, onPress, size = 56 }: Props) {
   if (streak < 10) return null;
 
@@ -29,7 +24,6 @@ export function StreakPet({ streak, done = true, onPress, size = 56 }: Props) {
       <View style={[styles.glow, { shadowColor: color }]}>
         <FlameIcon streak={streak} size={size} />
       </View>
-      {/* Artwork is already happy; show a sad badge only when the streak lapses. */}
       {!done && (
         <View style={styles.moodBadge}>
           <Text style={styles.moodText}>😢</Text>

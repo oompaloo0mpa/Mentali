@@ -20,12 +20,10 @@ const OPTIONS: { key: FriendOption; label: string; danger?: boolean }[] = [
   { key: 'archive', label: 'Archive' },
 ];
 
-/** Long-press menu for a friend: Remove / Mute / Block / Archive. */
 export function FriendOptionsModal({ visible, friend, onClose, onSelect }: Props) {
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose}>
-        {/* Stop propagation so taps on the card don't dismiss it. */}
         <Pressable style={styles.card} onPress={() => {}}>
           {OPTIONS.map((opt, index) => (
             <Fragment key={opt.key}>

@@ -6,7 +6,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { Brand } from '@/constants/theme';
 
-// App is dark-first; extend the navigation dark theme with our background.
+// Dark-first: align the navigation theme with our background.
 const navTheme = {
   ...DarkTheme,
   colors: { ...DarkTheme.colors, background: Brand.background, card: Brand.background },

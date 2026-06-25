@@ -7,7 +7,6 @@ type Props = {
   size?: number;
 };
 
-/** Circular placeholder avatar (grey circle with a person glyph). */
 export function Avatar({ size = 44 }: Props) {
   return (
     <View

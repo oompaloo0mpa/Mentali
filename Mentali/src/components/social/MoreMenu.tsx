@@ -22,13 +22,11 @@ const ITEMS: Item[] = [
   { key: 'logout', label: 'Logout', icon: 'log-out' },
 ];
 
-/** Top-right dropdown: Statistics / Settings / Logout. */
 export function MoreMenu({ visible, onClose, onSelect }: Props) {
   const insets = useSafeAreaInsets();
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      {/* Tapping anywhere outside the card closes the menu. */}
       <Pressable style={styles.backdrop} onPress={onClose}>
         <View style={[styles.card, { marginTop: insets.top + 56 }]}>
           <Pressable style={styles.closeRow} onPress={onClose} hitSlop={8}>

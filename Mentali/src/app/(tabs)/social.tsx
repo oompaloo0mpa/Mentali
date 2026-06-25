@@ -59,7 +59,7 @@ export default function SocialScreen() {
     if (option === 'remove' || option === 'block' || option === 'archive') {
       setFriends((prev) => prev.filter((f) => f.id !== friend.id));
     }
-    // "mute" would toggle a flag once persistence is wired up.
+    // Mute is not persisted yet.
   };
 
   return (

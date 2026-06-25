@@ -1,6 +1,5 @@
 import { Image } from 'expo-image';
 
-// Custom raster icons used in the stat bar and streak displays.
 const SOURCES = {
   fire: require('@/assets/images/icons/fire.png'),
   diamond: require('@/assets/images/icons/diamond.png'),

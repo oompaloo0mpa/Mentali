@@ -11,7 +11,6 @@ type Props = {
   onReject?: (id: string) => void;
 };
 
-/** Incoming friend request row with green accept / red reject buttons. */
 export function RequestRow({ request, onAccept, onReject }: Props) {
   return (
     <View style={styles.row}>

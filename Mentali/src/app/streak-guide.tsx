@@ -6,7 +6,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { FlameIcon } from '@/components/chat/FlameIcon';
 import { Brand, Radius, Spacing } from '@/constants/theme';
 
-// Sample streak values that fall into each colour tier, for the guide art.
 const TIERS = [
   { streak: 150, label: '100 - 249' },
   { streak: 300, label: '250-499' },

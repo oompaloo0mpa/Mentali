@@ -7,12 +7,10 @@ import { Brand, Radius } from '@/constants/theme';
 type Props = {
   onSend: (text: string) => void;
   onAttach?: () => void;
-  /** Controlled value, e.g. when a suggestion is inserted. */
   value?: string;
   onChangeText?: (text: string) => void;
 };
 
-/** Bottom composer: attach (+), text field, send. Supports controlled value. */
 export function ChatInput({ onSend, onAttach, value, onChangeText }: Props) {
   const [internal, setInternal] = useState('');
   const isControlled = value !== undefined;

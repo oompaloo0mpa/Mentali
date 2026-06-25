@@ -11,7 +11,6 @@ type Props = {
   onPickFiles: () => void;
 };
 
-/** Bottom sheet shown when tapping the chat "+": Add photos or files. */
 export function AttachmentSheet({ visible, onClose, onPickPhotos, onPickFiles }: Props) {
   const insets = useSafeAreaInsets();
   if (!visible) return null;

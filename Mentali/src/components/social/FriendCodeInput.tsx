@@ -8,7 +8,6 @@ type Props = {
   onSubmit?: (code: string) => void;
 };
 
-/** Magenta-outlined "Friend code" field with a pink send button. */
 export function FriendCodeInput({ onSubmit }: Props) {
   const [code, setCode] = useState('');
 

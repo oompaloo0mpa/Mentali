@@ -3,10 +3,7 @@ import { Tabs } from 'expo-router';
 
 import { Brand } from '@/constants/theme';
 
-/**
- * Bottom tab bar (magenta) matching the mockup: Home, Friends, Stats,
- * Journal, Profile. Only the Friends tab is fully built on this branch.
- */
+/** Tab bar styled to match the product mockups. Only Friends is fully implemented. */
 export default function TabsLayout() {
   return (
     <Tabs

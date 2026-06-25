@@ -2,8 +2,7 @@ import { useEffect, useState } from 'react';
 import { useColorScheme as useRNColorScheme } from 'react-native';
 
 /**
- * On web the color scheme is only correct after hydration, so we wait for the
- * component to mount before trusting the value.
+ * On web, the color scheme is unreliable until after hydration.
  */
 export function useColorScheme() {
   const [hasHydrated, setHasHydrated] = useState(false);

@@ -1,15 +1,12 @@
-/**
- * In-memory mock data for the Friends feature.
- * Replace with API/store calls when the backend is wired up.
- */
+/** In-memory mock data for Friends. Replace with API calls when the backend is ready. */
 
 export type Friend = {
   id: string;
   name: string;
   streak: number;
-  mood: string; // emoji
+  mood: string;
   lastSeen: string;
-  /** Whether today's shared streak task is done (drives the pet's happy/sad face). */
+  /** Drives the streak pet's happy or sad mood. */
   streakDone: boolean;
 };
 
@@ -20,14 +17,10 @@ export type FriendRequest = {
 
 export type ChatMessage = {
   id: string;
-  /** Empty string for attachment-only messages. */
   text: string;
-  /** Local/remote image URI for photo attachments. */
   imageUri?: string;
-  /** File attachment (documents, etc.). */
   fileName?: string;
   fileUri?: string;
-  /** "them" = incoming (left), "me" = outgoing (right) */
   sender: 'me' | 'them';
 };
 
@@ -64,7 +57,6 @@ export const INITIAL_MESSAGES: ChatMessage[] = [
   { id: 'm4', text: 'No worries, I am always here if you change your mind!', sender: 'them' },
 ];
 
-/** Auto-generated motivational suggestions; the refresh button cycles through these. */
 export const MOTIVATIONAL_SUGGESTIONS: string[] = [
   'Don’t give up! I am so proud of you!',
   'You’ve got this — one small step at a time.',

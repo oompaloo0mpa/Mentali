@@ -12,7 +12,6 @@ type Props = {
   onPressMenu?: () => void;
 };
 
-/** Top bar: streak / diamond / gem counters plus the notification + menu buttons. */
 export function StatBar({ fire, diamonds, gems, onPressNotifications, onPressMenu }: Props) {
   return (
     <View style={styles.container}>

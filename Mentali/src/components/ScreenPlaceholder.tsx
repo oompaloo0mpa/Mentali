@@ -9,7 +9,7 @@ type Props = {
   icon: keyof typeof Ionicons.glyphMap;
 };
 
-/** Lightweight placeholder for tabs owned by other branches/teammates. */
+/** Placeholder for tabs not yet implemented on this branch. */
 export function ScreenPlaceholder({ title, icon }: Props) {
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>

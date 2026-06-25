@@ -5,7 +5,6 @@ type Props = {
   size?: number;
 };
 
-// Streak-pet artwork per tier (transparent PNGs).
 const SOURCES = {
   orange: require('@/assets/images/streak/orange.png'),
   blue: require('@/assets/images/streak/blue.png'),
@@ -22,10 +21,7 @@ export function getStreakTier(streak: number): StreakTier {
   return 'orange';
 }
 
-/**
- * Streak-pet flame whose artwork reflects the streak tier:
- * orange (10-99) → blue (100-249) → purple (250-499) → rainbow (500+).
- */
+/** Streak flame artwork by tier: orange, blue, purple, then rainbow. */
 export function FlameIcon({ streak, size = 64 }: Props) {
   return (
     <Image

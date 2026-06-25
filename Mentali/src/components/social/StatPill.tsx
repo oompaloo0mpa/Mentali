@@ -9,7 +9,6 @@ type Props = {
   color: string;
 };
 
-/** A single top-bar stat, e.g. fire icon + 67. */
 export function StatPill({ icon, value, color }: Props) {
   return (
     <View style={styles.row}>

@@ -9,7 +9,6 @@ type Props = {
   message: ChatMessage;
 };
 
-/** Chat bubble: incoming (pink, left) or outgoing (magenta, right). Supports image + file attachments. */
 export function ChatBubble({ message }: Props) {
   const isMe = message.sender === 'me';
   const hasImage = !!message.imageUri;

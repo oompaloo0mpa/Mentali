@@ -9,7 +9,6 @@ type Props = {
   onRefresh?: () => void;
 };
 
-/** Auto-generated motivational suggestion pill + refresh button. */
 export function SuggestionBar({ suggestion, onUse, onRefresh }: Props) {
   return (
     <View style={styles.container}>

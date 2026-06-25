@@ -56,13 +56,12 @@ export default function FriendChatScreen() {
 
   const runAttachmentAction = (action: () => Promise<void>) => {
     setAttachVisible(false);
-    // Keep a tiny delay so the sheet visually dismisses before native UI opens.
+    // Let the sheet dismiss before opening the native picker.
     setTimeout(() => {
       void action();
     }, 80);
   };
 
-  // Pick an image from the library and send it as an attachment message.
   const pickPhotos = async () => {
     try {
       const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -89,7 +88,6 @@ export default function FriendChatScreen() {
     }
   };
 
-  // Pick a document/file and send it as an attachment message.
   const pickFiles = async () => {
     try {
       const result = await DocumentPicker.getDocumentAsync({
@@ -119,7 +117,6 @@ export default function FriendChatScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
-      {/* Header */}
       <View style={styles.header}>
         <Pressable
           style={({ pressed }) => [styles.backBtn, pressed && styles.pressed]}
@@ -164,7 +161,6 @@ export default function FriendChatScreen() {
             ))}
           </ScrollView>
 
-          {/* Streak pet floats in the bottom-right corner of the chat area. */}
           {friend && (
             <View style={styles.petWrap} pointerEvents="box-none">
               <StreakPet
@@ -203,7 +199,6 @@ export default function FriendChatScreen() {
         friend={friend ?? null}
         onClose={() => setOptionsVisible(false)}
         onSelect={(_option) => {
-          // After removing/blocking/archiving, return to the friends list.
           router.back();
         }}
       />

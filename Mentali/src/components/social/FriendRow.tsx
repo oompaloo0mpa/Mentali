@@ -12,7 +12,7 @@ type Props = {
   onLongPress?: (friend: Friend) => void;
 };
 
-/** Friend list item. Tap opens the chat; long-press opens friend options. */
+/** Tap opens chat; long-press opens friend options. */
 export function FriendRow({ friend, onPress, onLongPress }: Props) {
   return (
     <Pressable

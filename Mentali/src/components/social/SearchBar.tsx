@@ -7,7 +7,6 @@ type Props = {
   onChangeText: (text: string) => void;
 };
 
-/** Magenta-bordered search field for the friends list. */
 export function SearchBar({ value, onChangeText }: Props) {
   return (
     <TextInput
