@@ -11,7 +11,6 @@ interface Props {
   color: string;
 }
 
-/** A soft horizontal bar for a single sub-scale (e.g. anxiety / mood). */
 export function ScoreBar({ label, value, max, hint, color }: Props) {
   const pct = max === 0 ? 0 : Math.min(1, value / max);
 

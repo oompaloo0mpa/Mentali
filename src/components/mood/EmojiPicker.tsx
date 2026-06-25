@@ -11,7 +11,6 @@ interface Props {
   disabled?: boolean;
 }
 
-/** One-tap daily mood selector that kicks off the check-in. */
 export function EmojiPicker({ selectedId, onSelect, disabled }: Props) {
   return (
     <View style={styles.row}>

@@ -3,10 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { CheckInRecord, StreakState } from '@/types/wellbeing';
 import { emptyStreak } from '@/logic/streak';
 
-/**
- * Thin persistence layer over AsyncStorage (bundled with Expo Go).
- * Everything degrades gracefully: a storage failure never crashes the UI.
- */
+/** AsyncStorage persistence for streak and check-in history. */
 
 const STREAK_KEY = 'mentali.streak.v1';
 const HISTORY_KEY = 'mentali.history.v1';
@@ -24,7 +21,7 @@ export async function saveStreak(state: StreakState): Promise<void> {
   try {
     await AsyncStorage.setItem(STREAK_KEY, JSON.stringify(state));
   } catch {
-    // Non-fatal: the in-memory state still drives the current session.
+    // Non-fatal: keep the current session running.
   }
 }
 
@@ -37,7 +34,7 @@ export async function loadHistory(): Promise<CheckInRecord[]> {
   }
 }
 
-/** Wipe streak + history (used for testing the flow from a clean slate). */
+/** Clears streak and history (used by reset/testing flows). */
 export async function clearCheckInData(): Promise<void> {
   try {
     await AsyncStorage.multiRemove([STREAK_KEY, HISTORY_KEY]);
@@ -48,7 +45,7 @@ export async function clearCheckInData(): Promise<void> {
 
 export async function addHistoryRecord(record: CheckInRecord): Promise<CheckInRecord[]> {
   const history = await loadHistory();
-  // Keep one record per day (latest wins) and cap to the last 60 days.
+  // Keep one record per day and limit history size.
   const next = [record, ...history.filter((r) => r.date !== record.date)].slice(0, 60);
   try {
     await AsyncStorage.setItem(HISTORY_KEY, JSON.stringify(next));

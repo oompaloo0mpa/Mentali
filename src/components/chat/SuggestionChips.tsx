@@ -14,7 +14,6 @@ interface Props {
   disabled?: boolean;
 }
 
-/** Horizontally scrollable answer / quick-reply chips (matches screenshot). */
 export function SuggestionChips({ chips, onSelect, disabled }: Props) {
   if (chips.length === 0) return null;
 

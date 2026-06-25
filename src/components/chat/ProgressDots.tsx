@@ -5,11 +5,10 @@ import { colors, radius, spacing, typography } from '@/theme/colors';
 
 interface Props {
   total: number;
-  /** Number of completed questions (0..total). */
+  /** Number of completed questions, from 0 to total. */
   completed: number;
 }
 
-/** Slim progress track + "x of y" label shown under the chat header. */
 export function ProgressDots({ total, completed }: Props) {
   const pct = total === 0 ? 0 : Math.min(1, completed / total);
 

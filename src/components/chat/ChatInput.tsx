@@ -9,7 +9,6 @@ interface Props {
   disabled?: boolean;
 }
 
-/** The magenta bottom bar with a "+" affordance, text field and send arrow. */
 export function ChatInput({ onSend, placeholder = "What's on your mind?", disabled }: Props) {
   const [value, setValue] = useState('');
 

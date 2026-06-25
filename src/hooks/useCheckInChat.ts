@@ -9,9 +9,8 @@ import type {
 } from '@/types/wellbeing';
 
 /**
- * Drives the scripted check-in conversation: it reveals bot messages one at a
- * time (with a typing pause), records answers, and signals when the flow is
- * complete. Pure state lives in a reducer; a single effect handles the timer.
+ * Manages the scripted check-in conversation.
+ * State transitions stay in the reducer; one effect controls reveal timing.
  */
 
 export interface ChatMessage {
@@ -27,10 +26,10 @@ interface State {
   messages: ChatMessage[];
   queue: ChatMessage[];
   typing: boolean;
-  step: number; // index of the question currently being asked
+  step: number;
   answers: RecordedAnswer[];
-  awaiting: boolean; // waiting for the user to tap an option
-  pendingQuestion: boolean; // a question is queued but not yet answered
+  awaiting: boolean;
+  pendingQuestion: boolean;
   finished: boolean;
   ackIndex: number;
   nextId: number;
@@ -70,7 +69,6 @@ function init(args: { mood: MoodOption; questions: CheckInQuestion[] }): State {
     nextId: 0,
   };
 
-  // Welcome messages, then the first question.
   const welcome1: ChatMessage = { id: 'm0', role: 'bot', text: COPY.greeting };
   const welcome2: ChatMessage = {
     id: 'm1',
@@ -146,7 +144,7 @@ function reducer(state: State, action: Action): State {
     }
 
     case 'NOTE': {
-      // Free-text is logged as a user note + gentle nudge, without scoring.
+      // Notes are acknowledged but do not affect scores.
       const userMsg = makeMessage(state, 'user', action.text);
       const nudge: ChatMessage = {
         id: `m${state.nextId + 1}`,
@@ -185,7 +183,7 @@ export interface UseCheckInChat {
 export function useCheckInChat(mood: MoodOption, questions: CheckInQuestion[]): UseCheckInChat {
   const [state, dispatch] = useReducer(reducer, { mood, questions }, init);
 
-  // Single timer effect: when something is queued, "type" then reveal it.
+  // Reveal queued bot messages with a short typing delay.
   useEffect(() => {
     if (state.queue.length === 0) return;
     if (!state.typing) {

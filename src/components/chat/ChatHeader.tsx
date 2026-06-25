@@ -11,7 +11,6 @@ interface Props {
   completed?: number;
 }
 
-/** Chat screen header: caption title, pink Back pill, optional progress. */
 export function ChatHeader({ title, onBack, total, completed }: Props) {
   const showProgress = typeof total === 'number' && typeof completed === 'number' && total > 0;
 

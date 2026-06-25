@@ -1,16 +1,10 @@
 import type { AnswerOption, CheckInQuestion, MoodOption } from '@/types/wellbeing';
 
-/**
- * All user-facing copy + question content for the check-in flow lives here so
- * it is easy to tweak tone without touching UI code.
- *
- * The questions are *inspired* by PHQ-4 and K10 but deliberately reworded into
- * short, app-friendly language. We never present them as a medical test.
- */
+/** Centralized copy and question content for the check-in flow. */
 
 export const USER_NAME = 'Jayden';
 
-/** Today's one-tap mood picker (drives the emoji streak). */
+/** One-tap mood options used for daily check-ins. */
 export const MOODS: MoodOption[] = [
   { id: 'great', emoji: '😄', label: 'Great', value: 4 },
   { id: 'good', emoji: '🙂', label: 'Good', value: 3 },
@@ -19,11 +13,7 @@ export const MOODS: MoodOption[] = [
   { id: 'rough', emoji: '😢', label: 'Rough', value: 0 },
 ];
 
-/**
- * Shared 0-3 frequency scale for the brief (PHQ-4 style) daily questions.
- * Standard PHQ-4 wording is "Not at all / Several days / More than half the
- * days / Nearly every day" — softened here.
- */
+/** Shared 0-3 response scale for the short check-in questions. */
 const FREQUENCY_0_3: AnswerOption[] = [
   { label: 'Not really', value: 0 },
   { label: 'A little', value: 1 },
@@ -31,10 +21,7 @@ const FREQUENCY_0_3: AnswerOption[] = [
   { label: 'A lot', value: 3 },
 ];
 
-/**
- * The default daily flow: 4 short questions (PHQ-4 inspired).
- * Items 1-2 lean anxiety, items 3-4 lean low mood. Total range 0-12.
- */
+/** Default daily flow: 4 short questions, total score 0-12. */
 export const PHQ4_QUESTIONS: CheckInQuestion[] = [
   {
     id: 'phq4_anx_1',
@@ -68,10 +55,7 @@ export const PHQ4_QUESTIONS: CheckInQuestion[] = [
   },
 ];
 
-/**
- * Optional deeper check-in (K10 inspired): 10 items, each 1-5, total 10-50.
- * Offered only after the brief flow, never forced.
- */
+/** Optional deeper flow: 10 questions, each scored 1-5 (total 10-50). */
 const FREQUENCY_1_5: AnswerOption[] = [
   { label: 'None of the time', value: 1 },
   { label: 'A little', value: 2 },
@@ -99,7 +83,6 @@ export const K10_QUESTIONS: CheckInQuestion[] = [
   options: FREQUENCY_1_5,
 }));
 
-/** Conversational copy used to make the flow feel warm, not clinical. */
 export const COPY = {
   greeting: `Hey there, ${USER_NAME}! I'm here to check in with you.`,
   intro: 'Want to talk a little about how today has been?',
@@ -108,7 +91,7 @@ export const COPY = {
   moodPrompt: 'First, which emoji feels closest to your day?',
   moodThanks: (label: string, emoji: string) =>
     `Thanks for sharing ${emoji} — let's keep it light. Just a few quick taps.`,
-  // Gentle acknowledgements rotated between questions.
+  // Rotated between questions to keep the flow conversational.
   acks: [
     'Thanks for being honest.',
     'Got it — no right or wrong answers here.',
@@ -122,5 +105,5 @@ export const COPY = {
     'This is a supportive wellbeing check-in, not a diagnosis. If anything here worries you, please talk to someone you trust or a professional.',
 } as const;
 
-/** Free-text quick replies shown as chips (matches the screenshot). */
+/** Quick replies shown as suggestion chips. */
 export const QUICK_REPLIES = ['Thank you!', 'Goodbye!', 'Actually...'] as const;

@@ -9,7 +9,6 @@ interface Props {
   result: WellbeingResult;
 }
 
-/** Headline card summarising a screening result in gentle language. */
 export function BandCard({ result }: Props) {
   const accent = bandColor(result.band.level);
   const scaleName = result.scale === 'phq4' ? 'Quick check-in' : 'Deeper check-in';

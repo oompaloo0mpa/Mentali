@@ -1,48 +1,34 @@
-/**
- * Design tokens for the Mentali check-in feature.
- *
- * The palette is derived from the provided chatbot screenshot: a calm dark
- * charcoal canvas with a soft "bubblegum" pink for the bot and a deeper
- * magenta for the user / primary actions.
- */
+/** Design tokens for the check-in experience. */
 
 export const colors = {
-  // Canvas
   background: '#2B2B2F',
   surface: '#323237',
   surfaceMuted: '#3A3A40',
 
-  // Bot message bubble (light pink, dark text)
   botBubble: '#F4A9D7',
   botBubbleText: '#2A2230',
 
-  // User message bubble + primary brand (deep magenta, light text)
   userBubble: '#C2218F',
   userBubbleText: '#FFFFFF',
 
-  // Brand / accents
   primary: '#D81E9E',
   primaryDark: '#A6166F',
   primarySoft: '#F4A9D7',
 
-  // Text
   textPrimary: '#F5F1F4',
   textSecondary: '#B9B3BB',
   textMuted: '#8A8590',
   textOnPink: '#2A2230',
 
-  // Lines / chips
   border: '#46464C',
   chipBorder: '#D81E9E',
   chipText: '#F4A9D7',
 
-  // Wellbeing bands (kept gentle, never alarming)
   bandCalm: '#5FB8A6',
   bandMild: '#E2C36B',
   bandModerate: '#E59B5C',
   bandHigh: '#E2738C',
 
-  // Utility
   white: '#FFFFFF',
   black: '#000000',
   overlay: 'rgba(0,0,0,0.45)',

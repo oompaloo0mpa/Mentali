@@ -1,6 +1,6 @@
 import type { StreakState } from '@/types/wellbeing';
 
-/** Local date key like "2026-06-23" (avoids UTC off-by-one issues). */
+/** Local date key like "2026-06-23" to avoid UTC off-by-one issues. */
 export function dateKey(d: Date = new Date()): string {
   const y = d.getFullYear();
   const m = `${d.getMonth() + 1}`.padStart(2, '0');
@@ -8,7 +8,7 @@ export function dateKey(d: Date = new Date()): string {
   return `${y}-${m}-${day}`;
 }
 
-/** Whole-day difference between two date keys (b - a). */
+/** Whole-day difference between two date keys (`b - a`). */
 export function daysBetween(a: string, b: string): number {
   const da = new Date(`${a}T00:00:00`);
   const db = new Date(`${b}T00:00:00`);
@@ -21,12 +21,7 @@ export const emptyStreak: StreakState = {
   lastCheckInDate: null,
 };
 
-/**
- * Apply a check-in for `today`, returning the next streak state.
- * - Same day  -> unchanged (already counted today).
- * - Next day  -> increment.
- * - Otherwise -> reset to 1.
- */
+/** Applies a check-in for `today` and returns the next streak state. */
 export function applyCheckIn(state: StreakState, today: string = dateKey()): StreakState {
   if (state.lastCheckInDate === today) return state;
 
@@ -40,7 +35,7 @@ export function applyCheckIn(state: StreakState, today: string = dateKey()): Str
   };
 }
 
-/** True if the user has already completed today's check-in. */
+/** Returns true if today's check-in is already complete. */
 export function hasCheckedInToday(state: StreakState, today: string = dateKey()): boolean {
   return state.lastCheckInDate === today;
 }

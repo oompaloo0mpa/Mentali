@@ -3,7 +3,6 @@ import { Animated, Easing, StyleSheet, View } from 'react-native';
 
 import { colors, radius, spacing } from '@/theme/colors';
 
-/** Three softly pulsing dots inside a bot-styled bubble. */
 export function TypingIndicator() {
   const dots = [useRef(new Animated.Value(0.3)).current, useRef(new Animated.Value(0.3)).current, useRef(new Animated.Value(0.3)).current];
 

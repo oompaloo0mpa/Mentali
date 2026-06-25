@@ -3,10 +3,6 @@ import { StyleSheet, Text, View } from 'react-native';
 
 import { colors, radius, spacing, typography } from '@/theme/colors';
 
-/**
- * Gentle escalation card shown when answers suggest higher distress.
- * Encourages reaching out — never makes a clinical claim.
- */
 export function SupportCard() {
   return (
     <View style={styles.card}>

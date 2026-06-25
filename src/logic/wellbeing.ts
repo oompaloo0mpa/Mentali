@@ -6,11 +6,8 @@ import type {
 } from '@/types/wellbeing';
 
 /**
- * Scoring helpers for the check-in.
- *
- * Inspired by (but not a substitute for) PHQ-4 and K10. All thresholds are used
- * only to choose a supportive message and whether to gently surface extra
- * support — never to label or diagnose the user.
+ * Scoring helpers for check-in summaries.
+ * Thresholds are used only for supportive messaging and guidance.
  */
 
 const PHQ4_BANDS: Record<BandLevel, WellbeingBand> = {
@@ -65,7 +62,7 @@ const K10_BANDS: Record<BandLevel, WellbeingBand> = {
   },
 };
 
-/** PHQ-4 style: 4 items, each 0-3, total 0-12. */
+/** PHQ-4 style scoring: 4 items, 0-3 each, total 0-12. */
 export function scorePhq4(answers: RecordedAnswer[]): WellbeingResult {
   const phq = answers.filter((a) => a.scale === 'phq4');
   const total = sum(phq.map((a) => a.value));
@@ -76,13 +73,13 @@ export function scorePhq4(answers: RecordedAnswer[]): WellbeingResult {
     phq.filter((a) => a.dimension === 'mood').map((a) => a.value),
   );
 
-  // Standard PHQ-4 cut-points: 0-2 none, 3-5 mild, 6-8 moderate, 9-12 severe.
+  // PHQ-4 cut points: 0-2, 3-5, 6-8, 9-12.
   let level: BandLevel = 'calm';
   if (total >= 9) level = 'high';
   else if (total >= 6) level = 'moderate';
   else if (total >= 3) level = 'mild';
 
-  // A sub-scale >= 3 is the conventional flag for anxiety / depression.
+  // A sub-score of 3+ is the standard screening flag.
   const subscaleFlag = anxietyScore >= 3 || moodScore >= 3;
   const suggestSupport = level === 'moderate' || level === 'high' || subscaleFlag;
 
@@ -97,12 +94,12 @@ export function scorePhq4(answers: RecordedAnswer[]): WellbeingResult {
   };
 }
 
-/** K10 style: 10 items, each 1-5, total 10-50. */
+/** K10 style scoring: 10 items, 1-5 each, total 10-50. */
 export function scoreK10(answers: RecordedAnswer[]): WellbeingResult {
   const k10 = answers.filter((a) => a.scale === 'k10');
   const total = sum(k10.map((a) => a.value));
 
-  // Common K10 bands: 10-19 well, 20-24 mild, 25-29 moderate, 30-50 high.
+  // Common K10 bands: 10-19, 20-24, 25-29, 30-50.
   let level: BandLevel = 'calm';
   if (total >= 30) level = 'high';
   else if (total >= 25) level = 'moderate';
@@ -117,7 +114,7 @@ export function scoreK10(answers: RecordedAnswer[]): WellbeingResult {
   };
 }
 
-/** Plain-language label for a sub-scale (0-6). */
+/** Plain-language label for a 0-6 sub-score. */
 export function subscaleLabel(score: number): string {
   if (score >= 5) return 'Noticeable';
   if (score >= 3) return 'Present';
