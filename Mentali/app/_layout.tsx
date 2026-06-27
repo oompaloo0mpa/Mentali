@@ -11,6 +11,7 @@ export default function RootLayout() {
       <Stack.Screen name="index" options={{ title: 'Onboarding' }} />
       <Stack.Screen name="OnboardingPage_2" options={{ title: 'Onboarding' }} />
       <Stack.Screen name="OnboardingPage_3" options={{ title: 'Onboarding' }} />
+      <Stack.Screen name="OnboardingPage_4" options={{ title: 'Onboarding' }} />
       <Stack.Screen name="OnboardingPage_5" options={{ title: 'Onboarding' }} />
       <Stack.Screen name="NonAnonymousWarningPage" options={{ title: 'Confirmation' }} />
       <Stack.Screen name="login" options={{ title: 'Login' }} />
