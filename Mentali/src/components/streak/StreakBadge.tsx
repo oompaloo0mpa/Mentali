@@ -1,9 +1,8 @@
 import React from 'react';
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { colors, radius, spacing, typography } from '@/theme/colors';
-
-const FLAME = require('../../../assets/flame.png');
 
 interface Props {
   current: number;
@@ -24,7 +23,7 @@ export function StreakBadge({ current, longest, checkedInToday, onReset }: Props
       android_ripple={onReset ? { color: 'rgba(255,255,255,0.06)' } : undefined}
       style={styles.card}
     >
-      <Image source={FLAME} style={[styles.flame, !active && styles.flameDim]} resizeMode="contain" />
+      <Ionicons name="flame" size={36} color={active ? '#FF7A1A' : colors.textSecondary} style={!active ? styles.flameDim : undefined} />
       <View style={styles.body}>
         <Text style={styles.headline}>{headline}</Text>
         <Text style={styles.sub}>
@@ -48,7 +47,6 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     padding: spacing.lg,
   },
-  flame: { width: 40, height: 40 },
   flameDim: { opacity: 0.35 },
   body: { flex: 1 },
   headline: { ...typography.heading, color: colors.textPrimary },
