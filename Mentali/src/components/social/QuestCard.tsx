@@ -2,8 +2,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { AppIcon } from '@/components/AppIcon';
-import { Brand, Radius, Spacing } from '@/constants/theme';
-import type { Quest } from '@/constants/mockData';
+import { Brand, Radius, Spacing } from '@/theme/theme';
+import type { Quest } from '@/data/mockData';
 
 type Props = {
   quests: Quest[];

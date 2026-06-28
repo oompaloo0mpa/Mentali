@@ -2,17 +2,24 @@ import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { StyleSheet, Text, View } from 'react-native';
 
-import { Brand, Radius } from '@/constants/theme';
-import type { ChatMessage } from '@/constants/mockData';
+import { Brand, Radius } from '@/theme/theme';
+import type { ChatMessage } from '@/data/mockData';
 
-type Props = {
-  message: ChatMessage;
+type CheckInBubbleProps = {
+  role: 'bot' | 'user';
+  text: string;
+  helper?: string;
 };
 
-export function ChatBubble({ message }: Props) {
-  const isMe = message.sender === 'me';
-  const hasImage = !!message.imageUri;
-  const hasFile = !!message.fileName;
+type Props = { message: ChatMessage } | CheckInBubbleProps;
+
+export function ChatBubble(props: Props) {
+  const isSocialMessage = 'message' in props;
+  const isMe = isSocialMessage ? props.message.sender === 'me' : props.role === 'user';
+  const hasImage = isSocialMessage ? !!props.message.imageUri : false;
+  const hasFile = isSocialMessage ? !!props.message.fileName : false;
+  const text = isSocialMessage ? props.message.text : props.text;
+  const helper = isSocialMessage ? undefined : props.helper;
 
   return (
     <View style={[styles.row, isMe ? styles.rowMe : styles.rowThem]}>
@@ -22,20 +29,21 @@ export function ChatBubble({ message }: Props) {
           isMe ? styles.bubbleMe : styles.bubbleThem,
           hasImage && styles.bubbleImage,
         ]}>
-        {hasImage && (
-          <Image source={{ uri: message.imageUri }} style={styles.image} contentFit="cover" transition={150} />
-        )}
+        {hasImage && isSocialMessage ? (
+          <Image source={{ uri: props.message.imageUri }} style={styles.image} contentFit="cover" transition={150} />
+        ) : null}
         {hasFile && (
           <View style={styles.fileRow}>
             <Ionicons name="document-text" size={22} color="#FFFFFF" />
             <Text style={styles.fileName} numberOfLines={1}>
-              {message.fileName}
+              {isSocialMessage ? props.message.fileName : ''}
             </Text>
           </View>
         )}
-        {!!message.text && (
-          <Text style={[styles.text, hasImage && styles.textWithImage]}>{message.text}</Text>
+        {!!text && (
+          <Text style={[styles.text, hasImage && styles.textWithImage]}>{text}</Text>
         )}
+        {helper ? <Text style={styles.helper}>{helper}</Text> : null}
       </View>
     </View>
   );
@@ -65,4 +73,5 @@ const styles = StyleSheet.create({
   fileName: { flex: 1, color: Brand.textOnBubble, fontSize: 14, fontWeight: '600' },
   text: { color: Brand.textOnBubble, fontSize: 15, lineHeight: 20, fontWeight: '600' },
   textWithImage: { paddingHorizontal: 10, paddingTop: 6, paddingBottom: 2 },
+  helper: { color: Brand.textOnBubble, fontSize: 12, lineHeight: 17, opacity: 0.82, marginTop: 4 },
 });

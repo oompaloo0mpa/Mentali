@@ -3,9 +3,9 @@ import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { AppIcon } from '@/components/AppIcon';
 import { Avatar } from '@/components/Avatar';
-import { Brand, Radius, Spacing } from '@/constants/theme';
-import { friendMood, highestMilestone, isMuted } from '@/store/socialStore';
-import type { Friend } from '@/constants/mockData';
+import { Brand, Radius, Spacing } from '@/theme/theme';
+import { friendMood, highestMilestone, isMuted } from '@/storage/socialStore';
+import type { Friend } from '@/data/mockData';
 
 type Props = {
   friend: Friend | null;

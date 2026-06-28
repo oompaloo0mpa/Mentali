@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import LoginPage from './src/pages/LoginPage';
-import HomePage from './src/pages/HomePage';
-import { SocialProvider } from './src/store/socialStore';
-import { FriendChatScreenContent } from './src/components/chat/FriendChatScreenContent';
-import { StreakGuideScreenContent } from './src/components/chat/StreakGuideScreenContent';
+import LoginPage from '@/pages/LoginPage';
+import HomePage from '@/pages/HomePage';
+import { SocialProvider } from '@/storage/socialStore';
+import { FriendChatScreenContent } from '@/components/chat/FriendChatScreenContent';
+import { StreakGuideScreenContent } from '@/components/chat/StreakGuideScreenContent';
 
 type ScreenState =
   | { screen: 'login' }

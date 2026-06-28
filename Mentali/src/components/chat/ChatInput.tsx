@@ -2,16 +2,17 @@ import { Ionicons } from '@expo/vector-icons';
 import { useState } from 'react';
 import { Pressable, StyleSheet, TextInput, View } from 'react-native';
 
-import { Brand, Radius } from '@/constants/theme';
+import { Brand, Radius } from '@/theme/theme';
 
 type Props = {
   onSend: (text: string) => void;
   onAttach?: () => void;
   value?: string;
   onChangeText?: (text: string) => void;
+  disabled?: boolean;
 };
 
-export function ChatInput({ onSend, onAttach, value, onChangeText }: Props) {
+export function ChatInput({ onSend, onAttach, value, onChangeText, disabled }: Props) {
   const [internal, setInternal] = useState('');
   const isControlled = value !== undefined;
   const text = isControlled ? value : internal;
@@ -22,6 +23,7 @@ export function ChatInput({ onSend, onAttach, value, onChangeText }: Props) {
   };
 
   const send = () => {
+    if (disabled) return;
     const trimmed = text.trim();
     if (!trimmed) return;
     onSend(trimmed);
@@ -30,7 +32,11 @@ export function ChatInput({ onSend, onAttach, value, onChangeText }: Props) {
 
   return (
     <View style={styles.container}>
-      <Pressable style={({ pressed }) => [styles.attach, pressed && styles.pressed]} onPress={onAttach} hitSlop={6}>
+      <Pressable
+        style={({ pressed }) => [styles.attach, disabled && styles.disabled, pressed && styles.pressed]}
+        onPress={onAttach}
+        disabled={disabled}
+        hitSlop={6}>
         <Ionicons name="add" size={22} color="#FFFFFF" />
       </Pressable>
 
@@ -42,11 +48,16 @@ export function ChatInput({ onSend, onAttach, value, onChangeText }: Props) {
           placeholderTextColor="rgba(255,255,255,0.85)"
           style={styles.input}
           multiline
+          editable={!disabled}
           onSubmitEditing={send}
         />
       </View>
 
-      <Pressable style={({ pressed }) => [styles.send, pressed && styles.pressed]} onPress={send} hitSlop={6}>
+      <Pressable
+        style={({ pressed }) => [styles.send, disabled && styles.disabled, pressed && styles.pressed]}
+        onPress={send}
+        disabled={disabled}
+        hitSlop={6}>
         <Ionicons name="send" size={18} color="#FFFFFF" />
       </Pressable>
     </View>
@@ -82,4 +93,5 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   pressed: { opacity: 0.75 },
+  disabled: { opacity: 0.45 },
 });

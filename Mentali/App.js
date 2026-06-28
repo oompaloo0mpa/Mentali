@@ -7,19 +7,19 @@ import {
 
 import {
     FriendChatScreenContent
-} from './src/components/chat/FriendChatScreenContent';
+} from '@/components/chat/FriendChatScreenContent';
 import {
     StreakGuideScreenContent
-} from './src/components/chat/StreakGuideScreenContent';
-import HomePage from './src/pages/HomePage';
-import LoginPage from './src/pages/LoginPage';
+} from '@/components/chat/StreakGuideScreenContent';
+import HomePage from '@/pages/HomePage';
+import LoginPage from '@/pages/LoginPage';
 import {
     SocialProvider
-} from './src/store/socialStore';
+} from '@/storage/socialStore';
 
 export default function App() {
     const [screenState, setScreenState] = useState({
-        screen: 'login'
+        screen: 'login',
     });
     const [homeNav, setHomeNav] = useState('home-outline');
 
@@ -28,7 +28,7 @@ export default function App() {
             screen: 'chat',
             friendId,
             prefill,
-            returnToNav: homeNav
+            returnToNav: homeNav,
         });
     };
 
@@ -48,15 +48,17 @@ export default function App() {
                     () => {}
                 }
                 onLoginPress = {
-                    () => setScreenState({
+                    () =>
+                    setScreenState({
                         screen: 'home',
-                        selectedNav: homeNav
+                        selectedNav: homeNav,
                     })
                 }
                 onSocialAuthSuccess = {
-                    () => setScreenState({
+                    () =>
+                    setScreenState({
                         screen: 'home',
-                        selectedNav: homeNav
+                        selectedNav: homeNav,
                     })
                 }
                 />
@@ -90,9 +92,10 @@ export default function App() {
                     screenState.prefill ? '1' : undefined
                 }
                 onBack = {
-                    () => setScreenState({
+                    () =>
+                    setScreenState({
                         screen: 'home',
-                        selectedNav: screenState.returnToNav
+                        selectedNav: screenState.returnToNav,
                     })
                 }
                 onOpenStreakGuide = {

@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { StatPill } from '@/components/social/StatPill';
-import { Brand, Radius } from '@/constants/theme';
+import { Brand, Radius } from '@/theme/theme';
 
 type Props = {
   fire: number;

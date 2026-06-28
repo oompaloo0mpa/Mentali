@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { Brand, Spacing } from '@/constants/theme';
+import { Brand, Spacing } from '@/theme/theme';
 
 type Props = {
   title: string;

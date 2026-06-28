@@ -1,7 +1,7 @@
 import { StyleSheet, Text, View } from 'react-native';
 
 import { AppIcon, type AppIconName } from '@/components/AppIcon';
-import { Brand } from '@/constants/theme';
+import { Brand } from '@/theme/theme';
 
 type Props = {
   icon: AppIconName;

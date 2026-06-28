@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Pressable, StyleSheet, TextInput, View } from 'react-native';
 
-import { Brand, Radius } from '@/constants/theme';
+import { Brand, Radius } from '@/theme/theme';
 
 type Props = {
   value: string;

@@ -3,7 +3,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { FlameIcon } from '@/components/chat/FlameIcon';
-import { Brand, Radius, Spacing } from '@/constants/theme';
+import { Brand, Radius, Spacing } from '@/theme/theme';
 
 const TIERS = [
   { streak: 150, label: '100 - 249' },

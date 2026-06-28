@@ -21,9 +21,9 @@ import { ChatInput } from '@/components/chat/ChatInput';
 import { StreakPet } from '@/components/chat/StreakPet';
 import { SuggestionBar } from '@/components/chat/SuggestionBar';
 import { FriendOptionsModal } from '@/components/social/FriendOptionsModal';
-import { Brand, MaxContentWidth, Radius, Spacing } from '@/constants/theme';
-import { MOTIVATIONAL_SUGGESTIONS } from '@/constants/mockData';
-import { friendMood, useSocial } from '@/store/socialStore';
+import { Brand, MaxContentWidth, Radius, Spacing } from '@/theme/theme';
+import { MOTIVATIONAL_SUGGESTIONS } from '@/data/mockData';
+import { friendMood, useSocial } from '@/storage/socialStore';
 
 type Props = {
   friendId: string;

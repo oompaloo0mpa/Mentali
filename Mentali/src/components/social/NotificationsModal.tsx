@@ -3,8 +3,8 @@ import { Fragment } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Brand, Radius, Spacing } from '@/constants/theme';
-import type { AppNotification } from '@/constants/mockData';
+import { Brand, Radius, Spacing } from '@/theme/theme';
+import type { AppNotification } from '@/data/mockData';
 
 /** Purple accent used across the notifications panel. */
 const Accent = '#B02AB3';

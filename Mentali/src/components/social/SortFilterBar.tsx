@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { Brand, Radius, Spacing } from '@/constants/theme';
+import { Brand, Radius, Spacing } from '@/theme/theme';
 
 export type FriendSort = 'streak' | 'recent' | 'alpha';
 export type FriendFilter = 'all' | 'at-risk' | 'needs-support' | 'new';

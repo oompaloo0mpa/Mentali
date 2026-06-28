@@ -1,7 +1,7 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { FlameIcon } from '@/components/chat/FlameIcon';
-import { getStreakColor } from '@/constants/theme';
+import { getStreakColor } from '@/theme/theme';
 
 type Props = {
   streak: number;

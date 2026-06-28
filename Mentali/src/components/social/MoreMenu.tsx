@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Brand, Radius, Spacing } from '@/constants/theme';
+import { Brand, Radius, Spacing } from '@/theme/theme';
 
 type Props = {
   visible: boolean;

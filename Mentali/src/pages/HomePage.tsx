@@ -25,7 +25,7 @@ import {
   type StatItem,
 } from '../hooks/homepageData';
 import { FriendsScreenContent } from '../components/social/FriendsScreenContent';
-import type { Friend } from '@/constants/mockData';
+import type { Friend } from '@/data/mockData';
 
 type HomePageProps = {
   initialSelectedNav?: string;

@@ -3,7 +3,7 @@ import { useEffect, useRef } from 'react';
 import { Animated, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { FlameIcon } from '@/components/chat/FlameIcon';
-import { Brand, Radius, Spacing, getStreakColor } from '@/constants/theme';
+import { Brand, Radius, Spacing, getStreakColor } from '@/theme/theme';
 
 type Props = {
   visible: boolean;

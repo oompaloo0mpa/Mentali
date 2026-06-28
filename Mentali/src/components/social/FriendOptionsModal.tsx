@@ -2,9 +2,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { Fragment, useEffect, useState } from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { Brand, Radius, Spacing } from '@/constants/theme';
-import { isMuted, type MuteDuration } from '@/store/socialStore';
-import type { Friend } from '@/constants/mockData';
+import { Brand, Radius, Spacing } from '@/theme/theme';
+import { isMuted, type MuteDuration } from '@/storage/socialStore';
+import type { Friend } from '@/data/mockData';
 
 type Props = {
   visible: boolean;

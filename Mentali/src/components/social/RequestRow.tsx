@@ -2,8 +2,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Avatar } from '@/components/Avatar';
-import { Brand, Radius } from '@/constants/theme';
-import type { FriendRequest } from '@/constants/mockData';
+import { Brand, Radius } from '@/theme/theme';
+import type { FriendRequest } from '@/data/mockData';
 
 type Props = {
   request: FriendRequest;

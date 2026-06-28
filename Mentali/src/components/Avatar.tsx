@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { StyleSheet, View } from 'react-native';
 
-import { Brand } from '@/constants/theme';
+import { Brand } from '@/theme/theme';
 
 type Props = {
   size?: number;

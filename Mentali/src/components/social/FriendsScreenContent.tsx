@@ -13,9 +13,9 @@ import { RequestRow } from '@/components/social/RequestRow';
 import { SearchBar } from '@/components/social/SearchBar';
 import { SortFilterBar, type FriendFilter, type FriendSort } from '@/components/social/SortFilterBar';
 import { StatBar } from '@/components/social/StatBar';
-import { Brand, MaxContentWidth, Spacing } from '@/constants/theme';
-import { CURRENT_USER, type Friend } from '@/constants/mockData';
-import { friendBadges, useSocial } from '@/store/socialStore';
+import { Brand, MaxContentWidth, Spacing } from '@/theme/theme';
+import { CURRENT_USER, type Friend } from '@/data/mockData';
+import { friendBadges, useSocial } from '@/storage/socialStore';
 
 function lastMotivationText(messages: { text: string; sender: 'me' | 'them' }[]): string | null {
   for (let i = messages.length - 1; i >= 0; i--) {
