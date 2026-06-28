@@ -1,6 +1,10 @@
-import React, { useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import {
+  Dimensions,
   Image,
+  Modal,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
   Pressable,
   SafeAreaView,
   ScrollView,
@@ -15,25 +19,23 @@ type ShopItemId =
   | 'cap'
   | 'cute-cap'
   | 'glasses'
-  | 'royal-crown';
+  | 'royal-crown'
+  | 'brainfreeze';
+
+type Category = 'Hair' | 'Hats' | 'Face' | 'Color' | 'Shoes';
+type ScreenMode = 'shop' | 'preview';
+type NavKey = 'home' | 'social' | 'leaderboard' | 'shop' | 'preview';
 
 type ShopItem = {
   id: ShopItemId;
   name: string;
   price: number;
-  category: 'Hair' | 'Hats' | 'Face' | 'Color' | 'Shoes';
+  category: Category;
+  section: 'cosmetics' | 'items';
 };
 
-const cosmetics: ShopItem[] = [
-  { id: 'sonic-shoes', name: 'Sonic Shoes', price: 45, category: 'Shoes' },
-  { id: 'tung-buddy', name: 'Tung Buddy', price: 80, category: 'Hats' },
-  { id: 'cap', name: 'Cap', price: 45, category: 'Hats' },
-  { id: 'cute-cap', name: 'Cute Cap', price: 45, category: 'Hats' },
-  { id: 'glasses', name: 'Glasses', price: 80, category: 'Face' },
-  { id: 'royal-crown', name: 'Royal Crown', price: 1000, category: 'Hats' },
-];
-
-const categories: ShopItem['category'][] = ['Hair', 'Hats', 'Face', 'Color', 'Shoes'];
+const windowWidth = Dimensions.get('window').width;
+const bannerWidth = Math.min(windowWidth - 48, 390);
 
 const shopImages = {
   coins: require('../../assets/images/shop/Coins.png'),
@@ -41,76 +43,176 @@ const shopImages = {
   featuredBanner: require('../../assets/images/shop/LimitedSetGodzilla.png'),
   mascot: require('../../assets/images/shop/Mascot.png'),
   items: {
+    brainfreeze: require('../../assets/images/shop/Brainfreeze.png'),
     'sonic-shoes': require('../../assets/images/shop/SonicShoes.png'),
     'tung-buddy': require('../../assets/images/shop/Tung Buddy.png'),
     cap: require('../../assets/images/shop/Cap.png'),
     'cute-cap': require('../../assets/images/shop/CuteCap.png'),
     glasses: require('../../assets/images/shop/Glasses.png'),
     'royal-crown': require('../../assets/images/shop/RoyalCrown.png'),
-  } as const,
+  } as Partial<Record<ShopItemId, number>>,
 };
+
+const cosmetics: ShopItem[] = [
+  { id: 'sonic-shoes', name: 'Sonic Shoes', price: 45, category: 'Shoes', section: 'cosmetics' },
+  { id: 'tung-buddy', name: 'Tung Buddy', price: 80, category: 'Hats', section: 'cosmetics' },
+  { id: 'cap', name: 'Cap', price: 45, category: 'Hats', section: 'cosmetics' },
+  { id: 'cute-cap', name: 'Cute Cap', price: 45, category: 'Hats', section: 'cosmetics' },
+  { id: 'glasses', name: 'Glasses', price: 80, category: 'Face', section: 'cosmetics' },
+  { id: 'royal-crown', name: 'Royal Crown', price: 1000, category: 'Hats', section: 'cosmetics' },
+];
+
+const items: ShopItem[] = [
+  { id: 'brainfreeze', name: 'Brainfreeze', price: 200, category: 'Color', section: 'items' },
+];
+
+const categories: Category[] = ['Hair', 'Hats', 'Face', 'Color', 'Shoes'];
+
+const banners = [
+  {
+    id: 'godzilla',
+    kind: 'image' as const,
+    title: 'Limited Set: Godzilla',
+    subtitle: 'Ends 6/7',
+  },
+  {
+    id: 'brainy-bundle',
+    kind: 'custom' as const,
+    title: 'Brainy Bundle',
+    subtitle: 'New this week',
+    background: ['#ff87d4', '#ff6b43'],
+    accent: '#fff0f8',
+  },
+  {
+    id: 'summer-drop',
+    kind: 'custom' as const,
+    title: 'Summer Drop',
+    subtitle: 'Limited hats',
+    background: ['#ffa857', '#ff4fb0'],
+    accent: '#fff7d8',
+  },
+];
 
 function PriceTag({ value, large = false }: { value: number; large?: boolean }) {
   return (
     <View style={styles.priceRow}>
-      <View style={[styles.gemIcon, large && styles.gemIconLarge]} />
-      <Text style={[styles.priceText, large && styles.largePriceText]}>{value}</Text>
-    </View>
-  );
-}
-
-function GemCountIcon() {
-  return <Image source={shopImages.coins} style={styles.gemCountIcon} resizeMode="contain" />;
-}
-
-function ItemArt({ item, large = false }: { item: ShopItem; large?: boolean }) {
-  return (
-    <View style={[styles.itemArtFrame, large && styles.itemArtFrameLarge]}>
       <Image
-        source={shopImages.items[item.id]}
-        style={[styles.itemImage, large && styles.itemImageLarge]}
+        source={shopImages.coins}
+        style={[styles.priceCoin, large && styles.priceCoinLarge]}
         resizeMode="contain"
       />
+      <Text style={[styles.priceText, large && styles.priceTextLarge]}>{value}</Text>
     </View>
   );
 }
 
-function FeaturedBanner() {
+function NavIcon({ name, active }: { name: NavKey; active: boolean }) {
+  const color = active ? '#141018' : '#1e1523';
+
+  if (name === 'home') {
+    return (
+      <View style={styles.iconBox}>
+        <View style={[styles.homeRoof, { borderBottomColor: color }]} />
+        <View style={[styles.homeBody, { borderColor: color }]}>
+          <View style={[styles.homeDoor, { backgroundColor: color }]} />
+        </View>
+      </View>
+    );
+  }
+
+  if (name === 'social') {
+    return (
+      <View style={styles.iconBox}>
+        <View style={[styles.socialHeadLeft, { borderColor: color }]} />
+        <View style={[styles.socialHeadRight, { borderColor: color }]} />
+        <View style={[styles.socialBodyLeft, { borderColor: color }]} />
+        <View style={[styles.socialBodyRight, { borderColor: color }]} />
+      </View>
+    );
+  }
+
+  if (name === 'leaderboard') {
+    return (
+      <View style={styles.iconBox}>
+        <View style={[styles.rankBarShort, { backgroundColor: color }]} />
+        <View style={[styles.rankBarTall, { backgroundColor: color }]} />
+        <View style={[styles.rankBarMid, { backgroundColor: color }]} />
+      </View>
+    );
+  }
+
+  if (name === 'shop') {
+    return (
+      <View style={[styles.shopIconWrap, active && styles.shopIconWrapActive]}>
+        <View style={[styles.bagHandle, { borderColor: color }]} />
+        <View style={[styles.bagBody, { borderColor: color }]}>
+          <View style={[styles.bagPocket, { borderColor: color }]} />
+        </View>
+      </View>
+    );
+  }
+
   return (
-    <View style={styles.bannerCard}>
-      <Image source={shopImages.featuredBanner} style={styles.bannerImage} resizeMode="cover" />
+    <View style={styles.iconBox}>
+      <View style={[styles.previewHead, { borderColor: color }]} />
+      <View style={[styles.previewBody, { borderColor: color }]} />
     </View>
   );
 }
 
-function BrainPreview({ item }: { item: ShopItem }) {
+function ItemTile({
+  item,
+  selected,
+  onPress,
+}: {
+  item: ShopItem;
+  selected: boolean;
+  onPress: () => void;
+}) {
   return (
-    <View style={styles.previewStage}>
-      <View style={styles.shadowOval} />
-      <Image source={shopImages.mascot} style={styles.mascotImage} resizeMode="contain" />
-      {item.id === 'glasses' ? (
-        <Image source={shopImages.items.glasses} style={styles.previewGlasses} resizeMode="contain" />
-      ) : null}
-      {item.id === 'cap' ? (
-        <Image source={shopImages.items.cap} style={styles.previewHat} resizeMode="contain" />
-      ) : null}
-      {item.id === 'cute-cap' ? (
-        <Image source={shopImages.items['cute-cap']} style={styles.previewHat} resizeMode="contain" />
-      ) : null}
-      {item.id === 'royal-crown' ? (
-        <Image
-          source={shopImages.items['royal-crown']}
-          style={styles.previewCrown}
-          resizeMode="contain"
-        />
-      ) : null}
-      {item.id === 'tung-buddy' ? (
-        <Image
-          source={shopImages.items['tung-buddy']}
-          style={styles.previewBuddy}
-          resizeMode="contain"
-        />
-      ) : null}
+    <Pressable onPress={onPress} style={[styles.itemTile, selected && styles.itemTileSelected]}>
+      <View style={styles.itemImageCard}>
+        <Image source={shopImages.items[item.id]} style={styles.itemImage} resizeMode="contain" />
+      </View>
+      <Text style={styles.itemName}>{item.name}</Text>
+      <PriceTag value={item.price} />
+    </Pressable>
+  );
+}
+
+function FeaturedCard({
+  banner,
+}: {
+  banner: (typeof banners)[number];
+}) {
+  if (banner.kind === 'image') {
+    return (
+      <View style={styles.bannerCard}>
+        <Image source={shopImages.featuredBanner} style={styles.bannerImage} resizeMode="cover" />
+        <View style={styles.bannerCaption}>
+          <Text style={styles.bannerCaptionTitle}>{banner.title}</Text>
+          <Text style={styles.bannerCaptionMeta}>{banner.subtitle}</Text>
+        </View>
+      </View>
+    );
+  }
+
+  return (
+    <View
+      style={[
+        styles.bannerCard,
+        {
+          backgroundColor: banner.background[0],
+        },
+      ]}>
+      <View style={[styles.customBannerGlow, { backgroundColor: banner.background[1] }]} />
+      <View style={styles.customBannerShapes}>
+        <View style={styles.customBlobLarge} />
+        <View style={styles.customBlobSmall} />
+      </View>
+      <Text style={[styles.customBannerEyebrow, { color: banner.accent }]}>SPECIAL DROP</Text>
+      <Text style={[styles.customBannerTitle, { color: '#fffafc' }]}>{banner.title}</Text>
+      <Text style={[styles.customBannerMeta, { color: banner.accent }]}>{banner.subtitle}</Text>
     </View>
   );
 }
@@ -118,186 +220,287 @@ function BrainPreview({ item }: { item: ShopItem }) {
 export default function ShopPage() {
   const [coins, setCoins] = useState(500);
   const [selectedItem, setSelectedItem] = useState<ShopItem>(cosmetics[0]);
-  const [confirmingPurchase, setConfirmingPurchase] = useState(false);
-  const [purchaseMessage, setPurchaseMessage] = useState('');
+  const [screenMode, setScreenMode] = useState<ScreenMode>('shop');
+  const [confirmVisible, setConfirmVisible] = useState(false);
+  const [successVisible, setSuccessVisible] = useState(false);
+  const [lastPurchaseSucceeded, setLastPurchaseSucceeded] = useState(true);
+  const [bannerIndex, setBannerIndex] = useState(0);
+  const bannerScrollRef = useRef<ScrollView | null>(null);
 
-  const handleSelectItem = (item: ShopItem) => {
+  const activeNav = useMemo<NavKey>(() => {
+    return screenMode === 'preview' ? 'preview' : 'shop';
+  }, [screenMode]);
+
+  const selectedCategory = selectedItem.category;
+  const previewItems = [...cosmetics, ...items].filter((item) => item.category === selectedCategory);
+
+  const onBannerScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const offsetX = event.nativeEvent.contentOffset.x;
+    const nextIndex = Math.round(offsetX / bannerWidth);
+    if (nextIndex !== bannerIndex) {
+      setBannerIndex(nextIndex);
+    }
+  };
+
+  const openConfirm = (item: ShopItem) => {
     setSelectedItem(item);
-    setConfirmingPurchase(false);
-    setPurchaseMessage('');
+    setSuccessVisible(false);
+    setConfirmVisible(true);
+  };
+
+  const handleNo = () => {
+    setConfirmVisible(false);
+  };
+
+  const handlePreview = () => {
+    setConfirmVisible(false);
+    setScreenMode('preview');
   };
 
   const handleBuy = () => {
-    if (coins < selectedItem.price) {
-      setPurchaseMessage('Not enough gems for this item.');
-      setConfirmingPurchase(false);
+    setConfirmVisible(false);
+    if (coins >= selectedItem.price) {
+      setCoins((current) => current - selectedItem.price);
+      setLastPurchaseSucceeded(true);
+      setSuccessVisible(true);
       return;
     }
+    setLastPurchaseSucceeded(false);
+    setSuccessVisible(true);
+  };
 
-    setCoins((current) => current - selectedItem.price);
-    setConfirmingPurchase(false);
-    setPurchaseMessage('Item bought successfully, enjoy!');
+  const changeCategory = (category: Category) => {
+    const match = cosmetics.find((item) => item.category === category);
+    if (match) {
+      setSelectedItem(match);
+    }
   };
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <ScrollView
-        contentContainerStyle={styles.pageContent}
-        showsVerticalScrollIndicator={false}>
-        <View style={styles.stage}>
-          <View style={styles.phoneShell}>
-            <View style={styles.shopCard}>
+      <View style={styles.screen}>
+        {screenMode === 'shop' ? (
+          <>
+            <ScrollView contentContainerStyle={styles.shopContent} showsVerticalScrollIndicator={false}>
               <View style={styles.currencyRow}>
-                <GemCountIcon />
+                <Image source={shopImages.coins} style={styles.coinImage} resizeMode="contain" />
                 <Text style={styles.currencyText}>{coins}</Text>
               </View>
 
-              <View style={styles.featuredWrap}>
-                <Image
-                  source={shopImages.featuredRibbon}
-                  style={styles.ribbonImage}
-                  resizeMode="contain"
-                />
+              <Image
+                source={shopImages.featuredRibbon}
+                style={styles.ribbonImage}
+                resizeMode="contain"
+              />
 
-                <FeaturedBanner />
+              <View style={styles.bannerViewport}>
+                <ScrollView
+                  ref={bannerScrollRef}
+                  horizontal
+                  pagingEnabled
+                  showsHorizontalScrollIndicator={false}
+                  onMomentumScrollEnd={onBannerScroll}
+                  contentContainerStyle={styles.bannerTrack}>
+                  {banners.map((banner) => (
+                    <View key={banner.id} style={styles.bannerSlide}>
+                      <FeaturedCard banner={banner} />
+                    </View>
+                  ))}
+                </ScrollView>
+              </View>
 
-                <View style={styles.carouselDots}>
-                  <View style={[styles.dot, styles.dotActive]} />
-                  <View style={styles.dot} />
-                  <View style={styles.dot} />
-                </View>
+              <View style={styles.dotRow}>
+                {banners.map((banner, index) => (
+                  <View
+                    key={banner.id}
+                    style={[styles.dot, index === bannerIndex && styles.dotActive]}
+                  />
+                ))}
               </View>
 
               <View style={styles.sectionPill}>
                 <Text style={styles.sectionPillText}>COSMETICS</Text>
               </View>
 
-              <View style={styles.grid}>
+              <View style={styles.itemGrid}>
                 {cosmetics.map((item) => (
-                  <Pressable
+                  <ItemTile
                     key={item.id}
-                    onPress={() => handleSelectItem(item)}
-                    style={[styles.productCard, selectedItem.id === item.id && styles.productCardActive]}>
-                    <ItemArt item={item} />
-                    <Text style={styles.productName}>{item.name}</Text>
-                    <PriceTag value={item.price} />
-                  </Pressable>
+                    item={item}
+                    selected={selectedItem.id === item.id}
+                    onPress={() => openConfirm(item)}
+                  />
                 ))}
               </View>
 
               <View style={styles.sectionPill}>
                 <Text style={styles.sectionPillText}>ITEMS</Text>
               </View>
-            </View>
 
-            <View style={styles.bottomNav}>
-              <Text style={styles.navLabel}>Home</Text>
-              <Text style={styles.navLabel}>Social</Text>
-              <View style={styles.centerNavWrap}>
-                <Text style={styles.centerNavText}>Shop</Text>
-              </View>
-              <Text style={styles.navLabel}>Bag</Text>
-              <Text style={styles.navLabel}>Me</Text>
-            </View>
-          </View>
-
-          <View style={styles.centerColumn}>
-            <Text style={styles.centerLabel}>Purchase confirmation overlay</Text>
-            <View style={styles.confirmCard}>
-              <Pressable
-                onPress={() => setConfirmingPurchase(false)}
-                style={styles.confirmBackButton}>
-                <Text style={styles.confirmBackText}>{'<'}</Text>
-              </Pressable>
-
-              <Text style={styles.confirmTitle}>Are you sure you want to buy this?</Text>
-
-              <ItemArt item={selectedItem} />
-
-              <Text style={styles.confirmItemName}>{selectedItem.name}</Text>
-              <PriceTag value={selectedItem.price} large />
-
-              <View style={styles.confirmActions}>
-                <Pressable
-                  onPress={() => setConfirmingPurchase(false)}
-                  style={[styles.actionButton, styles.actionButtonNo]}>
-                  <Text style={[styles.actionButtonText, styles.actionButtonNoText]}>No</Text>
-                </Pressable>
-
-                <Pressable
-                  onPress={() => setConfirmingPurchase(true)}
-                  style={[styles.actionButton, styles.actionButtonPreview]}>
-                  <Text style={[styles.actionButtonText, styles.actionButtonPreviewText]}>
-                    Preview
-                  </Text>
-                </Pressable>
-
-                <Pressable
-                  onPress={handleBuy}
-                  style={[styles.actionButton, styles.actionButtonBuy]}>
-                  <Text style={[styles.actionButtonText, styles.actionButtonBuyText]}>Buy</Text>
-                </Pressable>
-              </View>
-            </View>
-
-            <Text style={styles.centerLabel}>Purchase successful message</Text>
-            <View style={styles.successCard}>
-              <Text style={styles.successText}>
-                {purchaseMessage || 'Item bought successfully, enjoy!'}
-              </Text>
-            </View>
-          </View>
-
-          <View style={styles.phoneShell}>
-            <View style={styles.previewCard}>
-              <Pressable style={styles.backButton}>
-                <Text style={styles.backButtonText}>Back</Text>
-              </Pressable>
-
-              <BrainPreview item={selectedItem} />
-
-              <View style={styles.categoryTabs}>
-                {categories.map((category) => (
-                  <Pressable
-                    key={category}
-                    onPress={() => {
-                      const match = cosmetics.find((item) => item.category === category);
-                      if (match) {
-                        handleSelectItem(match);
-                      }
-                    }}
-                    style={[
-                      styles.categoryTab,
-                      selectedItem.category === category && styles.categoryTabActive,
-                    ]}>
-                    <Text
-                      style={[
-                        styles.categoryTabText,
-                        selectedItem.category === category && styles.categoryTabTextActive,
-                      ]}>
-                      {category}
-                    </Text>
-                  </Pressable>
+              <View style={styles.itemsGrid}>
+                {items.map((item) => (
+                  <ItemTile
+                    key={item.id}
+                    item={item}
+                    selected={selectedItem.id === item.id}
+                    onPress={() => openConfirm(item)}
+                  />
                 ))}
               </View>
+            </ScrollView>
 
-              <View style={styles.previewInventory}>
-                <Pressable style={styles.previewSelectionCard}>
-                  <ItemArt item={selectedItem} />
+            <View style={styles.bottomBar}>
+              {(['home', 'social', 'leaderboard', 'shop', 'preview'] as NavKey[]).map((key) => (
+                <Pressable
+                  key={key}
+                  onPress={() => {
+                    if (key === 'preview') {
+                      setScreenMode('preview');
+                    } else if (key === 'shop') {
+                      setScreenMode('shop');
+                    }
+                  }}
+                  style={styles.navButton}>
+                  <NavIcon name={key} active={activeNav === key || key === 'leaderboard'} />
                 </Pressable>
-              </View>
+              ))}
+            </View>
+          </>
+        ) : (
+          <>
+            <View style={styles.previewTop}>
+              <Pressable onPress={() => setScreenMode('shop')} style={styles.previewBackButton}>
+                <Text style={styles.previewBackText}>Back</Text>
+              </Pressable>
+            </View>
+
+            <View style={styles.previewStage}>
+              <View style={styles.previewShadow} />
+              <Image source={shopImages.mascot} style={styles.previewMascot} resizeMode="contain" />
+              {selectedItem.id === 'glasses' ? (
+                <Image
+                  source={shopImages.items.glasses}
+                  style={styles.previewAccessoryGlasses}
+                  resizeMode="contain"
+                />
+              ) : null}
+              {selectedItem.id === 'cap' ? (
+                <Image
+                  source={shopImages.items.cap}
+                  style={styles.previewAccessoryHat}
+                  resizeMode="contain"
+                />
+              ) : null}
+              {selectedItem.id === 'cute-cap' ? (
+                <Image
+                  source={shopImages.items['cute-cap']}
+                  style={styles.previewAccessoryHat}
+                  resizeMode="contain"
+                />
+              ) : null}
+              {selectedItem.id === 'royal-crown' ? (
+                <Image
+                  source={shopImages.items['royal-crown']}
+                  style={styles.previewAccessoryCrown}
+                  resizeMode="contain"
+                />
+              ) : null}
+              {selectedItem.id === 'tung-buddy' ? (
+                <Image
+                  source={shopImages.items['tung-buddy']}
+                  style={styles.previewAccessoryBuddy}
+                  resizeMode="contain"
+                />
+              ) : null}
+            </View>
+
+            <View style={styles.categoryBar}>
+              {categories.map((category) => (
+                <Pressable
+                  key={category}
+                  onPress={() => changeCategory(category)}
+                  style={[
+                    styles.categoryButton,
+                    selectedCategory === category && styles.categoryButtonActive,
+                  ]}>
+                  <Text
+                    style={[
+                      styles.categoryText,
+                      selectedCategory === category && styles.categoryTextActive,
+                    ]}>
+                    {category}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+
+            <View style={styles.previewInventory}>
+              {previewItems.slice(0, 1).map((item) => (
+                <Pressable
+                  key={item.id}
+                  onPress={() => setSelectedItem(item)}
+                  style={styles.previewInventoryCard}>
+                  <Image
+                    source={shopImages.items[item.id]}
+                    style={styles.previewInventoryImage}
+                    resizeMode="contain"
+                  />
+                </Pressable>
+              ))}
+            </View>
+          </>
+        )}
+      </View>
+
+      <Modal transparent animationType="fade" visible={confirmVisible} onRequestClose={handleNo}>
+        <View style={styles.modalBackdrop}>
+          <View style={styles.confirmModal}>
+            <Pressable onPress={handleNo} style={styles.modalBackIcon}>
+              <Text style={styles.modalBackText}>{'<'}</Text>
+            </Pressable>
+
+            <Text style={styles.modalTitle}>Are you sure you want to buy this?</Text>
+
+            <View style={styles.modalItemCard}>
+              <Image
+                source={shopImages.items[selectedItem.id]}
+                style={styles.modalItemImage}
+                resizeMode="contain"
+              />
+            </View>
+
+            <Text style={styles.modalItemName}>{selectedItem.name}</Text>
+            <PriceTag value={selectedItem.price} large />
+
+            <View style={styles.modalActions}>
+              <Pressable onPress={handleNo} style={[styles.actionButton, styles.actionNo]}>
+                <Text style={[styles.actionText, styles.actionNoText]}>No</Text>
+              </Pressable>
+              <Pressable onPress={handlePreview} style={[styles.actionButton, styles.actionPreview]}>
+                <Text style={[styles.actionText, styles.actionPreviewText]}>Preview</Text>
+              </Pressable>
+              <Pressable onPress={handleBuy} style={[styles.actionButton, styles.actionBuy]}>
+                <Text style={[styles.actionText, styles.actionBuyText]}>Buy</Text>
+              </Pressable>
             </View>
           </View>
         </View>
+      </Modal>
 
-        {confirmingPurchase ? (
-          <View style={styles.inlineHint}>
-            <Text style={styles.inlineHintText}>
-              Preview active. Use Buy to confirm the selected cosmetic.
+      <Modal transparent animationType="fade" visible={successVisible} onRequestClose={() => setSuccessVisible(false)}>
+        <View style={styles.modalBackdrop}>
+          <View style={styles.successModal}>
+            <Text style={styles.successText}>
+              {lastPurchaseSucceeded
+                ? 'Item bought successfully, enjoy!'
+                : 'Not enough gems for this item.'}
             </Text>
+            <Pressable onPress={() => setSuccessVisible(false)} style={styles.successCloseButton}>
+              <Text style={styles.successCloseText}>Close</Text>
+            </Pressable>
           </View>
-        ) : null}
-      </ScrollView>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -305,411 +508,597 @@ export default function ShopPage() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#999999',
+    backgroundColor: '#6b6b6b',
   },
-  pageContent: {
-    flexGrow: 1,
-    paddingHorizontal: 20,
-    paddingVertical: 28,
-    alignItems: 'center',
+  screen: {
+    flex: 1,
+    backgroundColor: '#2d2d2d',
   },
-  stage: {
-    width: '100%',
-    maxWidth: 1240,
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'center',
-    gap: 48,
-  },
-  phoneShell: {
-    width: 356,
-  },
-  shopCard: {
-    minHeight: 730,
-    backgroundColor: '#4a4a4a',
-    paddingHorizontal: 18,
-    paddingTop: 24,
-    paddingBottom: 16,
-  },
-  previewCard: {
-    minHeight: 730,
-    backgroundColor: '#444444',
-    paddingHorizontal: 18,
-    paddingTop: 22,
-    paddingBottom: 16,
-  },
-  centerColumn: {
-    width: 320,
-    justifyContent: 'center',
-    paddingVertical: 64,
-  },
-  centerLabel: {
-    color: '#faf5f8',
-    fontSize: 16,
-    fontWeight: '700',
-    marginBottom: 10,
+  shopContent: {
+    paddingHorizontal: 16,
+    paddingTop: 26,
+    paddingBottom: 22,
   },
   currencyRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    marginBottom: 22,
+    marginBottom: 26,
   },
-  gemCountIcon: {
-    width: 18,
-    height: 36,
+  coinImage: {
+    width: 24,
+    height: 44,
   },
   currencyText: {
-    color: '#f3a0ff',
-    fontSize: 35,
+    color: '#df79ff',
+    fontSize: 30,
     fontWeight: '800',
   },
-  featuredWrap: {
-    alignItems: 'center',
-    marginBottom: 20,
-  },
   ribbonImage: {
-    width: 286,
-    height: 82,
-    marginBottom: 10,
+    width: '100%',
+    height: 86,
+    marginBottom: 8,
+  },
+  bannerViewport: {
+    marginTop: -6,
+  },
+  bannerTrack: {
+    alignItems: 'center',
+  },
+  bannerSlide: {
+    width: bannerWidth,
   },
   bannerCard: {
-    width: '100%',
-    height: 112,
-    borderRadius: 13,
+    width: bannerWidth,
+    height: 146,
+    borderRadius: 14,
     overflow: 'hidden',
-    backgroundColor: '#7c230c',
+    backgroundColor: '#7c280f',
   },
   bannerImage: {
     width: '100%',
     height: '100%',
   },
-  carouselDots: {
+  bannerCaption: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 10,
+    paddingHorizontal: 14,
     flexDirection: 'row',
-    gap: 8,
-    marginTop: 12,
+    justifyContent: 'space-between',
+    alignItems: 'flex-end',
+  },
+  bannerCaptionTitle: {
+    color: '#fff5f7',
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  bannerCaptionMeta: {
+    color: '#fff5e7',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  customBannerGlow: {
+    position: 'absolute',
+    width: 180,
+    height: 180,
+    borderRadius: 999,
+    right: -20,
+    top: -26,
+    opacity: 0.45,
+  },
+  customBannerShapes: {
+    position: 'absolute',
+    left: 18,
+    top: 24,
+  },
+  customBlobLarge: {
+    width: 86,
+    height: 86,
+    borderRadius: 28,
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    transform: [{ rotate: '-10deg' }],
+  },
+  customBlobSmall: {
+    width: 54,
+    height: 54,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255,255,255,0.22)',
+    marginTop: -10,
+    marginLeft: 54,
+    transform: [{ rotate: '14deg' }],
+  },
+  customBannerEyebrow: {
+    marginTop: 18,
+    marginLeft: 128,
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 1,
+  },
+  customBannerTitle: {
+    marginTop: 22,
+    marginLeft: 128,
+    fontSize: 26,
+    fontWeight: '900',
+  },
+  customBannerMeta: {
+    marginTop: 8,
+    marginLeft: 128,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  dotRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 10,
+    marginTop: 14,
+    marginBottom: 28,
   },
   dot: {
     width: 18,
     height: 4,
     borderRadius: 999,
-    backgroundColor: '#cfcfcf',
+    backgroundColor: '#c5c5c8',
   },
   dotActive: {
-    backgroundColor: '#f156f2',
+    backgroundColor: '#ff40e6',
   },
   sectionPill: {
-    backgroundColor: '#f8f5f7',
-    borderRadius: 9,
-    minHeight: 36,
-    justifyContent: 'center',
+    minHeight: 46,
+    borderRadius: 12,
+    backgroundColor: '#f4d7f2',
     alignItems: 'center',
-    marginBottom: 18,
+    justifyContent: 'center',
+    marginBottom: 22,
   },
   sectionPillText: {
-    color: '#ff39f4',
-    fontSize: 18,
+    color: '#ef31e4',
+    fontSize: 20,
     fontWeight: '900',
-    letterSpacing: 0.7,
   },
-  grid: {
+  itemGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
-    rowGap: 14,
-    marginBottom: 18,
+    rowGap: 18,
+    marginBottom: 26,
   },
-  productCard: {
+  itemsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'flex-start',
+    rowGap: 18,
+    columnGap: 18,
+    marginBottom: 10,
+  },
+  itemTile: {
     width: '31%',
     alignItems: 'center',
+    borderRadius: 14,
     paddingVertical: 4,
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: 'transparent',
   },
-  productCardActive: {
-    borderColor: '#f0b1ff',
-    backgroundColor: '#575757',
+  itemTileSelected: {
+    backgroundColor: '#3a3a3a',
   },
-  itemArtFrame: {
-    width: 80,
-    height: 80,
+  itemImageCard: {
+    width: 104,
+    height: 102,
     borderRadius: 12,
     backgroundColor: '#ffffff',
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
   },
-  itemArtFrameLarge: {
-    width: 88,
-    height: 88,
-  },
   itemImage: {
-    width: 64,
-    height: 64,
+    width: 74,
+    height: 74,
   },
-  itemImageLarge: {
-    width: 72,
-    height: 72,
-  },
-  productName: {
+  itemName: {
     color: '#ffffff',
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '700',
     textAlign: 'center',
-    marginTop: 6,
-    minHeight: 34,
+    marginTop: 8,
+    minHeight: 38,
   },
   priceRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    marginTop: 2,
+    gap: 5,
   },
-  gemIcon: {
-    width: 9,
-    height: 9,
-    backgroundColor: '#f2a1ff',
-    transform: [{ rotate: '45deg' }],
-    borderRadius: 1,
-  },
-  gemIconLarge: {
+  priceCoin: {
     width: 11,
-    height: 11,
+    height: 20,
+  },
+  priceCoinLarge: {
+    width: 12,
+    height: 24,
   },
   priceText: {
-    color: '#f2a1ff',
-    fontSize: 15,
+    color: '#d76ef6',
+    fontSize: 16,
     fontWeight: '800',
   },
-  largePriceText: {
-    fontSize: 16,
+  priceTextLarge: {
+    fontSize: 18,
   },
-  bottomNav: {
-    height: 40,
-    backgroundColor: '#f148ef',
+  bottomBar: {
+    height: 54,
+    backgroundColor: '#db39d8',
     flexDirection: 'row',
-    justifyContent: 'space-around',
     alignItems: 'center',
+    justifyContent: 'space-around',
   },
-  centerNavWrap: {
+  navButton: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  iconBox: {
     width: 34,
     height: 34,
-    borderRadius: 10,
-    backgroundColor: '#fff8fd',
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: -16,
   },
-  navLabel: {
-    color: '#231828',
-    fontSize: 11,
-    fontWeight: '800',
+  homeRoof: {
+    width: 0,
+    height: 0,
+    borderLeftWidth: 9,
+    borderRightWidth: 9,
+    borderBottomWidth: 9,
+    borderLeftColor: 'transparent',
+    borderRightColor: 'transparent',
+    marginBottom: -1,
   },
-  centerNavText: {
-    color: '#231828',
-    fontSize: 10,
-    fontWeight: '900',
-  },
-  confirmCard: {
-    borderWidth: 2,
-    borderColor: '#ececec',
-    backgroundColor: '#4b4b4b',
-    paddingVertical: 16,
-    paddingHorizontal: 14,
-    alignItems: 'center',
-    marginBottom: 18,
-    minHeight: 274,
-  },
-  confirmBackButton: {
-    position: 'absolute',
-    left: 10,
-    top: 12,
-  },
-  confirmBackText: {
-    color: '#eb95ff',
-    fontSize: 22,
-    fontWeight: '900',
-  },
-  confirmTitle: {
-    color: '#f0a4ff',
-    fontSize: 17,
-    fontWeight: '800',
-    textAlign: 'center',
-    width: 180,
-    lineHeight: 28,
-    marginTop: 4,
-    marginBottom: 12,
-  },
-  confirmItemName: {
-    color: '#ffffff',
-    fontSize: 18,
-    fontWeight: '800',
-    marginTop: 10,
-  },
-  confirmActions: {
-    flexDirection: 'row',
-    gap: 18,
-    marginTop: 24,
-  },
-  actionButton: {
-    minWidth: 58,
-    height: 36,
-    borderRadius: 8,
+  homeBody: {
+    width: 16,
+    height: 13,
     borderWidth: 2,
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 14,
-    backgroundColor: '#ffffff',
-  },
-  actionButtonNo: {
-    borderColor: '#ff5f55',
-  },
-  actionButtonPreview: {
-    borderColor: '#f079ff',
-  },
-  actionButtonBuy: {
-    borderColor: '#7ef338',
-  },
-  actionButtonText: {
-    fontSize: 14,
-    fontWeight: '800',
-  },
-  actionButtonNoText: {
-    color: '#ff5f55',
-  },
-  actionButtonPreviewText: {
-    color: '#f079ff',
-  },
-  actionButtonBuyText: {
-    color: '#33be00',
-  },
-  successCard: {
-    borderWidth: 2,
-    borderColor: '#ececec',
-    backgroundColor: '#4b4b4b',
-    minHeight: 166,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 24,
-  },
-  successText: {
-    color: '#f0a4ff',
-    fontSize: 23,
-    fontWeight: '800',
-    lineHeight: 38,
-    textAlign: 'center',
-  },
-  backButton: {
-    alignSelf: 'flex-start',
-    backgroundColor: '#f9f2f7',
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    marginBottom: 8,
-  },
-  backButtonText: {
-    color: '#f6e6f4',
-    fontSize: 16,
-    fontWeight: '900',
-  },
-  previewStage: {
-    height: 346,
-    position: 'relative',
     justifyContent: 'flex-end',
-    alignItems: 'center',
-    marginBottom: 14,
+    borderTopWidth: 0,
   },
-  shadowOval: {
-    position: 'absolute',
-    bottom: 24,
-    width: 212,
-    height: 28,
-    borderRadius: 999,
-    backgroundColor: '#d9d9d9',
+  homeDoor: {
+    width: 4,
+    height: 6,
   },
-  mascotImage: {
-    width: 242,
-    height: 302,
-    position: 'absolute',
-    top: 8,
-  },
-  previewHat: {
-    position: 'absolute',
-    top: 26,
-    width: 118,
-    height: 82,
-  },
-  previewGlasses: {
-    position: 'absolute',
-    top: 118,
-    width: 114,
-    height: 44,
-  },
-  previewCrown: {
-    position: 'absolute',
-    top: 12,
-    width: 130,
-    height: 106,
-  },
-  previewBuddy: {
+  socialHeadLeft: {
     position: 'absolute',
     left: 8,
-    bottom: 36,
-    width: 92,
-    height: 112,
+    top: 7,
+    width: 7,
+    height: 7,
+    borderWidth: 2,
+    borderRadius: 8,
   },
-  categoryTabs: {
-    flexDirection: 'row',
-    borderTopWidth: 2,
-    borderTopColor: '#777777',
-    marginHorizontal: -18,
+  socialHeadRight: {
+    position: 'absolute',
+    right: 8,
+    top: 7,
+    width: 7,
+    height: 7,
+    borderWidth: 2,
+    borderRadius: 8,
   },
-  categoryTab: {
-    flex: 1,
-    minHeight: 56,
+  socialBodyLeft: {
+    position: 'absolute',
+    left: 5,
+    bottom: 8,
+    width: 10,
+    height: 8,
+    borderWidth: 2,
+    borderTopLeftRadius: 8,
+    borderTopRightRadius: 8,
+    borderBottomWidth: 0,
+  },
+  socialBodyRight: {
+    position: 'absolute',
+    right: 5,
+    bottom: 8,
+    width: 10,
+    height: 8,
+    borderWidth: 2,
+    borderTopLeftRadius: 8,
+    borderTopRightRadius: 8,
+    borderBottomWidth: 0,
+  },
+  rankBarShort: {
+    width: 6,
+    height: 15,
+    position: 'absolute',
+    left: 6,
+    bottom: 7,
+  },
+  rankBarTall: {
+    width: 6,
+    height: 22,
+    position: 'absolute',
+    left: 14,
+    bottom: 7,
+  },
+  rankBarMid: {
+    width: 6,
+    height: 18,
+    position: 'absolute',
+    right: 6,
+    bottom: 7,
+  },
+  shopIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRightWidth: 1,
-    borderRightColor: '#555555',
   },
-  categoryTabActive: {
+  shopIconWrapActive: {
+    backgroundColor: '#ffe8ff',
+  },
+  bagHandle: {
+    width: 12,
+    height: 7,
     borderWidth: 2,
-    borderColor: '#e9edf2',
-    marginTop: -2,
+    borderBottomWidth: 0,
+    borderTopLeftRadius: 7,
+    borderTopRightRadius: 7,
+    marginBottom: -1,
   },
-  categoryTabText: {
+  bagBody: {
+    width: 15,
+    height: 14,
+    borderWidth: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  bagPocket: {
+    width: 6,
+    height: 5,
+    borderWidth: 2,
+    borderTopLeftRadius: 4,
+    borderTopRightRadius: 4,
+    borderBottomWidth: 0,
+  },
+  previewHead: {
+    width: 8,
+    height: 8,
+    borderWidth: 2,
+    borderRadius: 8,
+    marginBottom: 2,
+  },
+  previewBody: {
+    width: 16,
+    height: 10,
+    borderWidth: 2,
+    borderTopLeftRadius: 10,
+    borderTopRightRadius: 10,
+    borderBottomWidth: 0,
+  },
+  previewTop: {
+    paddingHorizontal: 22,
+    paddingTop: 30,
+    paddingBottom: 10,
+  },
+  previewBackButton: {
+    alignSelf: 'flex-start',
+    backgroundColor: '#ef8ed6',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 12,
+    borderWidth: 3,
+    borderColor: '#fff0ff',
+  },
+  previewBackText: {
+    color: '#fff5ff',
+    fontSize: 17,
+    fontWeight: '800',
+  },
+  previewStage: {
+    height: 454,
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+  },
+  previewShadow: {
+    position: 'absolute',
+    bottom: 54,
+    width: 210,
+    height: 34,
+    borderRadius: 999,
+    backgroundColor: '#acacac',
+  },
+  previewMascot: {
+    width: 286,
+    height: 352,
+    marginTop: 10,
+  },
+  previewAccessoryHat: {
+    position: 'absolute',
+    top: 90,
+    width: 130,
+    height: 88,
+  },
+  previewAccessoryGlasses: {
+    position: 'absolute',
+    top: 190,
+    width: 120,
+    height: 48,
+  },
+  previewAccessoryCrown: {
+    position: 'absolute',
+    top: 76,
+    width: 138,
+    height: 112,
+  },
+  previewAccessoryBuddy: {
+    position: 'absolute',
+    left: 28,
+    bottom: 84,
+    width: 94,
+    height: 114,
+  },
+  categoryBar: {
+    height: 58,
+    backgroundColor: '#111116',
+    flexDirection: 'row',
+    borderTopWidth: 1,
+    borderTopColor: '#494952',
+  },
+  categoryButton: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  categoryButtonActive: {
+    borderWidth: 2,
+    borderColor: '#cfd2ee',
+  },
+  categoryText: {
     color: '#ffffff',
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '700',
   },
-  categoryTabTextActive: {
+  categoryTextActive: {
     color: '#ffffff',
   },
   previewInventory: {
-    minHeight: 180,
-    backgroundColor: '#252529',
-    marginHorizontal: -18,
+    flex: 1,
+    backgroundColor: '#0e0e13',
+    padding: 26,
+  },
+  previewInventoryCard: {
+    width: 82,
+    height: 82,
+    borderRadius: 12,
+    borderWidth: 3,
+    borderColor: '#cbd2ff',
+    backgroundColor: '#3f424f',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  previewInventoryImage: {
+    width: 52,
+    height: 52,
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.28)',
+    alignItems: 'center',
+    justifyContent: 'center',
     padding: 20,
   },
-  previewSelectionCard: {
-    width: 68,
-    padding: 4,
-    borderRadius: 10,
-    borderWidth: 3,
-    borderColor: '#f0f0ff',
-    backgroundColor: '#4f4f57',
-  },
-  inlineHint: {
-    marginTop: 22,
+  confirmModal: {
+    width: '100%',
+    maxWidth: 370,
+    borderWidth: 2,
+    borderColor: '#d5d5d5',
+    backgroundColor: '#2d2d2d',
     paddingHorizontal: 18,
-    paddingVertical: 12,
-    borderRadius: 999,
-    backgroundColor: '#4d4d4d',
+    paddingVertical: 24,
+    alignItems: 'center',
   },
-  inlineHintText: {
-    color: '#f7c3ff',
-    fontSize: 14,
-    fontWeight: '700',
+  modalBackIcon: {
+    position: 'absolute',
+    left: 16,
+    top: 16,
+  },
+  modalBackText: {
+    color: '#d575ff',
+    fontSize: 26,
+    fontWeight: '900',
+  },
+  modalTitle: {
+    color: '#c86bf1',
+    fontSize: 20,
+    fontWeight: '800',
+    textAlign: 'center',
+    lineHeight: 32,
+    width: 246,
+    marginBottom: 18,
+  },
+  modalItemCard: {
+    width: 102,
+    height: 102,
+    borderRadius: 14,
+    backgroundColor: '#ffffff',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalItemImage: {
+    width: 72,
+    height: 72,
+  },
+  modalItemName: {
+    color: '#ffffff',
+    fontSize: 18,
+    fontWeight: '800',
+    marginTop: 14,
+    marginBottom: 4,
+  },
+  modalActions: {
+    flexDirection: 'row',
+    gap: 16,
+    marginTop: 24,
+  },
+  actionButton: {
+    minWidth: 76,
+    height: 42,
+    borderWidth: 3,
+    borderRadius: 10,
+    backgroundColor: '#fff4ff',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 14,
+  },
+  actionNo: {
+    borderColor: '#ff544d',
+  },
+  actionPreview: {
+    borderColor: '#f27cff',
+  },
+  actionBuy: {
+    borderColor: '#90ff56',
+  },
+  actionText: {
+    fontSize: 16,
+    fontWeight: '800',
+  },
+  actionNoText: {
+    color: '#ff544d',
+  },
+  actionPreviewText: {
+    color: '#cf77f2',
+  },
+  actionBuyText: {
+    color: '#3eb100',
+  },
+  successModal: {
+    width: '100%',
+    maxWidth: 420,
+    minHeight: 210,
+    borderWidth: 2,
+    borderColor: '#d5d5d5',
+    backgroundColor: '#2d2d2d',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 28,
+  },
+  successText: {
+    color: '#c86bf1',
+    fontSize: 22,
+    fontWeight: '800',
+    textAlign: 'center',
+    lineHeight: 42,
+  },
+  successCloseButton: {
+    marginTop: 24,
+    backgroundColor: '#f4d7f2',
+    borderRadius: 12,
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+  },
+  successCloseText: {
+    color: '#c34de7',
+    fontSize: 15,
+    fontWeight: '800',
   },
 });
