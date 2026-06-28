@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { StyleSheet, Text, View } from 'react-native';
 
+import { AppIcon } from '@/components/AppIcon';
 import { Brand, Radius, Spacing } from '@/constants/theme';
 import type { Quest } from '@/constants/mockData';
 
@@ -43,7 +44,7 @@ export function QuestCard({ quests }: Props) {
               </View>
             </View>
             <View style={styles.reward}>
-              <Ionicons name="diamond" size={12} color={Brand.gem} />
+              <AppIcon name="diamond" size={12} />
               <Text style={styles.rewardText}>{quest.rewardGems}</Text>
             </View>
           </View>
