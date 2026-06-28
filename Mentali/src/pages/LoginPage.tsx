@@ -31,6 +31,7 @@ type LoginPageProps = {
   onToggleMode: () => void;
   onSignupPress: () => void;
   onForgotPasswordPress: () => void;
+  onLoginPress: () => void;
   onSocialAuthSuccess: (session: SocialAuthResult) => void;
 };
 
@@ -83,6 +84,7 @@ export default function LoginPage({
   onToggleMode,
   onSignupPress,
   onForgotPasswordPress,
+  onLoginPress,
   onSocialAuthSuccess,
 }: LoginPageProps) {
   const [phoneNumber, setPhoneNumber] = useState("");
@@ -248,7 +250,10 @@ export default function LoginPage({
               <Text style={styles.forgotText}>Forgot password?</Text>
             </Pressable>
 
-            <Pressable style={({ pressed }) => [styles.loginButton, pressed && styles.loginButtonPressed]}>
+            <Pressable
+              onPress={onLoginPress}
+              style={({ pressed }) => [styles.loginButton, pressed && styles.loginButtonPressed]}
+            >
               <Text style={styles.loginButtonText}>LOGIN</Text>
             </Pressable>
 
