@@ -2,8 +2,21 @@
   "name": "mentali",
   "main": "expo/AppEntry",
   "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "start": "expo start",
+    "start:dev": "expo start --dev-client",
+    "reset-project": "node ./scripts/reset-project.js",
+    "android": "expo start --android",
+    "ios": "expo start --ios",
+    "web": "expo start --web",
+    "android:dev": "expo start --dev-client --android",
+    "ios:dev": "expo start --dev-client --ios",
+    "lint": "expo lint"
+  },
   "dependencies": {
     "@expo/ngrok": "^4.1.3",
+    "@expo/vector-icons": "^15.0.3",
     "expo": "54.0.35",
     "expo-apple-authentication": "~8.0.8",
     "expo-auth-session": "~7.0.11",
@@ -22,18 +35,6 @@
   "devDependencies": {
     "@types/react": "~19.2.2",
     "eas-cli": "^20.3.0",
-    "typescript": "~6.0.3"
-  },
-  "scripts": {
-    "start": "expo start",
-    "start:dev": "expo start --dev-client",
-    "reset-project": "node ./scripts/reset-project.js",
-    "android": "expo start --android",
-    "ios": "expo start --ios",
-    "android:dev": "expo start --dev-client --android",
-    "ios:dev": "expo start --dev-client --ios",
-    "web": "expo start --web",
-    "lint": "expo lint"
-  },
-  "private": true
+    "typescript": "~5.9.2"
+  }
 }
