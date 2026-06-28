@@ -11,7 +11,6 @@ import { FriendRow } from '@/components/social/FriendRow';
 import { MilestoneModal } from '@/components/social/MilestoneModal';
 import { MoreMenu } from '@/components/social/MoreMenu';
 import { NotificationsModal } from '@/components/social/NotificationsModal';
-import { QuestCard } from '@/components/social/QuestCard';
 import { RequestRow } from '@/components/social/RequestRow';
 import { SearchBar } from '@/components/social/SearchBar';
 import { SortFilterBar, type FriendFilter, type FriendSort } from '@/components/social/SortFilterBar';
@@ -122,8 +121,6 @@ export default function SocialScreen() {
           onPressNotifications={() => setNotifVisible(true)}
           onPressMenu={() => setMenuVisible(true)}
         />
-
-        <QuestCard quests={quests} />
 
         <FriendCodeInput onSubmit={addFriendByCode} />
 

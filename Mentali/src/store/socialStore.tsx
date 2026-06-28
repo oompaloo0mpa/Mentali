@@ -17,7 +17,7 @@ import {
   type Quest,
 } from '@/constants/mockData';
 
-const STORAGE_KEY = 'mentali.social.v2';
+const STORAGE_KEY = 'mentali.social.v3';
 
 export type MuteDuration = '8h' | '24h' | '1w';
 

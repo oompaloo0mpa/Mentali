@@ -132,8 +132,10 @@ export const DAILY_QUESTS: Quest[] = [
 export const NOTIFICATIONS: AppNotification[] = [
   { id: 'n1', icon: 'person-add', title: 'Alex sent you a friend request', time: '2m ago', read: false, recent: true },
   { id: 'n2', icon: 'flame', title: 'Your 10-day streak with Josh is at risk!', time: '1h ago', read: false, recent: true },
-  { id: 'n3', icon: 'chatbubble-ellipses', title: 'Alex sent you a message', time: '3h ago', read: true, recent: true },
-  { id: 'n4', icon: 'trophy', title: 'You reached a 67-day streak 🎉', time: 'Yesterday', read: true, recent: false },
+  { id: 'n3', icon: 'chatbubble-ellipses', title: 'Maya sent you a message', time: '3h ago', read: false, recent: true },
+  { id: 'n4', icon: 'person-add', title: 'Jordan accepted your friend request', time: '5h ago', read: true, recent: true },
+  { id: 'n5', icon: 'trophy', title: 'You reached a 67-day streak 🎉', time: 'Yesterday', read: true, recent: false },
+  { id: 'n6', icon: 'flame', title: 'Josh kept the streak alive for you', time: '2 days ago', read: true, recent: false },
 ];
 
 /** Streak lengths that unlock a shared milestone celebration. */

@@ -6,6 +6,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Brand, Radius, Spacing } from '@/constants/theme';
 import type { AppNotification } from '@/constants/mockData';
 
+/** Purple accent used across the notifications panel. */
+const Accent = '#B02AB3';
+
 type Props = {
   visible: boolean;
   onClose: () => void;
@@ -23,7 +26,7 @@ function NotificationItem({ item, onPress }: { item: AppNotification; onPress: (
       accessibilityRole="button"
       accessibilityLabel={`${item.title}. ${item.read ? 'Read' : 'Unread'}`}>
       <View style={[styles.iconCircle, !item.read && styles.iconCircleUnread]}>
-        <Ionicons name={item.icon} size={18} color={item.read ? Brand.textSecondary : Brand.magenta} />
+        <Ionicons name={item.icon} size={18} color={item.read ? Brand.textSecondary : Brand.magentaDeep} />
       </View>
       <View style={styles.itemText}>
         <Text style={[styles.itemTitle, !item.read && styles.itemTitleUnread]}>{item.title}</Text>
@@ -57,14 +60,14 @@ export function NotificationsModal({
       <Pressable style={styles.backdrop} onPress={onClose}>
         <Pressable style={[styles.card, { marginTop: insets.top + 56 }]} onPress={() => {}}>
           <View style={styles.header}>
-            <Text style={styles.title}>Notifications</Text>
+            <Text style={styles.title} numberOfLines={1}>Notifications</Text>
             <View style={styles.headerActions}>
               {hasUnread && (
                 <Pressable onPress={onMarkAllRead} hitSlop={8} accessibilityRole="button" accessibilityLabel="Mark all as read">
                   <Text style={styles.action}>Mark all read</Text>
                 </Pressable>
               )}
-              <Pressable onPress={onClose} hitSlop={8} accessibilityRole="button" accessibilityLabel="Close notifications">
+              <Pressable onPress={onClose} hitSlop={8} style={styles.closeButton} accessibilityRole="button" accessibilityLabel="Close notifications">
                 <Ionicons name="close" size={20} color={Brand.text} />
               </Pressable>
             </View>
@@ -83,8 +86,8 @@ export function NotificationsModal({
           </ScrollView>
 
           {notifications.length > 0 && (
-            <Pressable style={styles.clear} onPress={onClear} accessibilityRole="button" accessibilityLabel="Clear all notifications">
-              <Ionicons name="trash-outline" size={15} color={Brand.textSecondary} />
+            <Pressable style={({ pressed }) => [styles.clear, pressed && styles.clearPressed]} onPress={onClear} accessibilityRole="button" accessibilityLabel="Clear all notifications">
+              <Ionicons name="trash-outline" size={18} color="#FFFFFF" />
               <Text style={styles.clearText}>Clear all</Text>
             </Pressable>
           )}
@@ -100,7 +103,9 @@ const styles = StyleSheet.create({
     width: '88%',
     maxHeight: '64%',
     backgroundColor: Brand.surface,
-    borderRadius: Radius.md,
+    borderRadius: Radius.lg,
+    borderWidth: 2,
+    borderColor: '#FF6DEB',
     paddingHorizontal: Spacing.three,
     paddingVertical: Spacing.two,
   },
@@ -108,26 +113,35 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingBottom: Spacing.one,
+    gap: Spacing.two,
+    paddingBottom: Spacing.two,
   },
-  title: { color: Brand.text, fontSize: 16, fontWeight: '800' },
-  headerActions: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
-  action: { color: Brand.pink, fontSize: 13, fontWeight: '700' },
+  title: { flex: 1, color: Brand.text, fontSize: 20, fontWeight: '800' },
+  headerActions: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two, flexShrink: 0 },
+  action: { color: Brand.pink, fontSize: 14, fontWeight: '800' },
+  closeButton: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: Brand.divider,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   list: { flexGrow: 0 },
   groupLabel: {
     color: Brand.textSecondary,
     fontSize: 12,
     fontWeight: '800',
-    textTransform: 'uppercase',
+    textTransform: 'capitalize',
     letterSpacing: 0.5,
-    paddingTop: Spacing.one,
-    paddingBottom: 4,
+    paddingTop: Spacing.two,
+    paddingBottom: Spacing.one,
   },
   item: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.two,
-    paddingVertical: Spacing.one,
+    paddingVertical: Spacing.two,
     borderRadius: Radius.sm,
   },
   itemPressed: { backgroundColor: 'rgba(255,255,255,0.04)' },
@@ -135,26 +149,28 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: Brand.surfaceElevated,
+    backgroundColor: '#312C2E',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  iconCircleUnread: { backgroundColor: 'rgba(216,27,156,0.18)' },
+  iconCircleUnread: { backgroundColor: '#FFE2F8' },
   itemText: { flex: 1 },
-  itemTitle: { color: Brand.textSecondary, fontSize: 14, fontWeight: '600', lineHeight: 19 },
-  itemTitleUnread: { color: Brand.text, fontWeight: '700' },
-  itemTime: { color: Brand.textMuted, fontSize: 12, marginTop: 2 },
-  unreadDot: { width: 9, height: 9, borderRadius: 5, backgroundColor: Brand.magenta },
+  itemTitle: { color: Brand.text, fontSize: 15, fontWeight: '700', lineHeight: 20 },
+  itemTitleUnread: { color: Brand.text, fontWeight: '800' },
+  itemTime: { color: Brand.textMuted, fontSize: 12, fontWeight: '600', marginTop: 2 },
+  unreadDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#FF5DE7' },
   empty: { color: Brand.textSecondary, fontSize: 14, paddingVertical: Spacing.three, textAlign: 'center' },
   clear: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
-    paddingTop: Spacing.two,
-    marginTop: Spacing.one,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: Brand.divider,
+    gap: Spacing.one,
+    paddingVertical: Spacing.two,
+    marginTop: Spacing.two,
+    marginBottom: Spacing.one,
+    borderRadius: Radius.pill,
+    backgroundColor: Accent,
   },
-  clearText: { color: Brand.textSecondary, fontSize: 13, fontWeight: '700' },
+  clearPressed: { opacity: 0.85 },
+  clearText: { color: '#FFFFFF', fontSize: 16, fontWeight: '800' },
 });
