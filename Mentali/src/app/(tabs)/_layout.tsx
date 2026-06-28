@@ -1,7 +1,19 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
+import { StyleSheet, View } from 'react-native';
 
-import { Brand } from '@/constants/theme';
+const NAV_BG = '#B02AB3';
+const ACTIVE_PILL = '#FFE2F8';
+const ACTIVE_ICON = '#B02AB3';
+const INACTIVE_ICON = '#FFFFFF';
+
+function TabIcon({ name, focused }: { name: keyof typeof Ionicons.glyphMap; focused: boolean }) {
+  return (
+    <View style={[styles.iconWrap, focused && styles.iconWrapActive]}>
+      <Ionicons name={name} size={24} color={focused ? ACTIVE_ICON : INACTIVE_ICON} />
+    </View>
+  );
+}
 
 /** Tab bar styled to match the product mockups. Only Friends is fully implemented. */
 export default function TabsLayout() {
@@ -10,10 +22,8 @@ export default function TabsLayout() {
       screenOptions={{
         headerShown: false,
         tabBarShowLabel: false,
-        tabBarActiveTintColor: '#FFFFFF',
-        tabBarInactiveTintColor: 'rgba(255,255,255,0.6)',
         tabBarStyle: {
-          backgroundColor: Brand.magenta,
+          backgroundColor: NAV_BG,
           borderTopWidth: 0,
           height: 64,
           paddingTop: 6,
@@ -24,37 +34,48 @@ export default function TabsLayout() {
         name="index"
         options={{
           title: 'Home',
-          tabBarIcon: ({ color, size }) => <Ionicons name="home" size={size} color={color} />,
+          tabBarIcon: ({ focused }) => <TabIcon name="home" focused={focused} />,
         }}
       />
       <Tabs.Screen
         name="social"
         options={{
           title: 'Friends',
-          tabBarIcon: ({ color, size }) => <Ionicons name="people" size={size} color={color} />,
+          tabBarIcon: ({ focused }) => <TabIcon name="people" focused={focused} />,
         }}
       />
       <Tabs.Screen
         name="stats"
         options={{
           title: 'Stats',
-          tabBarIcon: ({ color, size }) => <Ionicons name="stats-chart" size={size} color={color} />,
+          tabBarIcon: ({ focused }) => <TabIcon name="trophy" focused={focused} />,
         }}
       />
       <Tabs.Screen
         name="journal"
         options={{
           title: 'Journal',
-          tabBarIcon: ({ color, size }) => <Ionicons name="albums" size={size} color={color} />,
+          tabBarIcon: ({ focused }) => <TabIcon name="bag-handle" focused={focused} />,
         }}
       />
       <Tabs.Screen
         name="profile"
         options={{
           title: 'Profile',
-          tabBarIcon: ({ color, size }) => <Ionicons name="person" size={size} color={color} />,
+          tabBarIcon: ({ focused }) => <TabIcon name="shirt" focused={focused} />,
         }}
       />
     </Tabs>
   );
 }
+
+const styles = StyleSheet.create({
+  iconWrap: {
+    width: 48,
+    height: 36,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  iconWrapActive: { backgroundColor: ACTIVE_PILL },
+});

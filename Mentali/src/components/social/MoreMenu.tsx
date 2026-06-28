@@ -32,15 +32,19 @@ export function MoreMenu({ visible, onClose, onSelect }: Props) {
           <Pressable style={styles.closeRow} onPress={onClose} hitSlop={8}>
             <Ionicons name="close" size={20} color={Brand.text} />
           </Pressable>
-          {ITEMS.map((item) => (
+          {ITEMS.map((item, index) => (
             <Pressable
               key={item.key}
-              style={({ pressed }) => [styles.item, pressed && styles.pressed]}
+              style={({ pressed }) => [
+                styles.item,
+                index < ITEMS.length - 1 && styles.itemDivider,
+                pressed && styles.pressed,
+              ]}
               onPress={() => {
                 onSelect?.(item.key);
                 onClose();
               }}>
-              <Ionicons name={item.icon} size={18} color={Brand.gem} />
+              <Ionicons name={item.icon} size={20} color={MENU_ACCENT} />
               <Text style={styles.itemLabel}>{item.label}</Text>
             </Pressable>
           ))}
@@ -50,18 +54,23 @@ export function MoreMenu({ visible, onClose, onSelect }: Props) {
   );
 }
 
+const MENU_ACCENT = '#B02AB3';
+const MENU_BORDER = '#FF6DEB';
+
 const styles = StyleSheet.create({
   backdrop: { flex: 1, alignItems: 'flex-end', paddingHorizontal: Spacing.three },
   card: {
-    minWidth: 180,
-    backgroundColor: Brand.background,
-    borderRadius: Radius.md,
+    minWidth: 220,
+    backgroundColor: Brand.surface,
+    borderRadius: Radius.lg,
+    borderWidth: 2,
+    borderColor: MENU_BORDER,
     paddingVertical: Spacing.one,
-    paddingHorizontal: Spacing.two,
-    gap: 4,
+    paddingHorizontal: Spacing.three,
   },
-  closeRow: { alignSelf: 'flex-start', padding: 4 },
-  item: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10, paddingHorizontal: 4 },
+  closeRow: { alignSelf: 'flex-end', padding: 4 },
+  item: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: Spacing.two },
+  itemDivider: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: Brand.divider },
   pressed: { opacity: 0.6 },
-  itemLabel: { color: Brand.text, fontSize: 15, fontWeight: '600' },
+  itemLabel: { color: Brand.text, fontSize: 16, fontWeight: '700' },
 });
