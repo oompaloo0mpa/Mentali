@@ -1,50 +1,29 @@
 {
   "expo": {
-    "name": "Mentali",
-    "slug": "Mentali",
+    "name": "test54",
+    "slug": "test54",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
-    "scheme": "mentali",
-    "userInterfaceStyle": "automatic",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
     "ios": {
-      "icon": "./assets/expo.icon",
-      "bundleIdentifier": "com.jayden.mentali",
-      "usesAppleSignIn": true,
-      "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
-      }
+      "supportsTablet": true
     },
     "android": {
-      "package": "com.jayden.mentali",
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/images/android-icon-foreground.png",
-        "backgroundImage": "./assets/images/android-icon-background.png",
-        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
       },
-      "predictiveBackGestureEnabled": false
+      "edgeToEdgeEnabled": true
     },
     "web": {
-      "output": "single",
-      "favicon": "./assets/images/favicon.png"
-    },
-    "experiments": {
-      "reactCompiler": true
-    },
-    "plugins": [
-      "expo-web-browser"
-    ],
-    "extra": {
-      "eas": {
-        "projectId": "8f97c217-fc40-42b8-8f28-f21a8551a928"
-      }
-    },
-    "runtimeVersion": {
-      "policy": "appVersion"
-    },
-    "updates": {
-      "url": "https://u.expo.dev/8f97c217-fc40-42b8-8f28-f21a8551a928"
+      "favicon": "./assets/favicon.png"
     }
   }
 }
