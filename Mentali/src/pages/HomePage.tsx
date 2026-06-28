@@ -1,24 +1,49 @@
 import { useState, type ComponentProps } from 'react';
 import {
+  Modal,
   Image,
   type ImageSourcePropType,
   Pressable,
   StatusBar,
   StyleSheet,
   Text,
+  ScrollView,
   TouchableOpacity,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { moods, navItems, quests, stats, type MoodItem, type QuestItem, type StatItem } from '../hooks/homepageData';
+import {
+  initialNotifications,
+  moods,
+  navItems,
+  quests,
+  stats,
+  type AppNotification,
+  type MoodItem,
+  type QuestItem,
+  type StatItem,
+} from '../hooks/homepageData';
 
 const bronzeTrophy = require('../../assets/images/BronzeTrophy.png') as ImageSourcePropType;
-const feelings = require('../../assets/images/feelings.png') as ImageSourcePropType;
 const thinkingMascot = require('../../assets/images/thinkingMascot.png') as ImageSourcePropType;
+const arrowIcon = require('../../assets/images/ArrowIcon.png') as ImageSourcePropType;
+const statsIcon = require('../../assets/images/StatsIcon.png') as ImageSourcePropType;
+const diamondIcon = require('../../assets/images/DiamondIcon.png') as ImageSourcePropType;
 
 const moodStripWidth = 364;
 const moodFaceWidth = moodStripWidth / moods.length;
+
+type NotificationPanelProps = {
+  visible: boolean;
+  notifications: AppNotification[];
+  unreadCount: number;
+  onClose: () => void;
+  onMarkNotificationRead: (id: string) => void;
+  onMarkAllNotificationsRead: () => void;
+  onClearNotifications: () => void;
+  topInset: number;
+};
 
 type MoodButtonProps = {
   mood: MoodItem;
@@ -29,7 +54,7 @@ type MoodButtonProps = {
 function StatPill({ icon, value, color }: StatItem) {
   return (
     <View style={styles.statPill}>
-      <Text style={[styles.statIcon, { color }]}>{icon}</Text>
+      <Image source={icon} resizeMode="contain" style={[styles.statIconImage, { tintColor: color }]} />
       <Text style={[styles.statValue, { color }]}>{value}</Text>
     </View>
   );
@@ -38,11 +63,7 @@ function StatPill({ icon, value, color }: StatItem) {
 function MoodButton({ mood, selected, onPress }: MoodButtonProps) {
   return (
     <Pressable onPress={onPress} style={[styles.moodButton, selected && styles.moodButtonSelected, { backgroundColor: mood.color }]}>
-      <Image
-        source={feelings}
-        resizeMode="cover"
-        style={[styles.moodImage, { transform: [{ translateX: -(mood.imageOffset * moodFaceWidth) }] }]}
-      />
+      <Image source={mood.image} resizeMode="contain" style={styles.moodImage} />
     </Pressable>
   );
 }
@@ -79,15 +100,140 @@ function MascotArt() {
   return <Image source={thinkingMascot} resizeMode="contain" style={styles.mascotImage} />;
 }
 
+function NotificationPanel({
+  visible,
+  notifications,
+  unreadCount,
+  onClose,
+  onMarkNotificationRead,
+  onMarkAllNotificationsRead,
+  onClearNotifications,
+  topInset,
+}: NotificationPanelProps) {
+  const todayNotifications = notifications.filter((notification) => notification.recent);
+  const earlierNotifications = notifications.filter((notification) => !notification.recent);
+
+  const sections = [
+    { label: 'Today', items: todayNotifications },
+    { label: 'Earlier', items: earlierNotifications },
+  ].filter((section) => section.items.length > 0);
+
+  return (
+    <Modal transparent animationType="fade" visible={visible} onRequestClose={onClose}>
+      <Pressable style={[styles.notificationsBackdrop, { paddingTop: topInset + 56 }]} onPress={onClose}>
+        <Pressable style={styles.notificationsCard} onPress={() => {}}>
+          <View style={styles.notificationsHeader}>
+            <Text style={styles.notificationsTitle}>Notifications</Text>
+
+            <View style={styles.notificationsHeaderActions}>
+              {unreadCount > 0 ? (
+                <Pressable onPress={onMarkAllNotificationsRead} hitSlop={8}>
+                  <Text style={styles.markAllReadText}>Mark all read</Text>
+                </Pressable>
+              ) : null}
+
+              <Pressable onPress={onClose} style={styles.notificationsCloseButton} hitSlop={8}>
+                <Ionicons name="close" size={18} color="#fff" />
+              </Pressable>
+            </View>
+          </View>
+
+          {notifications.length === 0 ? (
+            <View style={styles.notificationsEmptyState}>
+              <Text style={styles.notificationsEmptyText}>You're all caught up!</Text>
+            </View>
+          ) : (
+            <>
+              <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.notificationsScrollContent}>
+                {sections.map((section) => (
+                  <View key={section.label} style={styles.notificationsSection}>
+                    <Text style={styles.notificationsSectionLabel}>{section.label}</Text>
+
+                    {section.items.map((notification) => {
+                      const unread = !notification.read;
+
+                      return (
+                        <Pressable
+                          key={notification.id}
+                          style={styles.notificationRow}
+                          onPress={() => onMarkNotificationRead(notification.id)}
+                        >
+                          <View
+                            style={[
+                              styles.notificationIconCircle,
+                              unread && styles.notificationIconCircleUnread,
+                            ]}
+                          >
+                            <Ionicons
+                              name={notification.icon}
+                              size={16}
+                              color={unread ? '#FF4DEA' : '#BCAFC2'}
+                            />
+                          </View>
+
+                          <View style={styles.notificationTextColumn}>
+                            <Text style={[styles.notificationItemTitle, unread && styles.notificationItemTitleUnread]}>
+                              {notification.title}
+                            </Text>
+                            <Text style={styles.notificationTime}>{notification.time}</Text>
+                          </View>
+
+                          {unread ? <View style={styles.notificationUnreadDot} /> : <View style={styles.notificationUnreadDotSpacer} />}
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                ))}
+              </ScrollView>
+
+              <View style={styles.notificationsFooter}>
+                <Pressable
+                  onPress={onClearNotifications}
+                  style={({ pressed }) => [styles.clearAllButton, pressed && styles.clearAllButtonPressed]}
+                >
+                  <Ionicons name="trash-outline" size={16} color="#fff" />
+                  <Text style={styles.clearAllText}>Clear all</Text>
+                </Pressable>
+              </View>
+            </>
+          )}
+        </Pressable>
+      </Pressable>
+    </Modal>
+  );
+}
+
 export default function HomePage() {
   const [selectedMood, setSelectedMood] = useState(0);
+  const [notificationsVisible, setNotificationsVisible] = useState(false);
+  const [notifications, setNotifications] = useState<AppNotification[]>(initialNotifications);
   const completedCount = 2;
+  const insets = useSafeAreaInsets();
+  const unreadCount = notifications.filter((notification) => !notification.read).length;
+
+  const markNotificationRead = (id: string) => {
+    setNotifications((currentNotifications) =>
+      currentNotifications.map((notification) =>
+        notification.id === id ? { ...notification, read: true } : notification,
+      ),
+    );
+  };
+
+  const markAllNotificationsRead = () => {
+    setNotifications((currentNotifications) =>
+      currentNotifications.map((notification) => ({ ...notification, read: true })),
+    );
+  };
+
+  const clearNotifications = () => {
+    setNotifications([]);
+  };
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
       <StatusBar barStyle="light-content" backgroundColor="#282425" />
 
-      <View style={styles.content}>
+      <View style={[styles.content, { paddingTop: insets.top - 100}]}> 
         <View style={styles.topRow}>
           <View style={styles.statGroup}>
             {stats.map((item) => (
@@ -96,14 +242,35 @@ export default function HomePage() {
           </View>
 
           <View style={styles.actionGroup}>
+            <Pressable
+              accessibilityLabel={`Notifications, ${unreadCount} unread`}
+              onPress={() => setNotificationsVisible(true)}
+              style={styles.notificationButton}
+            >
+              <Ionicons name="notifications-outline" size={20} color="#fff" />
+
+              {unreadCount > 0 ? (
+                <View style={styles.notificationBadge}>
+                  <Text style={styles.notificationBadgeText}>{unreadCount > 9 ? '9+' : String(unreadCount)}</Text>
+                </View>
+              ) : null}
+            </Pressable>
             <View style={styles.actionButton}>
-              <Text style={styles.actionIcon}>✉</Text>
-            </View>
-            <View style={styles.actionButton}>
-              <Text style={styles.actionIcon}>≡</Text>
+              <Ionicons name="menu-outline" size={22} color="#fff" />
             </View>
           </View>
         </View>
+
+        <NotificationPanel
+          visible={notificationsVisible}
+          notifications={notifications}
+          unreadCount={unreadCount}
+          onClose={() => setNotificationsVisible(false)}
+          onMarkNotificationRead={markNotificationRead}
+          onMarkAllNotificationsRead={markAllNotificationsRead}
+          onClearNotifications={clearNotifications}
+          topInset={insets.top}
+        />
 
         <View style={styles.heroRow}>
           <View style={styles.quoteBubble}>
@@ -168,7 +335,7 @@ export default function HomePage() {
 
           <View style={styles.rankCardRight}>
             <View style={styles.rankStatItem}>
-              <Text style={styles.rankStatIcon}>📊</Text>
+              <Image source={statsIcon} resizeMode="contain" style={styles.rankStatIconImage} />
               <View>
                 <Text style={styles.rankStatValue}>#10</Text>
                 <Text style={styles.rankStatLabel}>Current Position</Text>
@@ -176,7 +343,7 @@ export default function HomePage() {
             </View>
             <View style={styles.rankDivider} />
             <View style={styles.rankStatItem}>
-              <Text style={[styles.rankStatIcon, { color: '#C86BFF' }]}>🔷</Text>
+              <Image source={diamondIcon} resizeMode="contain" style={styles.rankStatIconImage} />
               <View>
                 <Text style={[styles.rankStatValue, { color: '#C86BFF' }]}>15</Text>
                 <Text style={styles.rankStatLabel}>Points this week</Text>
@@ -184,7 +351,9 @@ export default function HomePage() {
             </View>
             <View style={styles.rankDivider} />
             <View style={styles.rankStatItem}>
-              <Text style={[styles.rankStatIcon, { color: '#59C66A' }]}>⬆</Text>
+              <View style={styles.arrowIconCircle}>
+                <Image source={arrowIcon} resizeMode="contain" style={styles.rankStatIconImage} />
+              </View>
               <View>
                 <Text style={styles.rankStatValue}>20</Text>
                 <Text style={styles.rankStatLabel}>Positions</Text>
@@ -210,7 +379,6 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    paddingTop: 8,
     paddingHorizontal: 16,
     paddingBottom: 8,
   },
@@ -229,8 +397,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginRight: 10,
   },
-  statIcon: {
-    fontSize: 20,
+  statIconImage: {
+    width: 22,
+    height: 22,
     marginRight: 6,
   },
   statValue: {
@@ -257,10 +426,185 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 3 },
     elevation: 3,
   },
-  actionIcon: {
+  notificationButton: {
+    width: 42,
+    height: 42,
+    borderRadius: 14,
+    backgroundColor: '#FF9ADA',
+    borderWidth: 1,
+    borderColor: '#FFF4FB',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 10,
+    shadowColor: '#000',
+    shadowOpacity: 0.14,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 3,
+  },
+  notificationBadge: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: '#FF3B30',
+    borderWidth: 1.5,
+    borderColor: '#282425',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+  },
+  notificationBadgeText: {
     color: '#fff',
-    fontSize: 20,
+    fontSize: 10,
     fontWeight: '800',
+    lineHeight: 12,
+  },
+  notificationsBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'flex-end',
+    justifyContent: 'flex-start',
+    paddingHorizontal: 12,
+    zIndex: 20,
+  },
+  notificationsCard: {
+    width: '88%',
+    maxWidth: 360,
+    maxHeight: '64%',
+    borderRadius: 22,
+    backgroundColor: '#231F21',
+    borderWidth: 2,
+    borderColor: '#FF6DEB',
+    paddingHorizontal: 14,
+    paddingTop: 14,
+    paddingBottom: 12,
+    shadowColor: '#000',
+    shadowOpacity: 0.28,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 8,
+  },
+  notificationsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  notificationsTitle: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: '800',
+  },
+  notificationsHeaderActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  markAllReadText: {
+    color: '#FF6DEB',
+    fontSize: 12,
+    fontWeight: '800',
+    marginRight: 12,
+  },
+  notificationsCloseButton: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  notificationsScrollContent: {
+    paddingBottom: 8,
+  },
+  notificationsSection: {
+    marginBottom: 14,
+  },
+  notificationsSectionLabel: {
+    color: '#BCAFC2',
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 1,
+    marginBottom: 8,
+  },
+  notificationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+  },
+  notificationIconCircle: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#312C2E',
+    marginRight: 10,
+  },
+  notificationIconCircleUnread: {
+    backgroundColor: '#FFE2F8',
+  },
+  notificationTextColumn: {
+    flex: 1,
+    paddingRight: 10,
+  },
+  notificationItemTitle: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  notificationItemTitleUnread: {
+    color: '#FFF4FD',
+  },
+  notificationTime: {
+    color: '#BCAFC2',
+    fontSize: 11,
+    fontWeight: '600',
+    marginTop: 2,
+  },
+  notificationUnreadDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#FF5DE7',
+  },
+  notificationUnreadDotSpacer: {
+    width: 8,
+    height: 8,
+  },
+  notificationsFooter: {
+    paddingTop: 8,
+  },
+  clearAllButton: {
+    height: 38,
+    borderRadius: 19,
+    borderWidth: 1,
+    borderColor: '#FF6DEB',
+    backgroundColor: '#B03AB4',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+  },
+  clearAllButtonPressed: {
+    opacity: 0.85,
+  },
+  clearAllText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '800',
+    marginLeft: 8,
+  },
+  notificationsEmptyState: {
+    minHeight: 110,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+  },
+  notificationsEmptyText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '700',
   },
   heroRow: {
     flexDirection: 'row',
@@ -288,15 +632,15 @@ const styles = StyleSheet.create({
   },
   quoteTail: {
     position: 'absolute',
-    right: 40,
-    bottom: -10,
-    width: 18,
-    height: 18,
+    right: -8,
+    top: 38,
+    width: 16,
+    height: 16,
     backgroundColor: '#fff',
     borderBottomWidth: 2,
     borderRightWidth: 2,
     borderColor: '#FF8DED',
-    transform: [{ rotate: '45deg' }],
+    transform: [{ rotate: '315deg' }],
   },
   mascotImage: {
     width: 126,
@@ -327,8 +671,8 @@ const styles = StyleSheet.create({
     borderColor: '#FF5DE7',
   },
   moodImage: {
-    width: moodStripWidth,
-    height: 58,
+    width: 46,
+    height: 46,
   },
   sectionHeaderRow: {
     flexDirection: 'row',
@@ -461,7 +805,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   rankCardLeft: {
-    flex: 1,
+    flex: 0.9,
     backgroundColor: '#fff',
     borderRadius: 12,
     borderWidth: 2,
@@ -469,7 +813,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingTop: 10,
     paddingBottom: 10,
-    marginRight: 10,
   },
   rankLabel: {
     color: '#C150D2',
@@ -522,7 +865,7 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
   rankCardRight: {
-    width: 132,
+    width: 150,
     backgroundColor: '#fff',
     borderRadius: 12,
     borderWidth: 2,
@@ -540,6 +883,19 @@ const styles = StyleSheet.create({
     marginRight: 8,
     color: '#74B7FF',
   },
+  rankStatIconImage: {
+    width: 18,
+    height: 18,
+  },
+  arrowIconCircle: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#0d4a0d',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 8,
+  },
   rankStatValue: {
     color: '#111',
     fontSize: 16,
@@ -554,6 +910,10 @@ const styles = StyleSheet.create({
   rankDivider: {
     height: 2,
     backgroundColor: '#FF49EA',
+  },
+  ctaArrowImage: {
+    width: 16,
+    height: 16,
   },
   bottomNav: {
     height: 72,

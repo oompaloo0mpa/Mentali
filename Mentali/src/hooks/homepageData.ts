@@ -1,12 +1,24 @@
+import type { ImageSourcePropType } from 'react-native';
+
+const streakIcon = require('../../assets/images/StreakIcon.png') as ImageSourcePropType;
+const diamondIcon = require('../../assets/images/DiamondIcon.png') as ImageSourcePropType;
+const brainfreezeIcon = require('../../assets/images/BrainfreezeIcon.png') as ImageSourcePropType;
+
+const happyFeeling = require('../../assets/images/happyFeeling.png') as ImageSourcePropType;
+const contentFeeling = require('../../assets/images/contentFeeling.png') as ImageSourcePropType;
+const averageFeeling = require('../../assets/images/averageFeeling.png') as ImageSourcePropType;
+const sadFeeling = require('../../assets/images/sadFeeling.png') as ImageSourcePropType;
+const depressedFeeling = require('../../assets/images/depressedFeeling.png') as ImageSourcePropType;
+
 export type StatItem = {
-  icon: string;
+  icon: ImageSourcePropType;
   value: string;
   color: string;
 };
 
 export type MoodItem = {
   label: string;
-  imageOffset: number;
+  image: ImageSourcePropType;
   color: string;
 };
 
@@ -22,18 +34,27 @@ export type NavItem = {
   active?: boolean;
 };
 
+export type AppNotification = {
+  id: string;
+  icon: 'person-add' | 'flame' | 'chatbubble-ellipses' | 'trophy';
+  title: string;
+  time: string;
+  read: boolean;
+  recent: boolean;
+};
+
 export const stats: StatItem[] = [
-  { icon: '🔥', value: '67', color: '#FF9800' },
-  { icon: '🔷', value: '15', color: '#C86BFF' },
-  { icon: '🧊', value: '2', color: '#71BFEA' },
+  { icon: streakIcon, value: '67', color: '#FF9800' },
+  { icon: diamondIcon, value: '15', color: '#C86BFF' },
+  { icon: brainfreezeIcon, value: '2', color: '#71BFEA' },
 ];
 
 export const moods: MoodItem[] = [
-  { label: 'great', imageOffset: 0, color: '#7CD957' },
-  { label: 'good', imageOffset: 1, color: '#FFE06D' },
-  { label: 'meh', imageOffset: 2, color: '#FF8C42' },
-  { label: 'sad', imageOffset: 3, color: '#B8DCF5' },
-  { label: 'cry', imageOffset: 4, color: '#B6C9B7' },
+  { label: 'great', image: happyFeeling, color: '#7CD957' },
+  { label: 'good', image: contentFeeling, color: '#FFE06D' },
+  { label: 'meh', image: averageFeeling, color: '#FF8C42' },
+  { label: 'sad', image: sadFeeling, color: '#B8DCF5' },
+  { label: 'cry', image: depressedFeeling, color: '#B6C9B7' },
 ];
 
 export const quests: QuestItem[] = [
@@ -59,8 +80,43 @@ export const quests: QuestItem[] = [
 
 export const navItems: NavItem[] = [
   { icon: 'home-outline', active: true },
-  { icon: 'search-outline' },
+  { icon: 'people-outline' },
   { icon: 'trophy-outline' },
-  { icon: 'chatbubble-outline' },
-  { icon: 'person-outline' },
+  { icon: 'bag-outline' },
+  { icon: 'shirt-outline' },
+];
+
+export const initialNotifications: AppNotification[] = [
+  {
+    id: 'notif-1',
+    icon: 'person-add',
+    title: 'A friend sent you a request',
+    time: '2m ago',
+    read: false,
+    recent: true,
+  },
+  {
+    id: 'notif-2',
+    icon: 'flame',
+    title: 'Your streak is on fire',
+    time: '18m ago',
+    read: false,
+    recent: true,
+  },
+  {
+    id: 'notif-3',
+    icon: 'chatbubble-ellipses',
+    title: 'New message from Maya',
+    time: 'Yesterday',
+    read: true,
+    recent: false,
+  },
+  {
+    id: 'notif-4',
+    icon: 'trophy',
+    title: 'You unlocked Bronze rewards',
+    time: '2 days ago',
+    read: true,
+    recent: false,
+  },
 ];
