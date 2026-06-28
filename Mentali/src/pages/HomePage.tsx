@@ -8,7 +8,7 @@ import {
   StatusBar,
   View,
 } from 'react-native';
-import { moods, navItems, quests, stats, type MoodItem, type QuestItem, type StatItem } from '../data/homepageData';
+import { moods, navItems, quests, stats, type MoodItem, type QuestItem, type StatItem } from '../hooks/homepageData';
 
 function StatPill({ icon, value, color }: StatItem) {
   return (
