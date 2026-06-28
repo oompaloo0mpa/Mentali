@@ -5,12 +5,15 @@ import HomePage from '@/pages/HomePage';
 import { SocialProvider } from '@/storage/socialStore';
 import { FriendChatScreenContent } from '@/components/chat/FriendChatScreenContent';
 import { StreakGuideScreenContent } from '@/components/chat/StreakGuideScreenContent';
+import { CheckInChatScreen } from '@/pages/CheckInChatScreen';
+import { MOODS, PHQ4_QUESTIONS } from '@/data/checkInContent';
 
 type ScreenState =
   | { screen: 'login' }
   | { screen: 'home'; selectedNav?: string }
   | { screen: 'chat'; friendId: string; prefill?: boolean; returnToNav: string }
-  | { screen: 'streak-guide'; friendId: string; prefill?: boolean; returnToNav: string };
+  | { screen: 'streak-guide'; friendId: string; prefill?: boolean; returnToNav: string }
+  | { screen: 'check-in' };
 
 export default function App() {
   const [screenState, setScreenState] = useState<ScreenState>({ screen: 'login' });
@@ -37,6 +40,16 @@ export default function App() {
             initialSelectedNav={screenState.selectedNav ?? homeNav}
             onSelectedNavChange={setHomeNav}
             onOpenChat={(friend, prefill) => openChat(friend.id, prefill)}
+            onOpenCheckIn={() => setScreenState({ screen: 'check-in' })}
+          />
+        ) : screenState.screen === 'check-in' ? (
+          <CheckInChatScreen
+            mood={MOODS[2]}
+            questions={PHQ4_QUESTIONS}
+            headerTitle="Check-in"
+            completeLabel="Complete"
+            onBack={() => setScreenState({ screen: 'home', selectedNav: homeNav })}
+            onComplete={() => setScreenState({ screen: 'home', selectedNav: homeNav })}
           />
         ) : screenState.screen === 'chat' ? (
           <FriendChatScreenContent

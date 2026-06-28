@@ -31,6 +31,7 @@ type HomePageProps = {
   initialSelectedNav?: string;
   onSelectedNavChange?: (selectedNav: string) => void;
   onOpenChat?: (friend: Friend, prefillMotivation?: boolean) => void;
+  onOpenCheckIn?: () => void;
 };
 
 const bronzeTrophy = require('../../assets/images/BronzeTrophy.png') as ImageSourcePropType;
@@ -268,6 +269,7 @@ export default function HomePage({
   initialSelectedNav = navItems.find((item) => item.active)?.icon ?? navItems[0].icon,
   onSelectedNavChange,
   onOpenChat,
+  onOpenCheckIn,
 }: HomePageProps) {
   const [selectedMood, setSelectedMood] = useState(0);
   const [selectedNav, setSelectedNav] = useState(initialSelectedNav);
@@ -399,7 +401,7 @@ export default function HomePage({
                 <Text style={styles.ctaSubtitle}>It only takes a minute.</Text>
               </View>
 
-              <TouchableOpacity activeOpacity={0.9} style={styles.ctaButton}>
+              <TouchableOpacity activeOpacity={0.9} style={styles.ctaButton} onPress={onOpenCheckIn}>
                 <Text style={styles.ctaButtonText}>Start Check-in</Text>
                 <Text style={styles.ctaArrow}>→</Text>
               </TouchableOpacity>

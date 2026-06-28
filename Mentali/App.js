@@ -14,8 +14,15 @@ import {
 import HomePage from '@/pages/HomePage';
 import LoginPage from '@/pages/LoginPage';
 import {
+    CheckInChatScreen
+} from '@/pages/CheckInChatScreen';
+import {
     SocialProvider
 } from '@/storage/socialStore';
+import {
+    MOODS,
+    PHQ4_QUESTIONS
+} from '@/data/checkInContent';
 
 export default function App() {
     const [screenState, setScreenState] = useState({
@@ -71,6 +78,33 @@ export default function App() {
                 }
                 onOpenChat = {
                     (friend, prefill) => openChat(friend.id, prefill)
+                }
+                onOpenCheckIn = {
+                    () => setScreenState({
+                        screen: 'check-in'
+                    })
+                }
+                />
+            ) : screenState.screen === 'check-in' ? ( <
+                CheckInChatScreen mood = {
+                    MOODS[2]
+                }
+                questions = {
+                    PHQ4_QUESTIONS
+                }
+                headerTitle = "Check-in"
+                completeLabel = "Complete"
+                onBack = {
+                    () => setScreenState({
+                        screen: 'home',
+                        selectedNav: homeNav
+                    })
+                }
+                onComplete = {
+                    () => setScreenState({
+                        screen: 'home',
+                        selectedNav: homeNav
+                    })
                 }
                 />
             ) : screenState.screen === 'streak-guide' ? ( <
