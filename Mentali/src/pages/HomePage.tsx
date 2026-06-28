@@ -1,14 +1,30 @@
-import { useState } from 'react';
+import { useState, type ComponentProps } from 'react';
 import {
+  Image,
+  type ImageSourcePropType,
   Pressable,
-  ScrollView,
+  StatusBar,
   StyleSheet,
   Text,
   TouchableOpacity,
-  StatusBar,
   View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import { moods, navItems, quests, stats, type MoodItem, type QuestItem, type StatItem } from '../hooks/homepageData';
+
+const bronzeTrophy = require('../../assets/images/BronzeTrophy.png') as ImageSourcePropType;
+const feelings = require('../../assets/images/feelings.png') as ImageSourcePropType;
+const thinkingMascot = require('../../assets/images/thinkingMascot.png') as ImageSourcePropType;
+
+const moodStripWidth = 364;
+const moodFaceWidth = moodStripWidth / moods.length;
+
+type MoodButtonProps = {
+  mood: MoodItem;
+  selected: boolean;
+  onPress: () => void;
+};
 
 function StatPill({ icon, value, color }: StatItem) {
   return (
@@ -19,18 +35,14 @@ function StatPill({ icon, value, color }: StatItem) {
   );
 }
 
-type MoodButtonProps = {
-  mood: MoodItem;
-  selected: boolean;
-  onPress: () => void;
-};
-
 function MoodButton({ mood, selected, onPress }: MoodButtonProps) {
   return (
-    <Pressable onPress={onPress} style={[styles.moodButton, selected && styles.moodButtonSelected]}>
-      <View style={[styles.moodCircle, { backgroundColor: mood.color }]}>
-        <Text style={styles.moodFace}>{mood.face}</Text>
-      </View>
+    <Pressable onPress={onPress} style={[styles.moodButton, selected && styles.moodButtonSelected, { backgroundColor: mood.color }]}>
+      <Image
+        source={feelings}
+        resizeMode="cover"
+        style={[styles.moodImage, { transform: [{ translateX: -(mood.imageOffset * moodFaceWidth) }] }]}
+      />
     </Pressable>
   );
 }
@@ -39,8 +51,12 @@ function QuestCard({ item }: { item: QuestItem }) {
   return (
     <View style={[styles.questCard, item.active ? styles.questCardActive : styles.questCardInactive]}>
       <View style={styles.questTextWrap}>
-        <Text style={styles.questTitle}>{item.title}</Text>
-        <Text style={styles.questSubtitle}>{item.subtitle}</Text>
+        <Text numberOfLines={1} style={styles.questTitle}>
+          {item.title}
+        </Text>
+        <Text numberOfLines={1} style={styles.questSubtitle}>
+          {item.subtitle}
+        </Text>
       </View>
       <View style={styles.pointsPill}>
         <Text style={styles.pointsText}>{item.points}</Text>
@@ -50,46 +66,17 @@ function QuestCard({ item }: { item: QuestItem }) {
 }
 
 function BottomNavItem({ icon, active }: { icon: string; active?: boolean }) {
+  const iconName = active ? icon.replace('-outline', '') : icon;
+
   return (
     <View style={[styles.navItem, active && styles.navItemActive]}>
-      <Text style={[styles.navIcon, active && styles.navIconActive]}>{icon}</Text>
+      <Ionicons name={iconName as ComponentProps<typeof Ionicons>['name']} size={24} color={active ? '#111' : '#F4D5F2'} />
     </View>
   );
 }
 
-function BrainMascot() {
-  return (
-    <View style={styles.mascotWrap}>
-      <View style={styles.lightBulbWrap}>
-        <Text style={styles.lightBulb}>💡</Text>
-      </View>
-      <View style={styles.brainBody}>
-        <View style={styles.brainLobeOne} />
-        <View style={styles.brainLobeTwo} />
-        <View style={styles.brainLobeThree} />
-        <View style={styles.brainFace}>
-          <View style={styles.glassesLeft} />
-          <View style={styles.glassesRight} />
-          <View style={styles.glassesBridge} />
-          <View style={styles.eyeLeft} />
-          <View style={styles.eyeRight} />
-          <View style={styles.smile} />
-        </View>
-      </View>
-      <View style={styles.bookWrap}>
-        <View style={styles.bookLeft} />
-        <View style={styles.bookRight} />
-      </View>
-      <View style={styles.legsWrap}>
-        <View style={styles.legLeft} />
-        <View style={styles.legRight} />
-      </View>
-      <View style={styles.shoesWrap}>
-        <View style={styles.shoeLeft} />
-        <View style={styles.shoeRight} />
-      </View>
-    </View>
-  );
+function MascotArt() {
+  return <Image source={thinkingMascot} resizeMode="contain" style={styles.mascotImage} />;
 }
 
 export default function HomePage() {
@@ -97,9 +84,10 @@ export default function HomePage() {
   const completedCount = 2;
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
       <StatusBar barStyle="light-content" backgroundColor="#282425" />
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+
+      <View style={styles.content}>
         <View style={styles.topRow}>
           <View style={styles.statGroup}>
             {stats.map((item) => (
@@ -123,7 +111,7 @@ export default function HomePage() {
             <View style={styles.quoteTail} />
           </View>
 
-          <BrainMascot />
+          <MascotArt />
         </View>
 
         <View style={styles.moodsRow}>
@@ -166,7 +154,7 @@ export default function HomePage() {
           <View style={styles.rankCardLeft}>
             <Text style={styles.rankLabel}>Current Rank</Text>
             <View style={styles.rankBody}>
-              <Text style={styles.trophy}>🏆</Text>
+              <Image source={bronzeTrophy} resizeMode="contain" style={styles.trophyImage} />
               <View style={styles.rankInfo}>
                 <Text style={styles.rankName}>Bronze</Text>
                 <View style={styles.progressBarTrack}>
@@ -204,14 +192,14 @@ export default function HomePage() {
             </View>
           </View>
         </View>
-      </ScrollView>
+      </View>
 
       <View style={styles.bottomNav}>
         {navItems.map((item) => (
           <BottomNavItem key={item.icon} icon={item.icon} active={item.active} />
         ))}
       </View>
-    </View>
+    </SafeAreaView>
   );
 }
 
@@ -220,16 +208,17 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#282425',
   },
-  scrollContent: {
-    paddingTop: 54,
-    paddingHorizontal: 18,
-    paddingBottom: 108,
+  content: {
+    flex: 1,
+    paddingTop: 8,
+    paddingHorizontal: 16,
+    paddingBottom: 8,
   },
   topRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 34,
+    marginBottom: 10,
   },
   statGroup: {
     flexDirection: 'row',
@@ -238,298 +227,123 @@ const styles = StyleSheet.create({
   statPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginRight: 12,
+    marginRight: 10,
   },
   statIcon: {
-    fontSize: 28,
-    marginRight: 8,
+    fontSize: 20,
+    marginRight: 6,
   },
   statValue: {
-    fontSize: 22,
-    fontWeight: '700',
+    fontSize: 16,
+    fontWeight: '800',
   },
   actionGroup: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   actionButton: {
-    width: 64,
-    height: 64,
-    borderRadius: 16,
+    width: 42,
+    height: 42,
+    borderRadius: 14,
     backgroundColor: '#FF9ADA',
     borderWidth: 1,
     borderColor: '#FFF4FB',
     alignItems: 'center',
     justifyContent: 'center',
-    marginLeft: 14,
+    marginLeft: 10,
     shadowColor: '#000',
-    shadowOpacity: 0.16,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 4,
+    shadowOpacity: 0.14,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 3,
   },
   actionIcon: {
     color: '#fff',
-    fontSize: 25,
-    fontWeight: '700',
+    fontSize: 20,
+    fontWeight: '800',
   },
   heroRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 28,
+    marginBottom: 10,
   },
   quoteBubble: {
     flex: 1,
     backgroundColor: '#fff',
     borderRadius: 14,
-    paddingHorizontal: 18,
-    paddingVertical: 22,
-    marginRight: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginRight: 10,
     borderWidth: 2,
     borderColor: '#FF8DED',
-    minHeight: 132,
+    minHeight: 88,
     justifyContent: 'center',
   },
   quoteText: {
     color: '#F59AD3',
-    fontSize: 21,
-    fontWeight: '700',
-    lineHeight: 30,
+    fontSize: 15,
+    fontWeight: '800',
+    lineHeight: 19,
   },
   quoteTail: {
     position: 'absolute',
-    right: 52,
-    bottom: -12,
-    width: 24,
-    height: 24,
+    right: 40,
+    bottom: -10,
+    width: 18,
+    height: 18,
     backgroundColor: '#fff',
     borderBottomWidth: 2,
     borderRightWidth: 2,
     borderColor: '#FF8DED',
     transform: [{ rotate: '45deg' }],
   },
-  mascotWrap: {
-    width: 146,
-    height: 166,
-    alignItems: 'center',
-    justifyContent: 'center',
-    position: 'relative',
-  },
-  lightBulbWrap: {
-    position: 'absolute',
-    right: -2,
-    top: 2,
-  },
-  lightBulb: {
-    fontSize: 34,
-  },
-  brainBody: {
-    width: 118,
-    height: 98,
-    backgroundColor: '#F7A6B0',
-    borderRadius: 56,
-    alignItems: 'center',
-    justifyContent: 'center',
-    position: 'relative',
-  },
-  brainLobeOne: {
-    position: 'absolute',
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    backgroundColor: '#F6B3BC',
-    left: 10,
-    top: -4,
-  },
-  brainLobeTwo: {
-    position: 'absolute',
-    width: 54,
-    height: 54,
-    borderRadius: 27,
-    backgroundColor: '#F3A1AB',
-    right: 10,
-    top: -8,
-  },
-  brainLobeThree: {
-    position: 'absolute',
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: '#F8C2C9',
-    left: 34,
-    top: -12,
-  },
-  brainFace: {
-    width: 74,
-    height: 60,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  glassesLeft: {
-    position: 'absolute',
-    left: 4,
-    top: 16,
-    width: 26,
-    height: 26,
-    borderRadius: 13,
-    borderWidth: 4,
-    borderColor: '#2E2E2E',
-  },
-  glassesRight: {
-    position: 'absolute',
-    right: 4,
-    top: 16,
-    width: 26,
-    height: 26,
-    borderRadius: 13,
-    borderWidth: 4,
-    borderColor: '#2E2E2E',
-  },
-  glassesBridge: {
-    position: 'absolute',
-    top: 28,
-    left: 29,
-    width: 16,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: '#2E2E2E',
-  },
-  eyeLeft: {
-    position: 'absolute',
-    left: 15,
-    top: 26,
-    width: 7,
-    height: 7,
-    borderRadius: 4,
-    backgroundColor: '#C9D0DA',
-  },
-  eyeRight: {
-    position: 'absolute',
-    right: 15,
-    top: 26,
-    width: 7,
-    height: 7,
-    borderRadius: 4,
-    backgroundColor: '#C9D0DA',
-  },
-  smile: {
-    position: 'absolute',
-    bottom: 10,
-    width: 16,
-    height: 8,
-    borderBottomWidth: 3,
-    borderBottomColor: '#2E2E2E',
-    borderRadius: 10,
-  },
-  bookWrap: {
-    position: 'absolute',
-    left: -6,
-    top: 62,
-    flexDirection: 'row',
-    alignItems: 'center',
-    transform: [{ rotate: '-8deg' }],
-  },
-  bookLeft: {
-    width: 26,
-    height: 46,
-    backgroundColor: '#6A8A6B',
-    borderTopLeftRadius: 8,
-    borderBottomLeftRadius: 8,
-    borderWidth: 2,
-    borderColor: '#D9E3B1',
-  },
-  bookRight: {
-    width: 18,
-    height: 46,
-    backgroundColor: '#48614A',
-    borderTopRightRadius: 8,
-    borderBottomRightRadius: 8,
-  },
-  legsWrap: {
-    position: 'absolute',
-    bottom: 12,
-    flexDirection: 'row',
-    gap: 10,
-  },
-  legLeft: {
-    width: 14,
-    height: 22,
-    backgroundColor: '#6EC1FF',
-    borderRadius: 6,
-  },
-  legRight: {
-    width: 14,
-    height: 22,
-    backgroundColor: '#6EC1FF',
-    borderRadius: 6,
-  },
-  shoesWrap: {
-    position: 'absolute',
-    bottom: 2,
-    flexDirection: 'row',
-    gap: 14,
-  },
-  shoeLeft: {
-    width: 22,
-    height: 10,
-    backgroundColor: '#4D7FAE',
-    borderRadius: 6,
-  },
-  shoeRight: {
-    width: 22,
-    height: 10,
-    backgroundColor: '#4D7FAE',
-    borderRadius: 6,
+  mascotImage: {
+    width: 126,
+    height: 110,
+    marginRight: -2,
   },
   moodsRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 28,
+    marginBottom: 10,
   },
   moodButton: {
-    width: 88,
-    height: 88,
-    borderRadius: 44,
+    width: 58,
+    height: 58,
+    borderRadius: 29,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#fff',
+    overflow: 'hidden',
     shadowColor: '#000',
-    shadowOpacity: 0.16,
-    shadowRadius: 5,
-    shadowOffset: { width: 0, height: 3 },
-    elevation: 3,
+    shadowOpacity: 0.14,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
   },
   moodButtonSelected: {
-    borderWidth: 4,
+    borderWidth: 3,
     borderColor: '#FF5DE7',
-    backgroundColor: '#D6D2D5',
   },
-  moodCircle: {
-    width: 68,
-    height: 68,
-    borderRadius: 34,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  moodFace: {
-    fontSize: 30,
+  moodImage: {
+    width: moodStripWidth,
+    height: 58,
   },
   sectionHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 10,
+    marginBottom: 8,
   },
   sectionTitle: {
     color: '#fff',
-    fontSize: 22,
+    fontSize: 18,
     fontWeight: '800',
   },
   sectionMeta: {
     color: '#fff',
-    fontSize: 18,
+    fontSize: 13,
     fontWeight: '600',
   },
   sectionMetaHighlight: {
@@ -537,7 +351,7 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   questList: {
-    marginBottom: 18,
+    marginBottom: 10,
   },
   questCard: {
     flexDirection: 'row',
@@ -547,14 +361,15 @@ const styles = StyleSheet.create({
     borderColor: '#FF4DEA',
     borderRadius: 12,
     backgroundColor: '#F7C7F3',
-    paddingHorizontal: 20,
-    paddingVertical: 18,
-    marginBottom: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginBottom: 6,
+    minHeight: 44,
     shadowColor: '#000',
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 2,
+    shadowOpacity: 0.08,
+    shadowRadius: 3,
+    shadowOffset: { width: 0, height: 1 },
+    elevation: 1,
   },
   questCardInactive: {
     backgroundColor: '#fff',
@@ -565,31 +380,31 @@ const styles = StyleSheet.create({
   },
   questTextWrap: {
     flex: 1,
-    paddingRight: 12,
+    paddingRight: 10,
   },
   questTitle: {
     color: '#111',
-    fontSize: 22,
+    fontSize: 12,
     fontWeight: '800',
-    marginBottom: 3,
+    marginBottom: 1,
   },
   questSubtitle: {
     color: '#6E6E6E',
-    fontSize: 14,
+    fontSize: 9,
     fontWeight: '700',
   },
   pointsPill: {
-    minWidth: 86,
+    minWidth: 62,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#F48FD4',
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 20,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 16,
   },
   pointsText: {
     color: '#8F2A86',
-    fontSize: 16,
+    fontSize: 10,
     fontWeight: '800',
   },
   ctaCard: {
@@ -597,59 +412,53 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: '#FF49EA',
     borderRadius: 16,
-    paddingHorizontal: 22,
-    paddingVertical: 22,
-    marginBottom: 18,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    marginBottom: 8,
     shadowColor: '#000',
-    shadowOpacity: 0.15,
-    shadowRadius: 5,
-    shadowOffset: { width: 0, height: 3 },
-    elevation: 3,
+    shadowOpacity: 0.12,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
   },
   ctaTextWrap: {
-    marginBottom: 18,
+    marginBottom: 10,
   },
   ctaTitle: {
     color: '#111',
-    fontSize: 30,
+    fontSize: 18,
     fontWeight: '800',
-    lineHeight: 34,
-    marginBottom: 6,
+    lineHeight: 20,
+    marginBottom: 4,
   },
   ctaSubtitle: {
     color: '#7E6679',
-    fontSize: 18,
+    fontSize: 11,
     fontWeight: '700',
   },
   ctaButton: {
-    height: 54,
-    borderRadius: 27,
+    height: 36,
+    borderRadius: 18,
     backgroundColor: '#B03AB4',
     alignItems: 'center',
     justifyContent: 'center',
     flexDirection: 'row',
-    shadowColor: '#000',
-    shadowOpacity: 0.14,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 3 },
-    elevation: 3,
   },
   ctaButtonText: {
     color: '#fff',
-    fontSize: 18,
+    fontSize: 12,
     fontWeight: '800',
-    marginRight: 14,
+    marginRight: 10,
   },
   ctaArrow: {
     color: '#fff',
-    fontSize: 20,
+    fontSize: 14,
     fontWeight: '800',
   },
   rankRow: {
     flexDirection: 'row',
     alignItems: 'stretch',
     justifyContent: 'space-between',
-    marginBottom: 14,
   },
   rankCardLeft: {
     flex: 1,
@@ -657,62 +466,63 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 2,
     borderColor: '#FF49EA',
-    paddingHorizontal: 16,
-    paddingTop: 14,
-    paddingBottom: 18,
-    marginRight: 14,
+    paddingHorizontal: 10,
+    paddingTop: 10,
+    paddingBottom: 10,
+    marginRight: 10,
   },
   rankLabel: {
     color: '#C150D2',
-    fontSize: 18,
+    fontSize: 13,
     fontWeight: '800',
-    marginBottom: 12,
+    marginBottom: 8,
   },
   rankBody: {
     flexDirection: 'row',
     alignItems: 'center',
   },
-  trophy: {
-    fontSize: 70,
-    marginRight: 12,
+  trophyImage: {
+    width: 52,
+    height: 52,
+    marginRight: 8,
   },
   rankInfo: {
     flex: 1,
   },
   rankName: {
     color: '#8B5C35',
-    fontSize: 26,
+    fontSize: 18,
     fontWeight: '800',
-    marginBottom: 12,
+    marginBottom: 8,
   },
   progressBarTrack: {
-    height: 12,
-    borderRadius: 8,
+    height: 10,
+    borderRadius: 6,
     backgroundColor: '#D8D8D8',
     overflow: 'hidden',
-    marginBottom: 8,
+    marginBottom: 6,
   },
   progressBarFill: {
     width: '78%',
     height: '100%',
     backgroundColor: '#F47DF1',
-    borderRadius: 8,
+    borderRadius: 6,
   },
   rankPoints: {
     color: '#C150D2',
-    fontSize: 18,
+    fontSize: 12,
     fontWeight: '800',
     textAlign: 'right',
-    paddingRight: 12,
+    paddingRight: 6,
   },
   rankPosition: {
     color: '#8B5C35',
-    fontSize: 30,
+    fontSize: 18,
     fontWeight: '800',
-    marginLeft: 10,
+    marginLeft: 8,
   },
   rankCardRight: {
-    width: 150,
+    width: 132,
     backgroundColor: '#fff',
     borderRadius: 12,
     borderWidth: 2,
@@ -722,23 +532,23 @@ const styles = StyleSheet.create({
   rankStatItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 13,
+    paddingHorizontal: 10,
+    paddingVertical: 10,
   },
   rankStatIcon: {
-    fontSize: 22,
-    marginRight: 10,
+    fontSize: 18,
+    marginRight: 8,
     color: '#74B7FF',
   },
   rankStatValue: {
     color: '#111',
-    fontSize: 22,
+    fontSize: 16,
     fontWeight: '800',
-    marginBottom: 2,
+    marginBottom: 1,
   },
   rankStatLabel: {
     color: '#6E6E6E',
-    fontSize: 12,
+    fontSize: 10,
     fontWeight: '700',
   },
   rankDivider: {
@@ -746,11 +556,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FF49EA',
   },
   bottomNav: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    height: 86,
+    height: 72,
     backgroundColor: '#B02AB3',
     borderTopWidth: 1,
     borderTopColor: '#CC5FD0',
@@ -758,23 +564,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-around',
     paddingHorizontal: 10,
+    paddingBottom: 4,
   },
   navItem: {
-    width: 80,
-    height: 56,
+    width: 54,
+    height: 42,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 22,
+    borderRadius: 18,
   },
   navItemActive: {
     backgroundColor: '#F3C1F4',
-  },
-  navIcon: {
-    color: '#111',
-    fontSize: 30,
-    fontWeight: '900',
-  },
-  navIconActive: {
-    color: '#111',
   },
 });

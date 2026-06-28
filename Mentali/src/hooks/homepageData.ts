@@ -6,7 +6,7 @@ export type StatItem = {
 
 export type MoodItem = {
   label: string;
-  face: string;
+  imageOffset: number;
   color: string;
 };
 
@@ -29,11 +29,11 @@ export const stats: StatItem[] = [
 ];
 
 export const moods: MoodItem[] = [
-  { label: 'great', face: '😄', color: '#7CD957' },
-  { label: 'good', face: '🙂', color: '#FFE06D' },
-  { label: 'meh', face: '😞', color: '#FF8C42' },
-  { label: 'sad', face: '☹️', color: '#B8DCF5' },
-  { label: 'cry', face: '🥺', color: '#B6C9B7' },
+  { label: 'great', imageOffset: 0, color: '#7CD957' },
+  { label: 'good', imageOffset: 1, color: '#FFE06D' },
+  { label: 'meh', imageOffset: 2, color: '#FF8C42' },
+  { label: 'sad', imageOffset: 3, color: '#B8DCF5' },
+  { label: 'cry', imageOffset: 4, color: '#B6C9B7' },
 ];
 
 export const quests: QuestItem[] = [
@@ -58,9 +58,9 @@ export const quests: QuestItem[] = [
 ];
 
 export const navItems: NavItem[] = [
-  { icon: '⌂', active: true },
-  { icon: '◔' },
-  { icon: '▮▮▮' },
-  { icon: '👜' },
-  { icon: '⌄' },
+  { icon: 'home-outline', active: true },
+  { icon: 'search-outline' },
+  { icon: 'trophy-outline' },
+  { icon: 'chatbubble-outline' },
+  { icon: 'person-outline' },
 ];
