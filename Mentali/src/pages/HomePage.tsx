@@ -24,6 +24,7 @@ import {
   type QuestItem,
   type StatItem,
 } from '../hooks/homepageData';
+import { FriendsScreenContent } from '../components/social/FriendsScreenContent';
 
 const bronzeTrophy = require('../../assets/images/BronzeTrophy.png') as ImageSourcePropType;
 const thinkingMascot = require('../../assets/images/thinkingMascot.png') as ImageSourcePropType;
@@ -442,6 +443,8 @@ export default function HomePage() {
               </View>
             </View>
           </>
+        ) : selectedNav === 'people-outline' ? (
+          <FriendsScreenContent />
         ) : (
           <NavPlaceholder title={navLabels[selectedNav].title} icon={navLabels[selectedNav].icon} />
         )}
