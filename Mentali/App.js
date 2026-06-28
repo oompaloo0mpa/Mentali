@@ -1,52 +1,113 @@
-import { useState } from 'react';
-import { StyleSheet, TouchableOpacity, ScrollView, Text, View } from 'react-native';
-import { StatusBar } from 'expo-status-bar';
+import {
+    useState
+} from 'react';
+import {
+    SafeAreaProvider
+} from 'react-native-safe-area-context';
 
-const QUOTES = [
-  { text: 'Be yourself; everyone else is already taken.', author: 'Oscar Wilde' },
-  { text: 'The best time to plant a tree was 20 years ago. The second best time is now.', author: 'Chinese Proverb' },
-  { text: 'In the middle of difficulty lies opportunity.', author: 'Albert Einstein' },
-  { text: 'Do not watch the clock; do what it does. Keep going.', author: 'Sam Levenson' },
-  { text: 'The only impossible journey is the one you never begin.', author: 'Tony Robbins' },
-];
+import {
+    FriendChatScreenContent
+} from './src/components/chat/FriendChatScreenContent';
+import {
+    StreakGuideScreenContent
+} from './src/components/chat/StreakGuideScreenContent';
+import HomePage from './src/pages/HomePage';
+import LoginPage from './src/pages/LoginPage';
+import {
+    SocialProvider
+} from './src/store/socialStore';
 
 export default function App() {
-  const [index, setIndex] = useState(0);
+    const [screenState, setScreenState] = useState({
+        screen: 'login'
+    });
+    const [homeNav, setHomeNav] = useState('home-outline');
 
-  const nextQuote = () => {
-    setIndex(Math.floor(Math.random() * QUOTES.length));
-  };
+    const openChat = (friendId, prefill) => {
+        setScreenState({
+            screen: 'chat',
+            friendId,
+            prefill,
+            returnToNav: homeNav
+        });
+    };
 
-  const q = QUOTES[index];
-
-  return (
-    <View style={styles.container}>
-      <ScrollView contentContainerStyle={styles.inner}>
-        <Text style={styles.title}>💡 Daily Quotes</Text>
-        <View style={styles.quoteBox}>
-          <Text style={styles.quote}>"{q.text}"</Text>
-          <Text style={styles.author}>— {q.author}</Text>
-        </View>
-
-        <TouchableOpacity style={styles.button} onPress={nextQuote}>
-          <Text style={styles.buttonText}>Get New Quote</Text>
-        </TouchableOpacity>
-
-        <Text style={styles.footer}>Quote #{index + 1} of {QUOTES.length}</Text>
-        <StatusBar style="auto" />
-      </ScrollView>
-    </View>
-  );
+    return ( <
+        SafeAreaProvider >
+        <
+        SocialProvider > {
+            screenState.screen === 'login' ? ( <
+                LoginPage mode = "phone"
+                onToggleMode = {
+                    () => {}
+                }
+                onSignupPress = {
+                    () => {}
+                }
+                onForgotPasswordPress = {
+                    () => {}
+                }
+                onLoginPress = {
+                    () => setScreenState({
+                        screen: 'home',
+                        selectedNav: homeNav
+                    })
+                }
+                onSocialAuthSuccess = {
+                    () => setScreenState({
+                        screen: 'home',
+                        selectedNav: homeNav
+                    })
+                }
+                />
+            ) : screenState.screen === 'home' ? ( <
+                HomePage initialSelectedNav = {
+                    screenState.selectedNav || homeNav
+                }
+                onSelectedNavChange = {
+                    setHomeNav
+                }
+                onOpenChat = {
+                    (friend, prefill) => openChat(friend.id, prefill)
+                }
+                />
+            ) : screenState.screen === 'streak-guide' ? ( <
+                StreakGuideScreenContent onClose = {
+                    () =>
+                    setScreenState({
+                        screen: 'chat',
+                        friendId: screenState.friendId,
+                        prefill: screenState.prefill,
+                        returnToNav: screenState.returnToNav,
+                    })
+                }
+                />
+            ) : ( <
+                FriendChatScreenContent friendId = {
+                    screenState.friendId
+                }
+                prefill = {
+                    screenState.prefill ? '1' : undefined
+                }
+                onBack = {
+                    () => setScreenState({
+                        screen: 'home',
+                        selectedNav: screenState.returnToNav
+                    })
+                }
+                onOpenStreakGuide = {
+                    () =>
+                    setScreenState({
+                        screen: 'streak-guide',
+                        friendId: screenState.friendId,
+                        prefill: screenState.prefill,
+                        returnToNav: screenState.returnToNav,
+                    })
+                }
+                />
+            )
+        } <
+        /SocialProvider> <
+        /SafeAreaProvider>
+    );
 }
-
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff' },
-  inner: { flexGrow: 1, justifyContent: 'center', alignItems: 'center', padding: 24, gap: 16 },
-  title: { fontSize: 24, fontWeight: '600', marginBottom: 12 },
-  quoteBox: { padding: 18, borderRadius: 8, backgroundColor: '#f6f8fa', width: '100%', alignItems: 'center' },
-  quote: { fontSize: 18, fontStyle: 'italic', textAlign: 'center', lineHeight: 26 },
-  author: { fontSize: 14, textAlign: 'right', width: '100%', marginTop: 12 },
-  button: { marginTop: 18, backgroundColor: '#007AFF', paddingVertical: 12, paddingHorizontal: 22, borderRadius: 8 },
-  buttonText: { color: '#fff', fontWeight: '600' },
-  footer: { marginTop: 12, color: '#666' },
-});

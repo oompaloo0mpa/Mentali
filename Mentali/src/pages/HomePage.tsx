@@ -1,4 +1,4 @@
-import { useState, type ComponentProps } from 'react';
+import { useEffect, useState, type ComponentProps } from 'react';
 import {
   Modal,
   Image,
@@ -25,6 +25,13 @@ import {
   type StatItem,
 } from '../hooks/homepageData';
 import { FriendsScreenContent } from '../components/social/FriendsScreenContent';
+import type { Friend } from '@/constants/mockData';
+
+type HomePageProps = {
+  initialSelectedNav?: string;
+  onSelectedNavChange?: (selectedNav: string) => void;
+  onOpenChat?: (friend: Friend, prefillMotivation?: boolean) => void;
+};
 
 const bronzeTrophy = require('../../assets/images/BronzeTrophy.png') as ImageSourcePropType;
 const thinkingMascot = require('../../assets/images/thinkingMascot.png') as ImageSourcePropType;
@@ -257,9 +264,13 @@ function MoreMenuPanel({ visible, onClose, topInset }: MoreMenuPanelProps) {
   );
 }
 
-export default function HomePage() {
+export default function HomePage({
+  initialSelectedNav = navItems.find((item) => item.active)?.icon ?? navItems[0].icon,
+  onSelectedNavChange,
+  onOpenChat,
+}: HomePageProps) {
   const [selectedMood, setSelectedMood] = useState(0);
-  const [selectedNav, setSelectedNav] = useState(navItems.find((item) => item.active)?.icon ?? navItems[0].icon);
+  const [selectedNav, setSelectedNav] = useState(initialSelectedNav);
   const [notificationsVisible, setNotificationsVisible] = useState(false);
   const [moreMenuVisible, setMoreMenuVisible] = useState(false);
   const [notifications, setNotifications] = useState<AppNotification[]>(initialNotifications);
@@ -267,6 +278,10 @@ export default function HomePage() {
   const insets = useSafeAreaInsets();
   const unreadCount = notifications.filter((notification) => !notification.read).length;
   const isHomeSelected = selectedNav === 'home-outline';
+
+  useEffect(() => {
+    onSelectedNavChange?.(selectedNav);
+  }, [selectedNav, onSelectedNavChange]);
 
   const navLabels: Record<string, { title: string; icon: ComponentProps<typeof Ionicons>['name'] }> = {
     'home-outline': { title: 'Home', icon: 'home-outline' },
@@ -444,7 +459,11 @@ export default function HomePage() {
             </View>
           </>
         ) : selectedNav === 'people-outline' ? (
-          <FriendsScreenContent />
+          <FriendsScreenContent
+            showHeader={false}
+            onOpenChat={(friend) => onOpenChat?.(friend)}
+            onSendMotivation={(friend) => onOpenChat?.(friend, true)}
+          />
         ) : (
           <NavPlaceholder title={navLabels[selectedNav].title} icon={navLabels[selectedNav].icon} />
         )}

@@ -26,11 +26,12 @@ function lastMotivationText(messages: { text: string; sender: 'me' | 'them' }[])
 }
 
 type Props = {
+  showHeader?: boolean;
   onOpenChat?: (friend: Friend) => void;
   onSendMotivation?: (friend: Friend) => void;
 };
 
-export function FriendsScreenContent({ onOpenChat, onSendMotivation }: Props) {
+export function FriendsScreenContent({ showHeader = true, onOpenChat, onSendMotivation }: Props) {
   const {
     friends,
     requests,
@@ -114,14 +115,16 @@ export function FriendsScreenContent({ onOpenChat, onSendMotivation }: Props) {
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}>
-        <StatBar
-          fire={fireStreak}
-          diamonds={diamonds}
-          gems={gems}
-          unreadCount={unreadNotifications}
-          onPressNotifications={() => setNotifVisible(true)}
-          onPressMenu={() => setMenuVisible(true)}
-        />
+        {showHeader ? (
+          <StatBar
+            fire={fireStreak}
+            diamonds={diamonds}
+            gems={gems}
+            unreadCount={unreadNotifications}
+            onPressNotifications={() => setNotifVisible(true)}
+            onPressMenu={() => setMenuVisible(true)}
+          />
+        ) : null}
 
         <FriendCodeInput onSubmit={addFriendByCode} />
 
