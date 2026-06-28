@@ -42,6 +42,11 @@ const shopImages = {
   featuredRibbon: require('../../assets/images/shop/Featured.png'),
   featuredBanner: require('../../assets/images/shop/LimitedSetGodzilla.png'),
   mascot: require('../../assets/images/shop/Mascot.png'),
+  nav: {
+    home: require('../../assets/images/shop/Home.png'),
+    social: require('../../assets/images/shop/Social.png'),
+    preview: require('../../assets/images/shop/Preview.png'),
+  },
   items: {
     brainfreeze: require('../../assets/images/shop/Brainfreeze.png'),
     'sonic-shoes': require('../../assets/images/shop/SonicShoes.png'),
@@ -111,23 +116,17 @@ function NavIcon({ name, active }: { name: NavKey; active: boolean }) {
 
   if (name === 'home') {
     return (
-      <View style={styles.iconBox}>
-        <View style={[styles.homeRoof, { borderBottomColor: color }]} />
-        <View style={[styles.homeBody, { borderColor: color }]}>
-          <View style={[styles.homeDoor, { backgroundColor: color }]} />
-        </View>
-      </View>
+      <Image source={shopImages.nav.home} style={styles.bottomNavImage} resizeMode="contain" />
     );
   }
 
   if (name === 'social') {
     return (
-      <View style={styles.iconBox}>
-        <View style={[styles.socialHeadLeft, { borderColor: color }]} />
-        <View style={[styles.socialHeadRight, { borderColor: color }]} />
-        <View style={[styles.socialBodyLeft, { borderColor: color }]} />
-        <View style={[styles.socialBodyRight, { borderColor: color }]} />
-      </View>
+      <Image
+        source={shopImages.nav.social}
+        style={styles.bottomNavImage}
+        resizeMode="contain"
+      />
     );
   }
 
@@ -152,12 +151,7 @@ function NavIcon({ name, active }: { name: NavKey; active: boolean }) {
     );
   }
 
-  return (
-    <View style={styles.iconBox}>
-      <View style={[styles.previewHead, { borderColor: color }]} />
-      <View style={[styles.previewBody, { borderColor: color }]} />
-    </View>
-  );
+  return <Image source={shopImages.nav.preview} style={styles.bottomNavImage} resizeMode="contain" />;
 }
 
 function ItemTile({
@@ -741,67 +735,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  homeRoof: {
-    width: 0,
-    height: 0,
-    borderLeftWidth: 9,
-    borderRightWidth: 9,
-    borderBottomWidth: 9,
-    borderLeftColor: 'transparent',
-    borderRightColor: 'transparent',
-    marginBottom: -1,
-  },
-  homeBody: {
-    width: 16,
-    height: 13,
-    borderWidth: 2,
-    alignItems: 'center',
-    justifyContent: 'flex-end',
-    borderTopWidth: 0,
-  },
-  homeDoor: {
-    width: 4,
-    height: 6,
-  },
-  socialHeadLeft: {
-    position: 'absolute',
-    left: 8,
-    top: 7,
-    width: 7,
-    height: 7,
-    borderWidth: 2,
-    borderRadius: 8,
-  },
-  socialHeadRight: {
-    position: 'absolute',
-    right: 8,
-    top: 7,
-    width: 7,
-    height: 7,
-    borderWidth: 2,
-    borderRadius: 8,
-  },
-  socialBodyLeft: {
-    position: 'absolute',
-    left: 5,
-    bottom: 8,
-    width: 10,
-    height: 8,
-    borderWidth: 2,
-    borderTopLeftRadius: 8,
-    borderTopRightRadius: 8,
-    borderBottomWidth: 0,
-  },
-  socialBodyRight: {
-    position: 'absolute',
-    right: 5,
-    bottom: 8,
-    width: 10,
-    height: 8,
-    borderWidth: 2,
-    borderTopLeftRadius: 8,
-    borderTopRightRadius: 8,
-    borderBottomWidth: 0,
+  bottomNavImage: {
+    width: 24,
+    height: 24,
+    tintColor: '#1e1523',
   },
   rankBarShort: {
     width: 6,
@@ -856,21 +793,6 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderTopLeftRadius: 4,
     borderTopRightRadius: 4,
-    borderBottomWidth: 0,
-  },
-  previewHead: {
-    width: 8,
-    height: 8,
-    borderWidth: 2,
-    borderRadius: 8,
-    marginBottom: 2,
-  },
-  previewBody: {
-    width: 16,
-    height: 10,
-    borderWidth: 2,
-    borderTopLeftRadius: 10,
-    borderTopRightRadius: 10,
     borderBottomWidth: 0,
   },
   previewTop: {
