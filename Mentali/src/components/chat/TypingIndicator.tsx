@@ -1,22 +1,67 @@
-import { StyleSheet, View } from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import { Animated, Easing, StyleSheet, View } from 'react-native';
 
-import { Brand, Radius, Spacing } from '@/theme/theme';
+import { useReducedMotion } from '@/hooks/useReducedMotion';
+import { colors, radius, spacing } from '@/theme/colors';
 
 export function TypingIndicator() {
+  const reducedMotion = useReducedMotion();
+  const dots = [useRef(new Animated.Value(0.3)).current, useRef(new Animated.Value(0.3)).current, useRef(new Animated.Value(0.3)).current];
+
+  useEffect(() => {
+    if (reducedMotion) {
+      // Show steady dots instead of a pulsing loop.
+      dots.forEach((dot) => dot.setValue(0.7));
+      return;
+    }
+    const animations = dots.map((dot, i) =>
+      Animated.loop(
+        Animated.sequence([
+          Animated.delay(i * 160),
+          Animated.timing(dot, {
+            toValue: 1,
+            duration: 360,
+            easing: Easing.inOut(Easing.ease),
+            useNativeDriver: true,
+          }),
+          Animated.timing(dot, {
+            toValue: 0.3,
+            duration: 360,
+            easing: Easing.inOut(Easing.ease),
+            useNativeDriver: true,
+          }),
+        ]),
+      ),
+    );
+    animations.forEach((a) => a.start());
+    return () => animations.forEach((a) => a.stop());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reducedMotion]);
+
   return (
-    <View style={styles.wrap}>
+    <View style={styles.row} accessibilityRole="text" accessibilityLabel="Typing">
       <View style={styles.bubble}>
-        <View style={styles.dot} />
-        <View style={[styles.dot, styles.dotMid]} />
-        <View style={styles.dot} />
+        {dots.map((dot, i) => (
+          <Animated.View key={i} style={[styles.dot, { opacity: dot, transform: [{ scale: dot }] }]} />
+        ))}
       </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  wrap: { alignItems: 'flex-start', paddingHorizontal: Spacing.three, paddingVertical: Spacing.one },
-  bubble: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: Brand.pinkBubble, paddingHorizontal: 14, paddingVertical: 12, borderRadius: Radius.pill },
-  dot: { width: 7, height: 7, borderRadius: 999, backgroundColor: Brand.textOnBubble, opacity: 0.72 },
-  dotMid: { opacity: 0.5 },
+  row: { width: '100%', marginBottom: spacing.md, flexDirection: 'row', justifyContent: 'flex-start' },
+  bubble: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: colors.botBubble,
+    paddingVertical: 14,
+    paddingHorizontal: spacing.lg,
+    borderTopLeftRadius: radius.sm,
+    borderTopRightRadius: radius.lg,
+    borderBottomRightRadius: radius.lg,
+    borderBottomLeftRadius: radius.lg,
+  },
+  dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.botBubbleText },
 });

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Image, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native';
 
 import { BandCard } from '@/components/wellbeing/BandCard';
@@ -12,8 +12,6 @@ import { COPY } from '@/data/checkInContent';
 import { reflectionLine, shouldRecommendDeeper, subscaleLabel } from '@/logic/wellbeing';
 import type { MoodOption, StreakState, WellbeingResult } from '@/logic/checkin';
 import { colors, radius, spacing, typography } from '@/theme/colors';
-
-const FLAME = require('../../assets/flame.png');
 
 interface Props {
   mood: MoodOption;
@@ -39,7 +37,7 @@ export function SummaryScreen({ mood, streak, phq4, k10, onDeeper, onDone }: Pro
           <View style={styles.flex}>
             <Text style={styles.todayMood}>Today you felt {mood.label.toLowerCase()}</Text>
             <View style={styles.streakRow}>
-              <Image source={FLAME} style={styles.streakFlame} resizeMode="contain" />
+              <Text style={styles.streakFlame}>🔥</Text>
               <Text style={styles.streak}>{streak.current}-day streak</Text>
             </View>
           </View>
@@ -125,7 +123,7 @@ const styles = StyleSheet.create({
   todayEmoji: { fontSize: 40 },
   todayMood: { ...typography.subheading, color: colors.textPrimary },
   streakRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
-  streakFlame: { width: 18, height: 18 },
+  streakFlame: { fontSize: 18, lineHeight: 18 },
   streak: { ...typography.body, color: colors.textSecondary },
   bars: {
     backgroundColor: colors.surface,

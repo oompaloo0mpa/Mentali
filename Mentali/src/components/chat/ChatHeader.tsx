@@ -1,41 +1,53 @@
-import { Ionicons } from '@expo/vector-icons';
+import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { Brand, Radius, Spacing } from '@/theme/theme';
+import { colors, radius, spacing, typography } from '@/theme/colors';
+import { ProgressDots } from './ProgressDots';
 
-type Props = {
+interface Props {
   title: string;
   onBack: () => void;
   total?: number;
   completed?: number;
-};
+}
 
 export function ChatHeader({ title, onBack, total, completed }: Props) {
-  return (
-    <View style={styles.header}>
-      <Pressable style={styles.backBtn} onPress={onBack}>
-        <Ionicons name="chevron-back" size={18} color="#fff" />
-        <Text style={styles.backText}>Back</Text>
-      </Pressable>
+  const showProgress = typeof total === 'number' && typeof completed === 'number' && total > 0;
 
-      <View style={styles.center}>
-        <Text style={styles.title}>{title}</Text>
-        {typeof total === 'number' && typeof completed === 'number' ? (
-          <Text style={styles.progress}>{completed}/{total}</Text>
+  return (
+    <View style={styles.wrap}>
+      <Text style={styles.caption}>{title}</Text>
+      <View style={styles.row}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
+          onPress={onBack}
+          style={({ pressed }) => [styles.back, pressed && styles.backPressed]}
+        >
+          <Text style={styles.backText}>Back</Text>
+        </Pressable>
+        {showProgress ? (
+          <View style={styles.progress}>
+            <ProgressDots total={total} completed={completed} />
+          </View>
         ) : null}
       </View>
-
-      <View style={styles.spacer} />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  header: { flexDirection: 'row', alignItems: 'center', padding: Spacing.three, gap: Spacing.two },
-  backBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: Brand.magenta, paddingHorizontal: 12, paddingVertical: 8, borderRadius: Radius.pill },
-  backText: { color: '#fff', fontWeight: '800' },
-  center: { flex: 1, alignItems: 'center' },
-  title: { color: Brand.text, fontSize: 16, fontWeight: '800' },
-  progress: { color: Brand.textSecondary, fontSize: 12, marginTop: 2 },
-  spacer: { width: 56 },
+  wrap: { paddingHorizontal: spacing.lg, paddingTop: spacing.sm, paddingBottom: spacing.md, gap: spacing.sm },
+  caption: { ...typography.caption, color: colors.textSecondary },
+  row: { flexDirection: 'row', alignItems: 'center', gap: spacing.lg },
+  back: {
+    alignSelf: 'flex-start',
+    backgroundColor: colors.primarySoft,
+    borderRadius: radius.pill,
+    paddingVertical: 6,
+    paddingHorizontal: spacing.lg,
+  },
+  backPressed: { opacity: 0.8 },
+  backText: { fontSize: 14, fontWeight: '600', color: colors.textOnPink },
+  progress: { flex: 1 },
 });

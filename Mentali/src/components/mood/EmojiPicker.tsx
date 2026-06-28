@@ -1,36 +1,38 @@
+import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { Brand, Radius, Spacing } from '@/theme/theme';
+import { MOODS } from '@/data/checkInContent';
 import type { MoodOption } from '@/logic/checkin';
+import { colors, radius, spacing, typography } from '@/theme/colors';
 
-type Props = {
-  selectedId?: string;
+interface Props {
+  selectedId?: string | null;
   onSelect: (mood: MoodOption) => void;
   disabled?: boolean;
-};
-
-const MOODS: MoodOption[] = [
-  { id: 'great', emoji: '😄', label: 'Great', value: 4 },
-  { id: 'good', emoji: '🙂', label: 'Good', value: 3 },
-  { id: 'okay', emoji: '😐', label: 'Okay', value: 2 },
-  { id: 'low', emoji: '😟', label: 'Low', value: 1 },
-  { id: 'rough', emoji: '😢', label: 'Rough', value: 0 },
-];
+}
 
 export function EmojiPicker({ selectedId, onSelect, disabled }: Props) {
   return (
     <View style={styles.row}>
       {MOODS.map((mood) => {
-        const selected = selectedId === mood.id;
-
+        const active = mood.id === selectedId;
         return (
           <Pressable
             key={mood.id}
+            accessibilityRole="button"
+            accessibilityLabel={mood.label}
+            accessibilityState={{ selected: active }}
             disabled={disabled}
             onPress={() => onSelect(mood)}
-            style={({ pressed }) => [styles.item, selected && styles.itemSelected, pressed && styles.pressed]}>
+            style={({ pressed }) => [
+              styles.item,
+              active && styles.itemActive,
+              pressed && !disabled && styles.itemPressed,
+              disabled && !active && styles.itemDim,
+            ]}
+          >
             <Text style={styles.emoji}>{mood.emoji}</Text>
-            <Text style={styles.label}>{mood.label}</Text>
+            <Text style={[styles.label, active && styles.labelActive]}>{mood.label}</Text>
           </Pressable>
         );
       })}
@@ -39,10 +41,21 @@ export function EmojiPicker({ selectedId, onSelect, disabled }: Props) {
 }
 
 const styles = StyleSheet.create({
-  row: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.one },
-  item: { minWidth: 78, alignItems: 'center', justifyContent: 'center', paddingVertical: Spacing.two, paddingHorizontal: Spacing.one, borderRadius: Radius.md, backgroundColor: Brand.surface },
-  itemSelected: { borderWidth: 1, borderColor: Brand.magenta },
-  emoji: { fontSize: 24 },
-  label: { color: Brand.text, fontSize: 12, marginTop: 4, fontWeight: '700' },
-  pressed: { opacity: 0.78 },
+  row: { flexDirection: 'row', justifyContent: 'space-between', gap: spacing.sm },
+  item: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: spacing.md,
+    borderRadius: radius.md,
+    backgroundColor: colors.surface,
+    borderWidth: 1.5,
+    borderColor: 'transparent',
+    gap: spacing.xs,
+  },
+  itemActive: { borderColor: colors.primary, backgroundColor: 'rgba(216,30,158,0.16)' },
+  itemPressed: { transform: [{ scale: 0.96 }] },
+  itemDim: { opacity: 0.6 },
+  emoji: { fontSize: 26 },
+  label: { ...typography.caption, color: colors.textSecondary },
+  labelActive: { color: colors.primarySoft, fontWeight: '700' },
 });
