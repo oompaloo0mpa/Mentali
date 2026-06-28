@@ -45,6 +45,12 @@ type NotificationPanelProps = {
   topInset: number;
 };
 
+type MoreMenuPanelProps = {
+  visible: boolean;
+  onClose: () => void;
+  topInset: number;
+};
+
 type MoodButtonProps = {
   mood: MoodItem;
   selected: boolean;
@@ -86,18 +92,30 @@ function QuestCard({ item }: { item: QuestItem }) {
   );
 }
 
-function BottomNavItem({ icon, active }: { icon: string; active?: boolean }) {
+function BottomNavItem({ icon, active, onPress }: { icon: string; active?: boolean; onPress: () => void }) {
   const iconName = active ? icon.replace('-outline', '') : icon;
 
   return (
-    <View style={[styles.navItem, active && styles.navItemActive]}>
+    <Pressable onPress={onPress} style={[styles.navItem, active && styles.navItemActive]}>
       <Ionicons name={iconName as ComponentProps<typeof Ionicons>['name']} size={24} color={active ? '#111' : '#F4D5F2'} />
-    </View>
+    </Pressable>
   );
 }
 
 function MascotArt() {
   return <Image source={thinkingMascot} resizeMode="contain" style={styles.mascotImage} />;
+}
+
+function NavPlaceholder({ title, icon }: { title: string; icon: ComponentProps<typeof Ionicons>['name'] }) {
+  return (
+    <View style={styles.placeholderScreen}>
+      <View style={styles.placeholderCard}>
+        <Ionicons name={icon} size={44} color="#FF5DE7" />
+        <Text style={styles.placeholderTitle}>{title}</Text>
+        <Text style={styles.placeholderSubtitle}>Placeholder screen for testing the navigation bar.</Text>
+      </View>
+    </View>
+  );
 }
 
 function NotificationPanel({
@@ -203,13 +221,59 @@ function NotificationPanel({
   );
 }
 
+function MoreMenuPanel({ visible, onClose, topInset }: MoreMenuPanelProps) {
+  const menuItems = [
+    { icon: 'stats-chart-outline' as const, label: 'Statistics' },
+    { icon: 'settings-outline' as const, label: 'Settings' },
+    { icon: 'log-out-outline' as const, label: 'Logout' },
+  ];
+
+  return (
+    <Modal transparent animationType="fade" visible={visible} onRequestClose={onClose}>
+      <Pressable style={[styles.moreBackdrop, { paddingTop: topInset + 48 }]} onPress={onClose}>
+        <Pressable style={styles.moreCard} onPress={() => {}}>
+          <View style={styles.moreHeader}>
+            <Pressable onPress={onClose} style={styles.moreCloseButton} hitSlop={8}>
+              <Ionicons name="close" size={18} color="#fff" />
+            </Pressable>
+          </View>
+
+          <View style={styles.moreMenuList}>
+            {menuItems.map((item, index) => (
+              <View key={item.label}>
+                <Pressable style={styles.moreMenuItem} onPress={onClose}>
+                  <Ionicons name={item.icon} size={28} color="#FF5DE7" />
+                  <Text style={styles.moreMenuItemText}>{item.label}</Text>
+                </Pressable>
+
+                {index < menuItems.length - 1 ? <View style={styles.moreMenuDivider} /> : null}
+              </View>
+            ))}
+          </View>
+        </Pressable>
+      </Pressable>
+    </Modal>
+  );
+}
+
 export default function HomePage() {
   const [selectedMood, setSelectedMood] = useState(0);
+  const [selectedNav, setSelectedNav] = useState(navItems.find((item) => item.active)?.icon ?? navItems[0].icon);
   const [notificationsVisible, setNotificationsVisible] = useState(false);
+  const [moreMenuVisible, setMoreMenuVisible] = useState(false);
   const [notifications, setNotifications] = useState<AppNotification[]>(initialNotifications);
   const completedCount = 2;
   const insets = useSafeAreaInsets();
   const unreadCount = notifications.filter((notification) => !notification.read).length;
+  const isHomeSelected = selectedNav === 'home-outline';
+
+  const navLabels: Record<string, { title: string; icon: ComponentProps<typeof Ionicons>['name'] }> = {
+    'home-outline': { title: 'Home', icon: 'home-outline' },
+    'people-outline': { title: 'Friends', icon: 'people-outline' },
+    'trophy-outline': { title: 'Rewards', icon: 'trophy-outline' },
+    'bag-outline': { title: 'Shop', icon: 'bag-outline' },
+    'shirt-outline': { title: 'Wardrobe', icon: 'shirt-outline' },
+  };
 
   const markNotificationRead = (id: string) => {
     setNotifications((currentNotifications) =>
@@ -255,9 +319,13 @@ export default function HomePage() {
                 </View>
               ) : null}
             </Pressable>
-            <View style={styles.actionButton}>
+            <Pressable
+              accessibilityLabel="More options"
+              onPress={() => setMoreMenuVisible(true)}
+              style={styles.actionButton}
+            >
               <Ionicons name="menu-outline" size={22} color="#fff" />
-            </View>
+            </Pressable>
           </View>
         </View>
 
@@ -272,100 +340,121 @@ export default function HomePage() {
           topInset={insets.top}
         />
 
-        <View style={styles.heroRow}>
-          <View style={styles.quoteBubble}>
-            <Text style={styles.quoteText}>{'“Small steps every day lead to\nbig changes.”'}</Text>
-            <View style={styles.quoteTail} />
-          </View>
+        <MoreMenuPanel visible={moreMenuVisible} onClose={() => setMoreMenuVisible(false)} topInset={insets.top} />
 
-          <MascotArt />
-        </View>
+        {isHomeSelected ? (
+          <>
+            <View style={styles.heroRow}>
+              <View style={styles.quoteBubble}>
+                <Text style={styles.quoteText}>{'“Small steps every day lead to\nbig changes.”'}</Text>
+                <View style={styles.quoteTail} />
+              </View>
 
-        <View style={styles.moodsRow}>
-          {moods.map((mood, index) => (
-            <MoodButton
-              key={mood.label}
-              mood={mood}
-              selected={selectedMood === index}
-              onPress={() => setSelectedMood(index)}
-            />
-          ))}
-        </View>
+              <MascotArt />
+            </View>
 
-        <View style={styles.sectionHeaderRow}>
-          <Text style={styles.sectionTitle}>Daily Quest</Text>
-          <Text style={styles.sectionMeta}>
-            <Text style={styles.sectionMetaHighlight}>{completedCount}/3</Text> Completed
-          </Text>
-        </View>
+            <View style={styles.moodsRow}>
+              {moods.map((mood, index) => (
+                <MoodButton
+                  key={mood.label}
+                  mood={mood}
+                  selected={selectedMood === index}
+                  onPress={() => setSelectedMood(index)}
+                />
+              ))}
+            </View>
 
-        <View style={styles.questList}>
-          {quests.map((item) => (
-            <QuestCard key={item.title} item={item} />
-          ))}
-        </View>
+            <View style={styles.sectionHeaderRow}>
+              <Text style={styles.sectionTitle}>Daily Quest</Text>
+              <Text style={styles.sectionMeta}>
+                <Text style={styles.sectionMetaHighlight}>{completedCount}/3</Text> Completed
+              </Text>
+            </View>
 
-        <View style={styles.ctaCard}>
-          <View style={styles.ctaTextWrap}>
-            <Text style={styles.ctaTitle}>{'Lets do a quick\nCheck-in today!'}</Text>
-            <Text style={styles.ctaSubtitle}>It only takes a minute.</Text>
-          </View>
+            <View style={styles.questList}>
+              {quests.map((item) => (
+                <QuestCard key={item.title} item={item} />
+              ))}
+            </View>
 
-          <TouchableOpacity activeOpacity={0.9} style={styles.ctaButton}>
-            <Text style={styles.ctaButtonText}>Start Check-in</Text>
-            <Text style={styles.ctaArrow}>→</Text>
-          </TouchableOpacity>
-        </View>
+            <View style={styles.ctaCard}>
+              <View style={styles.ctaTextWrap}>
+                <Text style={styles.ctaTitle}>{'Lets do a quick\nCheck-in today!'}</Text>
+                <Text style={styles.ctaSubtitle}>It only takes a minute.</Text>
+              </View>
 
-        <View style={styles.rankRow}>
-          <View style={styles.rankCardLeft}>
-            <Text style={styles.rankLabel}>Current Rank</Text>
-            <View style={styles.rankBody}>
-              <Image source={bronzeTrophy} resizeMode="contain" style={styles.trophyImage} />
-              <View style={styles.rankInfo}>
-                <Text style={styles.rankName}>Bronze</Text>
-                <View style={styles.progressBarTrack}>
-                  <View style={styles.progressBarFill} />
+              <TouchableOpacity activeOpacity={0.9} style={styles.ctaButton}>
+                <Text style={styles.ctaButtonText}>Start Check-in</Text>
+                <Text style={styles.ctaArrow}>→</Text>
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.rankRow}>
+              <View style={styles.rankCardLeft}>
+                <Text style={styles.rankLabel}>Current Rank</Text>
+                <View style={styles.rankBody}>
+                  <Image source={bronzeTrophy} resizeMode="contain" style={styles.trophyImage} />
+                  <View style={styles.rankInfo}>
+                    <View style={styles.rankNameRow}>
+                      <Text style={styles.rankName}>Bronze</Text>
+                      <Text style={styles.rankPosition}>#10</Text>
+                    </View>
+                    <View style={styles.progressBarTrack}>
+                      <View style={styles.progressBarFill} />
+                    </View>
+                    <Text style={styles.rankPoints}>210 pts</Text>
+                  </View>
                 </View>
-                <Text style={styles.rankPoints}>210 pts</Text>
               </View>
-              <Text style={styles.rankPosition}>#10</Text>
-            </View>
-          </View>
 
-          <View style={styles.rankCardRight}>
-            <View style={styles.rankStatItem}>
-              <Image source={statsIcon} resizeMode="contain" style={styles.rankStatIconImage} />
-              <View>
-                <Text style={styles.rankStatValue}>#10</Text>
-                <Text style={styles.rankStatLabel}>Current Position</Text>
+              <View style={styles.rankCardRight}>
+                <View style={styles.rankStatItem}>
+                  <View style={styles.rankStatIconSlot}>
+                    <Image source={statsIcon} resizeMode="contain" style={styles.rankStatIconImage} />
+                  </View>
+                  <View>
+                    <Text style={styles.rankStatValue}>#10</Text>
+                    <Text style={styles.rankStatLabel}>Current Position</Text>
+                  </View>
+                </View>
+                <View style={styles.rankDivider} />
+                <View style={styles.rankStatItem}>
+                  <View style={styles.rankStatIconSlot}>
+                    <Image source={diamondIcon} resizeMode="contain" style={styles.rankStatIconImage} />
+                  </View>
+                  <View>
+                    <Text style={[styles.rankStatValue, { color: '#C86BFF' }]}>15</Text>
+                    <Text style={styles.rankStatLabel}>Points this week</Text>
+                  </View>
+                </View>
+                <View style={styles.rankDivider} />
+                <View style={styles.rankStatItem}>
+                  <View style={styles.rankStatIconSlot}>
+                    <View style={styles.arrowIconCircle}>
+                      <Image source={arrowIcon} resizeMode="contain" style={styles.rankStatIconImage} />
+                    </View>
+                  </View>
+                  <View>
+                    <Text style={styles.rankStatValue}>20</Text>
+                    <Text style={styles.rankStatLabel}>Positions</Text>
+                  </View>
+                </View>
               </View>
             </View>
-            <View style={styles.rankDivider} />
-            <View style={styles.rankStatItem}>
-              <Image source={diamondIcon} resizeMode="contain" style={styles.rankStatIconImage} />
-              <View>
-                <Text style={[styles.rankStatValue, { color: '#C86BFF' }]}>15</Text>
-                <Text style={styles.rankStatLabel}>Points this week</Text>
-              </View>
-            </View>
-            <View style={styles.rankDivider} />
-            <View style={styles.rankStatItem}>
-              <View style={styles.arrowIconCircle}>
-                <Image source={arrowIcon} resizeMode="contain" style={styles.rankStatIconImage} />
-              </View>
-              <View>
-                <Text style={styles.rankStatValue}>20</Text>
-                <Text style={styles.rankStatLabel}>Positions</Text>
-              </View>
-            </View>
-          </View>
-        </View>
+          </>
+        ) : (
+          <NavPlaceholder title={navLabels[selectedNav].title} icon={navLabels[selectedNav].icon} />
+        )}
       </View>
 
       <View style={styles.bottomNav}>
         {navItems.map((item) => (
-          <BottomNavItem key={item.icon} icon={item.icon} active={item.active} />
+          <BottomNavItem
+            key={item.icon}
+            icon={item.icon}
+            active={selectedNav === item.icon}
+            onPress={() => setSelectedNav(item.icon)}
+          />
         ))}
       </View>
     </SafeAreaView>
@@ -606,6 +695,61 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
   },
+  moreBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'flex-end',
+    justifyContent: 'flex-start',
+    paddingHorizontal: 12,
+    zIndex: 25,
+  },
+  moreCard: {
+    width: '40%',
+    maxWidth: 360,
+    maxHeight: '64%',
+    borderRadius: 22,
+    backgroundColor: '#231F21',
+    borderWidth: 2,
+    borderColor: '#FF6DEB',
+    paddingHorizontal: 14,
+    paddingTop: 14,
+    paddingBottom: 12,
+    shadowColor: '#000',
+    shadowOpacity: 0.28,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 8,
+  },
+  moreHeader: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    marginBottom: 8,
+  },
+  moreCloseButton: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  moreMenuList: {
+    paddingBottom: 4,
+  },
+  moreMenuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+  },
+  moreMenuItemText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '800',
+    marginLeft: 12,
+  },
+  moreMenuDivider: {
+    height: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+  },
   heroRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -832,21 +976,27 @@ const styles = StyleSheet.create({
   rankInfo: {
     flex: 1,
   },
+  rankNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
   rankName: {
     color: '#8B5C35',
     fontSize: 18,
     fontWeight: '800',
-    marginBottom: 8,
   },
   progressBarTrack: {
+    width: '100%',
     height: 10,
     borderRadius: 6,
     backgroundColor: '#D8D8D8',
     overflow: 'hidden',
-    marginBottom: 6,
+    marginBottom: 4,
   },
   progressBarFill: {
-    width: '78%',
+    width: '100%',
     height: '100%',
     backgroundColor: '#F47DF1',
     borderRadius: 6,
@@ -855,8 +1005,7 @@ const styles = StyleSheet.create({
     color: '#C150D2',
     fontSize: 12,
     fontWeight: '800',
-    textAlign: 'right',
-    paddingRight: 6,
+    alignSelf: 'flex-end',
   },
   rankPosition: {
     color: '#8B5C35',
@@ -878,6 +1027,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 10,
   },
+  rankStatIconSlot: {
+    width: 32,
+    height: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 2,
+  },
   rankStatIcon: {
     fontSize: 18,
     marginRight: 8,
@@ -888,13 +1044,12 @@ const styles = StyleSheet.create({
     height: 18,
   },
   arrowIconCircle: {
-    width: 32,
-    height: 32,
+    width: 22,
+    height: 22,
     borderRadius: 16,
     backgroundColor: '#0d4a0d',
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 8,
   },
   rankStatValue: {
     color: '#111',
@@ -914,6 +1069,35 @@ const styles = StyleSheet.create({
   ctaArrowImage: {
     width: 16,
     height: 16,
+  },
+  placeholderScreen: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  placeholderCard: {
+    width: '100%',
+    borderRadius: 18,
+    borderWidth: 2,
+    borderColor: '#FF6DEB',
+    backgroundColor: '#231F21',
+    paddingVertical: 28,
+    paddingHorizontal: 20,
+    alignItems: 'center',
+  },
+  placeholderTitle: {
+    color: '#fff',
+    fontSize: 24,
+    fontWeight: '800',
+    marginTop: 14,
+    marginBottom: 8,
+  },
+  placeholderSubtitle: {
+    color: '#D2C6CC',
+    fontSize: 13,
+    fontWeight: '600',
+    textAlign: 'center',
+    lineHeight: 18,
   },
   bottomNav: {
     height: 72,
