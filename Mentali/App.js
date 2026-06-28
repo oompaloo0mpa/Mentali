@@ -17,18 +17,30 @@ import {
     CheckInChatScreen
 } from '@/pages/CheckInChatScreen';
 import {
+    SummaryScreen
+} from '@/pages/SummaryScreen';
+import {
     SocialProvider
 } from '@/storage/socialStore';
 import {
     MOODS,
     PHQ4_QUESTIONS
 } from '@/data/checkInContent';
+import {
+    scorePhq4,
+    scoreK10
+} from '@/logic/wellbeing';
 
 export default function App() {
     const [screenState, setScreenState] = useState({
         screen: 'login',
     });
     const [homeNav, setHomeNav] = useState('home-outline');
+    const [streak, setStreak] = useState({
+        current: 0,
+        longest: 0,
+        lastCheckInDate: null,
+    });
 
     const openChat = (friendId, prefill) => {
         setScreenState({
@@ -36,6 +48,40 @@ export default function App() {
             friendId,
             prefill,
             returnToNav: homeNav,
+        });
+    };
+
+    const handleCheckInComplete = (answers, selectedMood) => {
+        const phq4 = scorePhq4(answers);
+        const k10 = answers.some((a) => a.scale === 'k10') ? scoreK10(answers) : null;
+
+        // Update streak
+        const today = new Date().toISOString().split('T')[0];
+        const newStreak = {
+            ...streak
+        };
+        if (streak.lastCheckInDate !== today) {
+            const yesterday = new Date();
+            yesterday.setDate(yesterday.getDate() - 1);
+            const yesterdayStr = yesterday.toISOString().split('T')[0];
+
+            if (streak.lastCheckInDate === yesterdayStr) {
+                newStreak.current = (streak.current || 0) + 1;
+                newStreak.longest = Math.max(newStreak.current, streak.longest || 0);
+            } else {
+                newStreak.current = 1;
+                newStreak.longest = Math.max(1, streak.longest || 0);
+            }
+        }
+        newStreak.lastCheckInDate = today;
+        setStreak(newStreak);
+
+        setScreenState({
+            screen: 'summary',
+            mood: selectedMood,
+            phq4,
+            k10,
+            streak: newStreak,
         });
     };
 
@@ -101,6 +147,29 @@ export default function App() {
                     })
                 }
                 onComplete = {
+                    (answers) => handleCheckInComplete(answers, MOODS[2])
+                }
+                />
+            ) : screenState.screen === 'summary' ? ( <
+                SummaryScreen mood = {
+                    screenState.mood
+                }
+                streak = {
+                    screenState.streak
+                }
+                phq4 = {
+                    screenState.phq4
+                }
+                k10 = {
+                    screenState.k10
+                }
+                onDeeper = {
+                    () => setScreenState({
+                        screen: 'home',
+                        selectedNav: homeNav
+                    })
+                }
+                onDone = {
                     () => setScreenState({
                         screen: 'home',
                         selectedNav: homeNav
