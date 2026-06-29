@@ -4,6 +4,7 @@ import {
   Platform,
   ScrollView,
   StyleSheet,
+  Text,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native';
@@ -16,7 +17,7 @@ import { TypingIndicator } from '@/components/chat/TypingIndicator';
 import { PrimaryButton } from '@/components/common/PrimaryButton';
 import { useCheckInChat } from '@/hooks/useCheckInChat';
 import type { CheckInQuestion, MoodOption, RecordedAnswer } from '@/logic/checkin';
-import { colors, spacing } from '@/theme/colors';
+import { colors, spacing, typography } from '@/theme/colors';
 
 interface Props {
   mood: MoodOption;
@@ -43,22 +44,20 @@ export function CheckInChatScreen({
     return () => clearTimeout(id);
   }, [chat.messages.length, chat.typing, chat.awaiting, chat.finished]);
 
-  const SKIP_KEY = 'skip';
-  const chips: Chip[] = [
-    ...chat.answerOptions.map((opt, i) => ({ key: `opt-${i}`, label: opt.label })),
-    { key: SKIP_KEY, label: 'Prefer not to say', muted: true },
-  ];
+  const chips: Chip[] = chat.answerOptions.map((opt, i) => ({
+    key: `opt-${i}`,
+    label: opt.label,
+    muted: !!opt.skip,
+  }));
 
   const handleChip = (chip: Chip) => {
-    if (chip.key === SKIP_KEY) {
-      chat.skipQuestion();
-      return;
-    }
     const idx = Number(chip.key.replace('opt-', ''));
     if (!Number.isNaN(idx) && chat.answerOptions[idx]) {
       chat.selectOption(chat.answerOptions[idx]);
     }
   };
+
+  const canType = !chat.finished && !chat.typing;
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -67,12 +66,7 @@ export function CheckInChatScreen({
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
       >
-        <ChatHeader
-          title={headerTitle}
-          onBack={onBack}
-          total={chat.totalQuestions}
-          completed={chat.answers.length}
-        />
+        <ChatHeader title={headerTitle} onBack={onBack} />
 
         <ScrollView
           ref={scrollRef}
@@ -97,10 +91,17 @@ export function CheckInChatScreen({
         </ScrollView>
 
         {chat.awaiting && chat.answerOptions.length > 0 ? (
-          <SuggestionChips chips={chips} onSelect={handleChip} />
+          <View style={styles.chipSection}>
+            <Text style={styles.chipHint}>Quick replies (optional)</Text>
+            <SuggestionChips chips={chips} onSelect={handleChip} />
+          </View>
         ) : null}
 
-        <ChatInput onSend={chat.sendNote} disabled={chat.typing} />
+        <ChatInput
+          onSend={chat.sendMessage}
+          disabled={!canType}
+          placeholder={canType ? 'Type a reply…' : 'One moment…'}
+        />
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -110,6 +111,13 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.background },
   flex: { flex: 1 },
   messages: { padding: spacing.lg, paddingBottom: spacing.xl },
+  chipSection: { paddingBottom: spacing.xs },
+  chipHint: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    paddingHorizontal: spacing.lg,
+    marginBottom: spacing.xs,
+  },
   cta: { marginTop: spacing.md, alignItems: 'center' },
   ctaButton: { alignSelf: 'center' },
 });

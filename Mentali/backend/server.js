@@ -277,6 +277,29 @@ app.get("/api/daily-checkins/:userId", async (req, res, next) => {
   }
 });
 
+const { generateCheckInReply } = require("./checkinChat");
+
+app.post("/api/checkin/chat", async (req, res, next) => {
+  try {
+    const { mood, questions, answers, messages, userMessage, selectedOption, ackIndex } = req.body || {};
+    if (!mood) return res.status(400).json({ error: "mood is required" });
+
+    const result = await generateCheckInReply({
+      mood,
+      questions: questions ?? [],
+      answers: answers ?? [],
+      messages: messages ?? [],
+      userMessage: userMessage ?? null,
+      selectedOption: selectedOption ?? null,
+      ackIndex: ackIndex ?? 0,
+    });
+
+    res.json(result);
+  } catch (e) {
+    next(e);
+  }
+});
+
 app.post("/api/chatbot-sessions", async (req, res, next) => {
   try {
     const { db } = await connectMongo();

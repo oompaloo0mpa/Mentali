@@ -10,9 +10,10 @@ type Props = {
   value?: string;
   onChangeText?: (text: string) => void;
   disabled?: boolean;
+  placeholder?: string;
 };
 
-export function ChatInput({ onSend, onAttach, value, onChangeText, disabled }: Props) {
+export function ChatInput({ onSend, onAttach, value, onChangeText, disabled, placeholder = "What's on your mind?" }: Props) {
   const [internal, setInternal] = useState('');
   const isControlled = value !== undefined;
   const text = isControlled ? value : internal;
@@ -32,6 +33,7 @@ export function ChatInput({ onSend, onAttach, value, onChangeText, disabled }: P
 
   return (
     <View style={styles.container}>
+      {onAttach ? (
       <Pressable
         style={({ pressed }) => [styles.attach, disabled && styles.disabled, pressed && styles.pressed]}
         onPress={onAttach}
@@ -39,12 +41,13 @@ export function ChatInput({ onSend, onAttach, value, onChangeText, disabled }: P
         hitSlop={6}>
         <Ionicons name="add" size={22} color="#FFFFFF" />
       </Pressable>
+      ) : null}
 
       <View style={styles.inputWrap}>
         <TextInput
           value={text}
           onChangeText={setText}
-          placeholder="What's on your mind?"
+          placeholder={placeholder}
           placeholderTextColor="rgba(255,255,255,0.85)"
           style={styles.input}
           multiline

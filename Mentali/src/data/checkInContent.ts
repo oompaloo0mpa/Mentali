@@ -19,12 +19,14 @@ export const MOODS: MoodOption[] = [
 ];
 
 /** Shared 0-3 response scale for the short check-in questions. */
-const FREQUENCY_0_3: AnswerOption[] = [
+export const FREQUENCY_0_3_OPTIONS: AnswerOption[] = [
   { label: 'Not really', value: 0 },
   { label: 'A little', value: 1 },
   { label: 'Quite a bit', value: 2 },
   { label: 'A lot', value: 3 },
 ];
+
+const FREQUENCY_0_3 = FREQUENCY_0_3_OPTIONS;
 
 /** Default daily flow: 4 short questions, total score 0-12. */
 export const PHQ4_QUESTIONS: CheckInQuestion[] = [
@@ -95,8 +97,7 @@ export const COPY = {
     'No worries, I am always here if you change your mind!',
   moodPrompt: 'First, which emoji feels closest to your day?',
   moodThanks: (label: string, emoji: string) =>
-    `Thanks for sharing ${emoji} — let's keep it light. Just a few quick taps.`,
-  // Rotated between questions to keep the flow conversational.
+    `Thanks for sharing ${emoji} — let's chat for a minute, nice and easy.`,
   acks: [
     'Thanks for being honest.',
     'Got it — no right or wrong answers here.',
@@ -109,25 +110,34 @@ export const COPY = {
   deeperInviteStrong:
     'A few answers stood out today. A slightly longer check-in can give a clearer picture — only if you feel up to it.',
   disclaimer:
-    'This is a supportive wellbeing check-in, not a diagnosis. If anything here worries you, please talk to someone you trust or a professional.',
+    'This is a supportive wellbeing check-in, not a diagnosis. If anything here worries you, please talk to someone you trust or a professional in Singapore.',
 } as const;
 
 /** Quick replies shown as suggestion chips. */
 export const QUICK_REPLIES = ['Thank you!', 'Goodbye!', 'Actually...'] as const;
 
 /**
- * Crisis and support contacts shown on the escalation card.
- * Numbers vary by region — replace these defaults with local services.
+ * Crisis and support contacts for Singapore.
  */
 export const SUPPORT_RESOURCES: SupportResource[] = [
   {
-    label: 'Emergency services',
-    description: 'If you feel unsafe or in danger right now.',
-    phone: '112',
+    label: 'Samaritans of Singapore (SOS)',
+    description: '24-hour emotional support — confidential and free.',
+    phone: '1767',
   },
   {
-    label: 'Find a helpline',
-    description: 'Free, confidential support lines worldwide.',
-    url: 'https://findahelpline.com',
+    label: 'National Care Hotline',
+    description: 'Emotional support during difficult times.',
+    phone: '18002026868',
+  },
+  {
+    label: 'IMH Mental Health Helpline',
+    description: 'Institute of Mental Health — professional support.',
+    phone: '63892222',
+  },
+  {
+    label: 'Emergency (ambulance)',
+    description: 'If you or someone else is in immediate danger.',
+    phone: '995',
   },
 ];

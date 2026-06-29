@@ -32,7 +32,7 @@ const API_BASE_URL = resolveApiBaseUrl();
 
 type AuthMode = "phone" | "email";
 
-async function request(path: string, options?: RequestInit) {
+export async function apiRequest(path: string, options?: RequestInit) {
   let response: Response;
   try {
     response = await fetch(`${API_BASE_URL}${path}`, {
@@ -62,14 +62,14 @@ export async function registerWithEmail(payload: {
   password: string;
   phone: string;
 }) {
-  return request("/auth/register", {
+  return apiRequest("/auth/register", {
     method: "POST",
     body: JSON.stringify({ ...payload, authProvider: "email" }),
   });
 }
 
 export async function login(payload: { mode: AuthMode; identifier: string; password: string }) {
-  return request("/auth/login", {
+  return apiRequest("/auth/login", {
     method: "POST",
     body: JSON.stringify(payload),
   });
@@ -81,14 +81,14 @@ export async function loginWithEmail(payload: { identifier: string; password: st
 }
 
 export async function requestResetCode(payload: { mode: AuthMode; value: string }) {
-  return request("/auth/request-reset", {
+  return apiRequest("/auth/request-reset", {
     method: "POST",
     body: JSON.stringify(payload),
   });
 }
 
 export async function verifyResetCode(payload: { mode: AuthMode; value: string; code: string }) {
-  return request("/auth/verify-reset-code", {
+  return apiRequest("/auth/verify-reset-code", {
     method: "POST",
     body: JSON.stringify(payload),
   });
@@ -100,7 +100,7 @@ export async function resetPassword(payload: {
   code: string;
   newPassword: string;
 }) {
-  return request("/auth/reset-password", {
+  return apiRequest("/auth/reset-password", {
     method: "POST",
     body: JSON.stringify(payload),
   });
@@ -113,7 +113,7 @@ export async function saveDailyCheckIn(payload: {
   reflectionText?: string | null;
   checkInDate: string;
 }) {
-  return request("/daily-checkins", {
+  return apiRequest("/daily-checkins", {
     method: "POST",
     body: JSON.stringify(payload),
   });
@@ -126,7 +126,7 @@ export async function saveChatbotSession(payload: {
   generatedInsight: string;
   sessionDate: string;
 }) {
-  return request("/chatbot-sessions", {
+  return apiRequest("/chatbot-sessions", {
     method: "POST",
     body: JSON.stringify(payload),
   });
