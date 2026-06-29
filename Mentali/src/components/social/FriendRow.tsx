@@ -1,10 +1,10 @@
-import { Ionicons } from '@expo/vector-icons';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { AppIcon } from '@/components/AppIcon';
 import { Avatar } from '@/components/Avatar';
 import { Brand, Radius } from '@/theme/theme';
-import { friendMood, isMuted, type FriendBadge } from '@/storage/socialStore';
+import { friendMoodImage, isMuted, isStreakDoneToday, type FriendBadge } from '@/storage/socialStore';
 import type { Friend } from '@/data/mockData';
 
 type Props = {
@@ -48,11 +48,17 @@ export function FriendRow({ friend, badges = [], onPress, onLongPress, onPressPr
           <Text style={styles.name} numberOfLines={1}>
             {friend.name}
           </Text>
-          {friend.pinned && <Ionicons name="pin" size={13} color={Brand.pink} />}
+          {friend.pinned && <MaterialCommunityIcons name="pin" size={14} color={Brand.pink} />}
+          {friend.blocked && <Ionicons name="ban" size={13} color={Brand.danger} />}
           {muted && <Ionicons name="notifications-off" size={13} color={Brand.textMuted} />}
           <AppIcon name="fire" size={14} />
           <Text style={styles.streak}>{friend.streak}</Text>
-          <Text style={styles.mood}>{friendMood(friend)}</Text>
+          <Image
+            source={friendMoodImage(friend)}
+            resizeMode="contain"
+            style={styles.moodImage}
+            accessibilityLabel={isStreakDoneToday(friend) ? 'Mood: great' : 'Mood: sad'}
+          />
         </View>
 
         {badges.length > 0 ? (
@@ -68,14 +74,16 @@ export function FriendRow({ friend, badges = [], onPress, onLongPress, onPressPr
         )}
       </View>
 
-      <Pressable
-        style={({ pressed }) => [styles.motivate, pressed && styles.motivatePressed]}
-        onPress={() => onSendMotivation?.(friend)}
-        hitSlop={8}
-        accessibilityRole="button"
-        accessibilityLabel={`Send motivation to ${friend.name}`}>
-        <Ionicons name="heart" size={16} color="#FFFFFF" />
-      </Pressable>
+      {!friend.blocked && (
+        <Pressable
+          style={({ pressed }) => [styles.motivate, pressed && styles.motivatePressed]}
+          onPress={() => onSendMotivation?.(friend)}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel={`Send motivation to ${friend.name}`}>
+          <Ionicons name="heart" size={16} color="#FFFFFF" />
+        </Pressable>
+      )}
 
       <Ionicons name="chevron-forward" size={20} color={Brand.textSecondary} />
     </Pressable>
@@ -100,7 +108,7 @@ const styles = StyleSheet.create({
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   name: { color: Brand.text, fontSize: 16, fontWeight: '700', flexShrink: 1 },
   streak: { color: Brand.fire, fontSize: 14, fontWeight: '700' },
-  mood: { fontSize: 14 },
+  moodImage: { width: 24, height: 24 },
   lastSeen: { color: Brand.textSecondary, fontSize: 13 },
   badgeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 4 },
   badge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: Radius.pill },

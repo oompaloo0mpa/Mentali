@@ -42,10 +42,13 @@ export function FriendChatScreenContent({ friendId, prefill, onBack, onOpenStrea
     muteFriend,
     unmuteFriend,
     removeFriend,
+    blockFriend,
+    unblockFriend,
   } = useSocial();
 
   const friend = friendById(friendId);
   const messages = friendId ? chatFor(friendId) : [];
+  const isBlocked = !!friend?.blocked;
 
   const scrollRef = useRef<ScrollView>(null);
   const [draft, setDraft] = useState('');
@@ -66,7 +69,7 @@ export function FriendChatScreenContent({ friendId, prefill, onBack, onOpenStrea
   const scrollToEnd = () => requestAnimationFrame(() => scrollRef.current?.scrollToEnd({ animated: true }));
 
   const send = (text: string) => {
-    if (!friendId) return;
+    if (!friendId || isBlocked) return;
     sendMessage(friendId, { text });
     scrollToEnd();
   };
@@ -182,8 +185,23 @@ export function FriendChatScreenContent({ friendId, prefill, onBack, onOpenStrea
         </View>
 
         <View style={styles.footer}>
-          <SuggestionBar suggestion={suggestion} onUse={() => setDraft(suggestion)} onRefresh={refreshSuggestion} />
-          <ChatInput value={draft} onChangeText={setDraft} onSend={send} onAttach={() => setAttachVisible(true)} />
+          {isBlocked ? (
+            <View style={styles.blockedBanner}>
+              <Ionicons name="ban" size={16} color={Brand.danger} />
+              <Text style={styles.blockedText}>
+                You blocked {friend?.name ?? 'this friend'}. Unblock from the menu to chat again.
+              </Text>
+            </View>
+          ) : (
+            <SuggestionBar suggestion={suggestion} onUse={() => setDraft(suggestion)} onRefresh={refreshSuggestion} />
+          )}
+          <ChatInput
+            value={draft}
+            onChangeText={setDraft}
+            onSend={send}
+            onAttach={() => setAttachVisible(true)}
+            disabled={isBlocked}
+          />
         </View>
       </KeyboardAvoidingView>
 
@@ -205,10 +223,8 @@ export function FriendChatScreenContent({ friendId, prefill, onBack, onOpenStrea
           removeFriend(f.id);
           onBack();
         }}
-        onBlock={(f) => {
-          removeFriend(f.id);
-          onBack();
-        }}
+        onBlock={(f) => blockFriend(f.id)}
+        onUnblock={(f) => unblockFriend(f.id)}
       />
     </SafeAreaView>
   );
@@ -258,4 +274,14 @@ const styles = StyleSheet.create({
     paddingBottom: Spacing.two,
     gap: Spacing.one,
   },
+  blockedBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: Radius.md,
+    backgroundColor: 'rgba(229,57,53,0.12)',
+  },
+  blockedText: { flex: 1, color: Brand.danger, fontSize: 13, fontWeight: '600' },
 });
