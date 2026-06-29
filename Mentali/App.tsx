@@ -3,6 +3,8 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import LoginPage from '@/pages/LoginPage';
 import SignupPage from '@/pages/SignupPage';
 import ForgetPasswordPage from '@/pages/ForgetPasswordPage';
+import VerifyCodePage from '@/pages/VerifyCodePage';
+import ResetPasswordPage from '@/pages/ResetPasswordPage';
 import HomePage from '@/pages/HomePage';
 import { SocialProvider } from '@/storage/socialStore';
 import { FriendChatScreenContent } from '@/components/chat/FriendChatScreenContent';
@@ -17,6 +19,8 @@ type ScreenState =
   | { screen: 'login' }
   | { screen: 'signup' }
   | { screen: 'forgot-password' }
+  | { screen: 'verify-code' }
+  | { screen: 'reset-password' }
   | { screen: 'home'; selectedNav?: string }
   | { screen: 'chat'; friendId: string; prefill?: boolean; returnToNav: string }
   | { screen: 'streak-guide'; friendId: string; prefill?: boolean; returnToNav: string }
@@ -31,6 +35,8 @@ type ScreenState =
 
 export default function App() {
   const [screenState, setScreenState] = useState<ScreenState>({ screen: 'login' });
+  const [loginMode, setLoginMode] = useState<'phone' | 'email'>('phone');
+  const [recoveryMode, setRecoveryMode] = useState<'phone' | 'email'>('phone');
   const [homeNav, setHomeNav] = useState('home-outline');
   const [streak, setStreak] = useState<StreakState>({
     current: 0,
@@ -83,10 +89,13 @@ export default function App() {
       <SocialProvider>
         {screenState.screen === 'login' ? (
           <LoginPage
-            mode="phone"
-            onToggleMode={() => {}}
+            mode={loginMode}
+            onToggleMode={() => setLoginMode((current) => (current === 'phone' ? 'email' : 'phone'))}
             onSignupPress={() => setScreenState({ screen: 'signup' })}
-            onForgotPasswordPress={() => setScreenState({ screen: 'forgot-password' })}
+            onForgotPasswordPress={() => {
+              setRecoveryMode(loginMode);
+              setScreenState({ screen: 'forgot-password' });
+            }}
             onLoginPress={handleAuthSuccess}
             onSocialAuthSuccess={handleAuthSuccess}
           />
@@ -99,10 +108,24 @@ export default function App() {
           />
         ) : screenState.screen === 'forgot-password' ? (
           <ForgetPasswordPage
-            mode="phone"
-            onToggleMode={() => {}}
-            onNextPress={() => setScreenState({ screen: 'login' })}
+            mode={recoveryMode}
+            onToggleMode={() => setRecoveryMode((current) => (current === 'phone' ? 'email' : 'phone'))}
+            onNextPress={() => setScreenState({ screen: 'verify-code' })}
             onBackPress={() => setScreenState({ screen: 'login' })}
+          />
+        ) : screenState.screen === 'verify-code' ? (
+          <VerifyCodePage
+            mode={recoveryMode}
+            onNextPress={() => setScreenState({ screen: 'reset-password' })}
+            onBackPress={() => setScreenState({ screen: 'forgot-password' })}
+          />
+        ) : screenState.screen === 'reset-password' ? (
+          <ResetPasswordPage
+            onDonePress={() => {
+              setLoginMode(recoveryMode);
+              setScreenState({ screen: 'login' });
+            }}
+            onBackPress={() => setScreenState({ screen: 'verify-code' })}
           />
         ) : screenState.screen === 'home' ? (
           <HomePage
@@ -110,6 +133,7 @@ export default function App() {
             onSelectedNavChange={setHomeNav}
             onOpenChat={(friend, prefill) => openChat(friend.id, prefill)}
             onOpenCheckIn={() => setScreenState({ screen: 'check-in' })}
+            onLogout={() => setScreenState({ screen: 'login' })}
           />
         ) : screenState.screen === 'check-in' ? (
           <CheckInChatScreen

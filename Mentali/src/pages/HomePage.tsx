@@ -32,6 +32,7 @@ type HomePageProps = {
   onSelectedNavChange?: (selectedNav: string) => void;
   onOpenChat?: (friend: Friend, prefillMotivation?: boolean) => void;
   onOpenCheckIn?: () => void;
+  onLogout?: () => void;
 };
 
 const bronzeTrophy = require('../../assets/images/BronzeTrophy.png') as ImageSourcePropType;
@@ -57,6 +58,7 @@ type NotificationPanelProps = {
 type MoreMenuPanelProps = {
   visible: boolean;
   onClose: () => void;
+  onLogout?: () => void;
   topInset: number;
 };
 
@@ -230,11 +232,11 @@ function NotificationPanel({
   );
 }
 
-function MoreMenuPanel({ visible, onClose, topInset }: MoreMenuPanelProps) {
+function MoreMenuPanel({ visible, onClose, onLogout, topInset }: MoreMenuPanelProps) {
   const menuItems = [
-    { icon: 'stats-chart-outline' as const, label: 'Statistics' },
-    { icon: 'settings-outline' as const, label: 'Settings' },
-    { icon: 'log-out-outline' as const, label: 'Logout' },
+    { icon: 'stats-chart-outline' as const, label: 'Statistics', key: 'statistics' as const },
+    { icon: 'settings-outline' as const, label: 'Settings', key: 'settings' as const },
+    { icon: 'log-out-outline' as const, label: 'Logout', key: 'logout' as const },
   ];
 
   return (
@@ -250,7 +252,15 @@ function MoreMenuPanel({ visible, onClose, topInset }: MoreMenuPanelProps) {
           <View style={styles.moreMenuList}>
             {menuItems.map((item, index) => (
               <View key={item.label}>
-                <Pressable style={styles.moreMenuItem} onPress={onClose}>
+                <Pressable
+                  style={styles.moreMenuItem}
+                  onPress={() => {
+                    onClose();
+                    if (item.key === 'logout') {
+                      onLogout?.();
+                    }
+                  }}
+                >
                   <Ionicons name={item.icon} size={28} color="#FF5DE7" />
                   <Text style={styles.moreMenuItemText}>{item.label}</Text>
                 </Pressable>
@@ -270,6 +280,7 @@ export default function HomePage({
   onSelectedNavChange,
   onOpenChat,
   onOpenCheckIn,
+  onLogout,
 }: HomePageProps) {
   const [selectedMood, setSelectedMood] = useState(0);
   const [selectedNav, setSelectedNav] = useState(initialSelectedNav);
@@ -358,7 +369,12 @@ export default function HomePage({
           topInset={insets.top}
         />
 
-        <MoreMenuPanel visible={moreMenuVisible} onClose={() => setMoreMenuVisible(false)} topInset={insets.top} />
+        <MoreMenuPanel
+          visible={moreMenuVisible}
+          onClose={() => setMoreMenuVisible(false)}
+          onLogout={onLogout}
+          topInset={insets.top}
+        />
 
         {isHomeSelected ? (
           <>
