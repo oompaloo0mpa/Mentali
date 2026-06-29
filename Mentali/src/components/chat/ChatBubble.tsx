@@ -1,6 +1,4 @@
-import { Ionicons } from '@expo/vector-icons';
-import { Image } from 'expo-image';
-import { StyleSheet, Text, View } from 'react-native';
+import { Image, StyleSheet, Text, View } from 'react-native';
 
 import { Brand, Radius } from '@/theme/theme';
 import type { ChatMessage } from '@/data/mockData';
@@ -30,11 +28,11 @@ export function ChatBubble(props: Props) {
           hasImage && styles.bubbleImage,
         ]}>
         {hasImage && isSocialMessage ? (
-          <Image source={{ uri: props.message.imageUri }} style={styles.image} contentFit="cover" transition={150} />
+          <Image source={{ uri: props.message.imageUri }} style={styles.image} resizeMode="cover" />
         ) : null}
         {hasFile && (
           <View style={styles.fileRow}>
-            <Ionicons name="document-text" size={22} color="#FFFFFF" />
+            <Text style={styles.fileIcon}>📄</Text>
             <Text style={styles.fileName} numberOfLines={1}>
               {isSocialMessage ? props.message.fileName : ''}
             </Text>
@@ -70,6 +68,7 @@ const styles = StyleSheet.create({
   },
   image: { width: 200, height: 200, borderRadius: Radius.sm },
   fileRow: { flexDirection: 'row', alignItems: 'center', gap: 8, maxWidth: 220 },
+  fileIcon: { fontSize: 18, lineHeight: 22 },
   fileName: { flex: 1, color: Brand.textOnBubble, fontSize: 14, fontWeight: '600' },
   text: { color: Brand.textOnBubble, fontSize: 15, lineHeight: 20, fontWeight: '600' },
   textWithImage: { paddingHorizontal: 10, paddingTop: 6, paddingBottom: 2 },
