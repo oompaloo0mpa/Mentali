@@ -16,7 +16,7 @@ import { MOODS, PHQ4_QUESTIONS } from '@/data/checkInContent';
 import { scorePhq4, scoreK10 } from '@/logic/wellbeing';
 import type { RecordedAnswer, StreakState, WellbeingResult } from '@/logic/checkin';
 import {
-  loginWithEmail,
+  login,
   registerWithEmail,
   requestResetCode,
   resetPassword,
@@ -132,6 +132,7 @@ export default function App() {
     username: string;
     displayName: string;
     password: string;
+    phone: string;
   }) => {
     try {
       const result = await registerWithEmail(payload);
@@ -143,13 +144,12 @@ export default function App() {
   };
 
   const handleLogin = async (payload: { mode: 'phone' | 'email'; identifier: string; password: string }) => {
-    if (payload.mode !== 'email') {
-      setLoginMode('email');
-      Alert.alert('Phone login not connected yet', 'Switched to email login. Sign in with your email and password.');
-      return;
-    }
     try {
-      const result = await loginWithEmail({ identifier: payload.identifier, password: payload.password });
+      const result = await login({
+        mode: payload.mode,
+        identifier: payload.identifier,
+        password: payload.password,
+      });
       setCurrentUserId(result?.user?._id ?? null);
       handleAuthSuccess();
     } catch (error) {

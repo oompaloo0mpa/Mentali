@@ -60,6 +60,7 @@ export async function registerWithEmail(payload: {
   username: string;
   displayName: string;
   password: string;
+  phone: string;
 }) {
   return request("/auth/register", {
     method: "POST",
@@ -67,11 +68,16 @@ export async function registerWithEmail(payload: {
   });
 }
 
-export async function loginWithEmail(payload: { identifier: string; password: string }) {
+export async function login(payload: { mode: AuthMode; identifier: string; password: string }) {
   return request("/auth/login", {
     method: "POST",
     body: JSON.stringify(payload),
   });
+}
+
+/** @deprecated Use login() */
+export async function loginWithEmail(payload: { identifier: string; password: string }) {
+  return login({ mode: "email", ...payload });
 }
 
 export async function requestResetCode(payload: { mode: AuthMode; value: string }) {

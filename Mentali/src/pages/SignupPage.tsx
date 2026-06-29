@@ -1,5 +1,6 @@
 import { useState } from "react";
 import {
+  Alert,
   Image,
   KeyboardAvoidingView,
   Platform,
@@ -13,7 +14,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import CountryPicker, { Country, CountryCode } from "react-native-country-picker-modal";
 import { AsYouType, CountryCode as PhoneCountryCode, isValidPhoneNumber } from "libphonenumber-js";
-import { isStrongPassword, isValidEmail } from "../utils/authValidation";
+import { isStrongPassword, isValidEmail, toE164Phone } from "../utils/authValidation";
 import { SocialAuthResult, useSocialAuth } from "../hooks/useSocialAuth";
 
 const mascotSource = require("../../assets/images/LoginMascot.png");
@@ -72,6 +73,7 @@ type SignupPageProps = {
     username: string;
     displayName: string;
     password: string;
+    phone: string;
   }) => void | Promise<void>;
   onSocialAuthSuccess: (session: SocialAuthResult) => void;
 };
@@ -261,11 +263,20 @@ export default function SignupPage({ onBackPress, onSignInPress, onRegisterPress
               onPress={() => {
                 const trimmedEmail = emailAddress.trim().toLowerCase();
                 const username = trimmedEmail.split("@")[0] || `user${Date.now()}`;
+                const phone = toE164Phone(phoneNumber, phoneCountryCode, callingCode);
+                if (!phone) {
+                  Alert.alert(
+                    "Invalid phone number",
+                    "Enter a valid mobile number for the selected country before registering.",
+                  );
+                  return;
+                }
                 onRegisterPress({
                   email: trimmedEmail,
                   username,
                   displayName: username,
                   password,
+                  phone,
                 });
               }}
               style={({ pressed }) => [

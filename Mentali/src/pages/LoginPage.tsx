@@ -1,6 +1,7 @@
-import { isStrongPassword, isValidEmail } from "../utils/authValidation";
+import { isStrongPassword, isValidEmail, toE164Phone } from "../utils/authValidation";
 import { useMemo, useState } from "react";
 import {
+  Alert,
   Image,
   KeyboardAvoidingView,
   Platform,
@@ -255,13 +256,16 @@ export default function LoginPage({
 
             <Pressable
               disabled={!canSubmitLogin}
-              onPress={() =>
-                onLoginPress({
-                  mode,
-                  identifier: (isPhoneMode ? phoneNumber : emailAddress).trim(),
-                  password,
-                })
-              }
+              onPress={() => {
+                const identifier = isPhoneMode
+                  ? toE164Phone(phoneNumber, phoneCountryCode, callingCode)
+                  : emailAddress.trim().toLowerCase();
+                if (isPhoneMode && !identifier) {
+                  Alert.alert("Invalid phone number", "Enter a valid mobile number for the selected country.");
+                  return;
+                }
+                onLoginPress({ mode, identifier: identifier!, password });
+              }}
               style={({ pressed }) => [
                 styles.loginButton,
                 !canSubmitLogin && styles.buttonDisabled,

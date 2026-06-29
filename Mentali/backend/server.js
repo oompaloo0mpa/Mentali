@@ -42,6 +42,12 @@ function stripSensitive(user) {
   return safe;
 }
 
+function normalizePhone(value) {
+  const compact = String(value || "").trim().replace(/[\s()-]/g, "");
+  if (!/^\+[1-9]\d{6,14}$/.test(compact)) return null;
+  return compact;
+}
+
 app.get("/api/health", async (_req, res, next) => {
   try {
     const { db } = await connectMongo();
@@ -55,7 +61,7 @@ app.get("/api/health", async (_req, res, next) => {
 app.post("/api/auth/register", async (req, res, next) => {
   try {
     const { db } = await connectMongo();
-    const { email, username, displayName, password, authProvider = "email" } = req.body || {};
+    const { email, username, displayName, password, phone, authProvider = "email" } = req.body || {};
 
     if (!email || !username || !displayName) {
       return res.status(400).json({ error: "email, username, displayName are required" });
@@ -63,11 +69,23 @@ app.post("/api/auth/register", async (req, res, next) => {
     if (authProvider === "email" && !password) {
       return res.status(400).json({ error: "password is required for email auth" });
     }
+    if (!phone) {
+      return res.status(400).json({ error: "phone is required" });
+    }
 
-    const existing = await db.collection("users").findOne({
-      $or: [{ email: String(email).toLowerCase() }, { username: String(username).toLowerCase() }],
-    });
-    if (existing) return res.status(409).json({ error: "Email or username already exists" });
+    const normalizedPhone = normalizePhone(phone);
+    if (!normalizedPhone) {
+      return res.status(400).json({ error: "Invalid phone number" });
+    }
+
+    const orConditions = [
+      { email: String(email).toLowerCase() },
+      { username: String(username).toLowerCase() },
+      { phone: normalizedPhone },
+    ];
+
+    const existing = await db.collection("users").findOne({ $or: orConditions });
+    if (existing) return res.status(409).json({ error: "Email, username, or phone already exists" });
 
     const now = new Date();
     const doc = {
@@ -83,6 +101,7 @@ app.post("/api/auth/register", async (req, res, next) => {
       createdAt: now,
       updatedAt: now,
       ...(authProvider === "email" ? { passwordHash: await bcrypt.hash(String(password), 10) } : {}),
+      phone: normalizedPhone,
     };
 
     const insert = await db.collection("users").insertOne(doc);
@@ -117,11 +136,18 @@ app.post("/api/auth/register", async (req, res, next) => {
 app.post("/api/auth/login", async (req, res, next) => {
   try {
     const { db } = await connectMongo();
-    const { identifier, password } = req.body || {};
+    const { identifier, password, mode = "email" } = req.body || {};
     if (!identifier || !password) return res.status(400).json({ error: "identifier and password are required" });
 
-    const id = String(identifier).trim().toLowerCase();
-    const user = await db.collection("users").findOne({ $or: [{ email: id }, { username: id }] });
+    let user;
+    if (mode === "phone") {
+      const phone = normalizePhone(identifier);
+      if (!phone) return res.status(400).json({ error: "Invalid phone number" });
+      user = await db.collection("users").findOne({ phone });
+    } else {
+      const id = String(identifier).trim().toLowerCase();
+      user = await db.collection("users").findOne({ $or: [{ email: id }, { username: id }] });
+    }
     if (!user) return res.status(401).json({ error: "Invalid credentials" });
 
     if (user.authProvider !== "email") {
@@ -141,12 +167,19 @@ app.post("/api/auth/request-reset", async (req, res, next) => {
     const { db } = await connectMongo();
     const { mode, value } = req.body || {};
     if (!mode || !value) return res.status(400).json({ error: "mode and value are required" });
-    const normalized = String(value).trim().toLowerCase();
 
-    const user =
-      mode === "email"
-        ? await db.collection("users").findOne({ email: normalized })
-        : await db.collection("users").findOne({ username: normalized });
+    let normalized;
+    let user;
+    if (mode === "email") {
+      normalized = String(value).trim().toLowerCase();
+      user = await db.collection("users").findOne({ email: normalized });
+    } else {
+      normalized = normalizePhone(value);
+      if (!normalized) {
+        return res.status(400).json({ error: "Invalid phone number" });
+      }
+      user = await db.collection("users").findOne({ phone: normalized });
+    }
     if (!user) return res.status(404).json({ error: "Account not found" });
 
     const code = String(Math.floor(100000 + Math.random() * 900000));
@@ -169,7 +202,11 @@ app.post("/api/auth/verify-reset-code", async (req, res, next) => {
   try {
     const { db } = await connectMongo();
     const { mode, value, code } = req.body || {};
-    const normalized = String(value || "").trim().toLowerCase();
+    const normalized =
+      mode === "phone" ? normalizePhone(value) : String(value || "").trim().toLowerCase();
+    if (!normalized) {
+      return res.status(400).json({ error: mode === "phone" ? "Invalid phone number" : "Invalid email" });
+    }
     const record = await db.collection("passwordResetCodes").findOne({ mode, value: normalized, code: String(code) });
     if (!record || record.used || record.expiresAt < new Date()) {
       return res.status(400).json({ error: "Invalid or expired code" });
@@ -184,7 +221,11 @@ app.post("/api/auth/reset-password", async (req, res, next) => {
   try {
     const { db } = await connectMongo();
     const { mode, value, code, newPassword } = req.body || {};
-    const normalized = String(value || "").trim().toLowerCase();
+    const normalized =
+      mode === "phone" ? normalizePhone(value) : String(value || "").trim().toLowerCase();
+    if (!normalized) {
+      return res.status(400).json({ error: mode === "phone" ? "Invalid phone number" : "Invalid email" });
+    }
     const record = await db.collection("passwordResetCodes").findOne({ mode, value: normalized, code: String(code) });
     if (!record || record.used || record.expiresAt < new Date()) {
       return res.status(400).json({ error: "Invalid or expired code" });

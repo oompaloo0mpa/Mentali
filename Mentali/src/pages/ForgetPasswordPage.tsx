@@ -13,7 +13,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import CountryPicker, { Country, CountryCode } from "react-native-country-picker-modal";
 import { AsYouType, CountryCode as PhoneCountryCode, isValidPhoneNumber } from "libphonenumber-js";
-import { isValidEmail } from "../utils/authValidation";
+import { isValidEmail, toE164Phone } from "../utils/authValidation";
 
 const mascotSource = require("../../assets/images/LoginMascot.png");
 
@@ -81,7 +81,9 @@ export default function ForgetPasswordPage({ mode, onToggleMode, onNextPress, on
 
     onNextPress({
       mode,
-      value: isPhoneMode ? phoneNumber.trim() : emailAddress.trim().toLowerCase(),
+      value: isPhoneMode
+        ? toE164Phone(phoneNumber, phoneCountryCode, callingCode) ?? ""
+        : emailAddress.trim().toLowerCase(),
     });
   };
 

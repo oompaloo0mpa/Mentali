@@ -17,6 +17,7 @@
     "lint": "expo lint",
     "db:test": "node backend/test-connection.js",
     "db:setup": "node backend/setup-database.js",
+    "db:clear-users": "node backend/clear-users.js",
     "api:start": "node backend/server.js"
   },
   "dependencies": {
