@@ -67,7 +67,12 @@ function SocialButton({
 type SignupPageProps = {
   onBackPress: () => void;
   onSignInPress: () => void;
-  onRegisterPress: () => void;
+  onRegisterPress: (payload: {
+    email: string;
+    username: string;
+    displayName: string;
+    password: string;
+  }) => void | Promise<void>;
   onSocialAuthSuccess: (session: SocialAuthResult) => void;
 };
 
@@ -253,7 +258,16 @@ export default function SignupPage({ onBackPress, onSignInPress, onRegisterPress
 
             <Pressable
               disabled={!isFormValid}
-              onPress={onRegisterPress}
+              onPress={() => {
+                const trimmedEmail = emailAddress.trim().toLowerCase();
+                const username = trimmedEmail.split("@")[0] || `user${Date.now()}`;
+                onRegisterPress({
+                  email: trimmedEmail,
+                  username,
+                  displayName: username,
+                  password,
+                });
+              }}
               style={({ pressed }) => [
                 styles.loginButton,
                 !isFormValid && styles.buttonDisabled,

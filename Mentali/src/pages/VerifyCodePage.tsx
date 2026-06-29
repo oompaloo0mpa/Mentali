@@ -17,7 +17,7 @@ const mascotSource = require("../../assets/images/LoginMascot.png");
 
 type VerifyCodePageProps = {
   mode: "phone" | "email";
-  onNextPress: () => void;
+  onNextPress: (code: string) => void | Promise<void>;
   onBackPress: () => void;
 };
 
@@ -47,7 +47,7 @@ export default function VerifyCodePage({ mode, onNextPress, onBackPress }: Verif
       return;
     }
 
-    onNextPress();
+    onNextPress(code);
   };
 
   const subtitle =

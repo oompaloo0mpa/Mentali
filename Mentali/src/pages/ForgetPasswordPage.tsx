@@ -20,7 +20,7 @@ const mascotSource = require("../../assets/images/LoginMascot.png");
 type ForgetPasswordPageProps = {
   mode: "phone" | "email";
   onToggleMode: () => void;
-  onNextPress: () => void;
+  onNextPress: (payload: { mode: "phone" | "email"; value: string }) => void | Promise<void>;
   onBackPress: () => void;
 };
 
@@ -79,7 +79,10 @@ export default function ForgetPasswordPage({ mode, onToggleMode, onNextPress, on
       return;
     }
 
-    onNextPress();
+    onNextPress({
+      mode,
+      value: isPhoneMode ? phoneNumber.trim() : emailAddress.trim().toLowerCase(),
+    });
   };
 
   return (

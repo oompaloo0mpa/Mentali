@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Alert } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import LoginPage from '@/pages/LoginPage';
 import SignupPage from '@/pages/SignupPage';
@@ -14,6 +15,15 @@ import { SummaryScreen } from '@/pages/SummaryScreen';
 import { MOODS, PHQ4_QUESTIONS } from '@/data/checkInContent';
 import { scorePhq4, scoreK10 } from '@/logic/wellbeing';
 import type { RecordedAnswer, StreakState, WellbeingResult } from '@/logic/checkin';
+import {
+  loginWithEmail,
+  registerWithEmail,
+  requestResetCode,
+  resetPassword,
+  saveChatbotSession,
+  saveDailyCheckIn,
+  verifyResetCode,
+} from '@/services/api';
 
 type ScreenState =
   | { screen: 'login' }
@@ -35,8 +45,11 @@ type ScreenState =
 
 export default function App() {
   const [screenState, setScreenState] = useState<ScreenState>({ screen: 'login' });
-  const [loginMode, setLoginMode] = useState<'phone' | 'email'>('phone');
-  const [recoveryMode, setRecoveryMode] = useState<'phone' | 'email'>('phone');
+  const [loginMode, setLoginMode] = useState<'phone' | 'email'>('email');
+  const [recoveryMode, setRecoveryMode] = useState<'phone' | 'email'>('email');
+  const [recoveryValue, setRecoveryValue] = useState('');
+  const [verifiedResetCode, setVerifiedResetCode] = useState('');
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [homeNav, setHomeNav] = useState('home-outline');
   const [streak, setStreak] = useState<StreakState>({
     current: 0,
@@ -48,9 +61,39 @@ export default function App() {
     setScreenState({ screen: 'chat', friendId, prefill, returnToNav: homeNav });
   };
 
+  const persistCheckInData = async (answers: RecordedAnswer[], selectedMood: typeof MOODS[0]) => {
+    if (!currentUserId) return;
+    const phq4 = scorePhq4(answers);
+    const overall = phq4.band.level === 'calm' ? 'high' : phq4.band.level === 'mild' ? 'moderate' : 'low';
+
+    await Promise.all([
+      saveDailyCheckIn({
+        userId: currentUserId,
+        moodEmoji: selectedMood.emoji,
+        moodScore: selectedMood.value,
+        checkInDate: new Date().toISOString().slice(0, 10),
+        reflectionText: null,
+      }),
+      saveChatbotSession({
+        userId: currentUserId,
+        sessionDate: new Date().toISOString(),
+        responses: answers.map((a) => ({
+          questionId: a.questionId,
+          value: a.value,
+          scale: a.scale,
+        })),
+        overallWellbeingLevel: overall,
+        generatedInsight: `Mood ${selectedMood.label}, PHQ4 level ${phq4.band.level}`,
+      }),
+    ]);
+  };
+
   const handleCheckInComplete = (answers: RecordedAnswer[], selectedMood: typeof MOODS[0]) => {
     const phq4 = scorePhq4(answers);
     const k10 = answers.some((a) => a.scale === 'k10') ? scoreK10(answers) : null;
+    persistCheckInData(answers, selectedMood).catch(() => {
+      // Non-blocking persistence: keep check-in UX responsive even if API is unreachable.
+    });
 
     // Update streak
     const today = new Date().toISOString().split('T')[0];
@@ -84,6 +127,78 @@ export default function App() {
     setScreenState({ screen: 'home', selectedNav: homeNav });
   };
 
+  const handleRegister = async (payload: {
+    email: string;
+    username: string;
+    displayName: string;
+    password: string;
+  }) => {
+    try {
+      const result = await registerWithEmail(payload);
+      setCurrentUserId(result?.user?._id ?? null);
+      handleAuthSuccess();
+    } catch (error) {
+      Alert.alert('Signup failed', error instanceof Error ? error.message : 'Unable to register user.');
+    }
+  };
+
+  const handleLogin = async (payload: { mode: 'phone' | 'email'; identifier: string; password: string }) => {
+    if (payload.mode !== 'email') {
+      setLoginMode('email');
+      Alert.alert('Phone login not connected yet', 'Switched to email login. Sign in with your email and password.');
+      return;
+    }
+    try {
+      const result = await loginWithEmail({ identifier: payload.identifier, password: payload.password });
+      setCurrentUserId(result?.user?._id ?? null);
+      handleAuthSuccess();
+    } catch (error) {
+      Alert.alert('Login failed', error instanceof Error ? error.message : 'Unable to login.');
+    }
+  };
+
+  const handleRequestReset = async (payload: { mode: 'phone' | 'email'; value: string }) => {
+    try {
+      await requestResetCode(payload);
+      setRecoveryMode(payload.mode);
+      setRecoveryValue(payload.value);
+      setScreenState({ screen: 'verify-code' });
+    } catch (error) {
+      Alert.alert('Verification failed', error instanceof Error ? error.message : 'Unable to send code.');
+    }
+  };
+
+  const handleVerifyCode = async (code: string) => {
+    try {
+      await verifyResetCode({
+        mode: recoveryMode,
+        value: recoveryValue,
+        code,
+      });
+      setVerifiedResetCode(code);
+      setScreenState({ screen: 'reset-password' });
+    } catch (error) {
+      Alert.alert('Invalid code', error instanceof Error ? error.message : 'Unable to verify code.');
+    }
+  };
+
+  const handleResetPassword = async (newPassword: string) => {
+    try {
+      await resetPassword({
+        mode: recoveryMode,
+        value: recoveryValue,
+        code: verifiedResetCode,
+        newPassword,
+      });
+      setLoginMode(recoveryMode);
+      setRecoveryValue('');
+      setVerifiedResetCode('');
+      setScreenState({ screen: 'login' });
+    } catch (error) {
+      Alert.alert('Reset failed', error instanceof Error ? error.message : 'Unable to reset password.');
+    }
+  };
+
   return (
     <SafeAreaProvider>
       <SocialProvider>
@@ -96,35 +211,32 @@ export default function App() {
               setRecoveryMode(loginMode);
               setScreenState({ screen: 'forgot-password' });
             }}
-            onLoginPress={handleAuthSuccess}
+            onLoginPress={handleLogin}
             onSocialAuthSuccess={handleAuthSuccess}
           />
         ) : screenState.screen === 'signup' ? (
           <SignupPage
             onBackPress={() => setScreenState({ screen: 'login' })}
             onSignInPress={() => setScreenState({ screen: 'login' })}
-            onRegisterPress={handleAuthSuccess}
+            onRegisterPress={handleRegister}
             onSocialAuthSuccess={handleAuthSuccess}
           />
         ) : screenState.screen === 'forgot-password' ? (
           <ForgetPasswordPage
             mode={recoveryMode}
             onToggleMode={() => setRecoveryMode((current) => (current === 'phone' ? 'email' : 'phone'))}
-            onNextPress={() => setScreenState({ screen: 'verify-code' })}
+            onNextPress={handleRequestReset}
             onBackPress={() => setScreenState({ screen: 'login' })}
           />
         ) : screenState.screen === 'verify-code' ? (
           <VerifyCodePage
             mode={recoveryMode}
-            onNextPress={() => setScreenState({ screen: 'reset-password' })}
+            onNextPress={handleVerifyCode}
             onBackPress={() => setScreenState({ screen: 'forgot-password' })}
           />
         ) : screenState.screen === 'reset-password' ? (
           <ResetPasswordPage
-            onDonePress={() => {
-              setLoginMode(recoveryMode);
-              setScreenState({ screen: 'login' });
-            }}
+            onDonePress={handleResetPassword}
             onBackPress={() => setScreenState({ screen: 'verify-code' })}
           />
         ) : screenState.screen === 'home' ? (
@@ -133,7 +245,10 @@ export default function App() {
             onSelectedNavChange={setHomeNav}
             onOpenChat={(friend, prefill) => openChat(friend.id, prefill)}
             onOpenCheckIn={() => setScreenState({ screen: 'check-in' })}
-            onLogout={() => setScreenState({ screen: 'login' })}
+            onLogout={() => {
+              setCurrentUserId(null);
+              setScreenState({ screen: 'login' });
+            }}
           />
         ) : screenState.screen === 'check-in' ? (
           <CheckInChatScreen
