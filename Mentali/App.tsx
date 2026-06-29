@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import LoginPage from '@/pages/LoginPage';
+import SignupPage from '@/pages/SignupPage';
+import ForgetPasswordPage from '@/pages/ForgetPasswordPage';
 import HomePage from '@/pages/HomePage';
 import { SocialProvider } from '@/storage/socialStore';
 import { FriendChatScreenContent } from '@/components/chat/FriendChatScreenContent';
@@ -13,6 +15,8 @@ import type { RecordedAnswer, StreakState, WellbeingResult } from '@/logic/check
 
 type ScreenState =
   | { screen: 'login' }
+  | { screen: 'signup' }
+  | { screen: 'forgot-password' }
   | { screen: 'home'; selectedNav?: string }
   | { screen: 'chat'; friendId: string; prefill?: boolean; returnToNav: string }
   | { screen: 'streak-guide'; friendId: string; prefill?: boolean; returnToNav: string }
@@ -70,6 +74,10 @@ export default function App() {
     });
   };
 
+  const handleAuthSuccess = () => {
+    setScreenState({ screen: 'home', selectedNav: homeNav });
+  };
+
   return (
     <SafeAreaProvider>
       <SocialProvider>
@@ -77,10 +85,24 @@ export default function App() {
           <LoginPage
             mode="phone"
             onToggleMode={() => {}}
-            onSignupPress={() => {}}
-            onForgotPasswordPress={() => {}}
-            onLoginPress={() => setScreenState({ screen: 'home', selectedNav: homeNav })}
-            onSocialAuthSuccess={() => setScreenState({ screen: 'home', selectedNav: homeNav })}
+            onSignupPress={() => setScreenState({ screen: 'signup' })}
+            onForgotPasswordPress={() => setScreenState({ screen: 'forgot-password' })}
+            onLoginPress={handleAuthSuccess}
+            onSocialAuthSuccess={handleAuthSuccess}
+          />
+        ) : screenState.screen === 'signup' ? (
+          <SignupPage
+            onBackPress={() => setScreenState({ screen: 'login' })}
+            onSignInPress={() => setScreenState({ screen: 'login' })}
+            onRegisterPress={handleAuthSuccess}
+            onSocialAuthSuccess={handleAuthSuccess}
+          />
+        ) : screenState.screen === 'forgot-password' ? (
+          <ForgetPasswordPage
+            mode="phone"
+            onToggleMode={() => {}}
+            onNextPress={() => setScreenState({ screen: 'login' })}
+            onBackPress={() => setScreenState({ screen: 'login' })}
           />
         ) : screenState.screen === 'home' ? (
           <HomePage

@@ -67,10 +67,11 @@ function SocialButton({
 type SignupPageProps = {
   onBackPress: () => void;
   onSignInPress: () => void;
+  onRegisterPress: () => void;
   onSocialAuthSuccess: (session: SocialAuthResult) => void;
 };
 
-export default function SignupPage({ onBackPress, onSignInPress, onSocialAuthSuccess }: SignupPageProps) {
+export default function SignupPage({ onBackPress, onSignInPress, onRegisterPress, onSocialAuthSuccess }: SignupPageProps) {
   const [phoneNumber, setPhoneNumber] = useState("");
   const [emailAddress, setEmailAddress] = useState("");
   const [password, setPassword] = useState("");
@@ -252,6 +253,7 @@ export default function SignupPage({ onBackPress, onSignInPress, onSocialAuthSuc
 
             <Pressable
               disabled={!isFormValid}
+              onPress={onRegisterPress}
               style={({ pressed }) => [
                 styles.loginButton,
                 !isFormValid && styles.buttonDisabled,
