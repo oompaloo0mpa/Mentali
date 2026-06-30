@@ -1,15 +1,20 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+import { localCheckInReply } from '@/logic/checkinChatLocal';
 import type { AnswerOption, CheckInQuestion, MoodOption, RecordedAnswer } from '@/logic/checkin';
-import { resolveCheckInReply, type CheckInChatMessage } from '@/services/checkinChat';
 
-export type { CheckInChatMessage as ChatMessage };
+export type ChatMessage = {
+  id: string;
+  role: 'bot' | 'user';
+  text: string;
+  helper?: string;
+};
 
-const TYPING_MS = 550;
+const TYPING_MS = 350;
 const SKIP_OPTION: AnswerOption = { label: 'Prefer not to say', value: 0, skip: true };
 
 export interface UseCheckInChat {
-  messages: CheckInChatMessage[];
+  messages: ChatMessage[];
   typing: boolean;
   awaiting: boolean;
   finished: boolean;
@@ -22,122 +27,164 @@ export interface UseCheckInChat {
 }
 
 export function useCheckInChat(mood: MoodOption, questions: CheckInQuestion[]): UseCheckInChat {
-  const [messages, setMessages] = useState<CheckInChatMessage[]>([]);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [answers, setAnswers] = useState<RecordedAnswer[]>([]);
-  const [typing, setTyping] = useState(true);
+  const [typing, setTyping] = useState(false);
   const [awaiting, setAwaiting] = useState(false);
   const [finished, setFinished] = useState(false);
+
   const nextId = useRef(0);
   const ackIndex = useRef(0);
-  const busy = useRef(false);
-  const totalTopics = questions.length;
+  const replyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const mounted = useRef(true);
 
+  const moodRef = useRef(mood);
+  const questionsRef = useRef(questions);
+  moodRef.current = mood;
+  questionsRef.current = questions;
+
+  const totalTopics = Math.max(questions.length, 1);
   const makeId = () => `m${nextId.current++}`;
+
+  const clearReplyTimer = () => {
+    if (replyTimer.current) {
+      clearTimeout(replyTimer.current);
+      replyTimer.current = null;
+    }
+  };
 
   const currentOptions = questions[answers.length]?.options ?? [];
 
-  const revealBotReply = useCallback(
-    async (
-      reply: { message: string; helper?: string | null; answer?: RecordedAnswer | null; finished: boolean },
-      priorAnswerCount: number,
-    ) => {
-      await new Promise((r) => setTimeout(r, TYPING_MS));
+  const showBotReply = useCallback(
+    (reply: ReturnType<typeof localCheckInReply>, priorAnswerCount: number) => {
+      if (!mounted.current) return;
 
       setMessages((prev) => [
         ...prev,
-        { id: makeId(), role: 'bot', text: reply.message, helper: reply.helper ?? undefined },
+        {
+          id: makeId(),
+          role: 'bot',
+          text: reply.message,
+          helper: reply.helper ?? undefined,
+        },
       ]);
 
-      const done =
-        reply.finished || (reply.answer != null && priorAnswerCount + 1 >= totalTopics);
-      setFinished(done);
-      setAwaiting(!done);
-      setTyping(false);
+      const nextCount = reply.answer ? priorAnswerCount + 1 : priorAnswerCount;
+      const done = reply.finished || (reply.answer != null && nextCount >= totalTopics);
 
       if (reply.answer) {
         setAnswers((prev) => [...prev, reply.answer as RecordedAnswer]);
       }
 
+      setFinished(done);
+      setAwaiting(!done);
+      setTyping(false);
       ackIndex.current += 1;
-      busy.current = false;
     },
     [totalTopics],
   );
 
-  const callAssistant = useCallback(
-    async (payload: {
-      userMessage?: string | null;
-      selectedOption?: AnswerOption | null;
-      snapshotMessages: CheckInChatMessage[];
-      snapshotAnswers: RecordedAnswer[];
-    }) => {
-      if (busy.current) return;
-      busy.current = true;
+  const deliverReply = useCallback(
+    (reply: ReturnType<typeof localCheckInReply>, priorAnswerCount: number) => {
+      clearReplyTimer();
       setTyping(true);
       setAwaiting(false);
-
-      const requestPayload = {
-        mood,
-        questions,
-        answers: payload.snapshotAnswers,
-        messages: payload.snapshotMessages,
-        userMessage: payload.userMessage ?? null,
-        selectedOption: payload.selectedOption ?? null,
-        ackIndex: ackIndex.current,
-      };
-
-      try {
-        const reply = await resolveCheckInReply(requestPayload);
-        await revealBotReply(reply, payload.snapshotAnswers.length);
-      } catch {
-        busy.current = false;
-        setTyping(false);
-        setAwaiting(true);
-        setMessages((prev) => [
-          ...prev,
-          {
-            id: makeId(),
-            role: 'bot',
-            text: "Something went wrong — try typing a reply or tap a quick option below.",
-          },
-        ]);
-      }
+      replyTimer.current = setTimeout(() => showBotReply(reply, priorAnswerCount), TYPING_MS);
     },
-    [mood, questions, revealBotReply],
+    [showBotReply],
   );
 
   const moodId = mood.id;
   const questionKey = `${questions.length}-${questions[0]?.scale ?? 'phq4'}`;
-  const bootedKey = useRef('');
 
   useEffect(() => {
-    const key = `${moodId}-${questionKey}`;
-    if (bootedKey.current === key) return;
-    bootedKey.current = key;
-    void callAssistant({ snapshotMessages: [], snapshotAnswers: [] });
-  }, [moodId, questionKey, callAssistant]);
+    mounted.current = true;
+    clearReplyTimer();
+    nextId.current = 0;
+    ackIndex.current = 0;
+    setAnswers([]);
+    setFinished(false);
+
+    const bootQuestions = questionsRef.current;
+    const bootMood = moodRef.current;
+
+    if (bootQuestions.length === 0) {
+      setMessages([
+        {
+          id: 'm0',
+          role: 'bot',
+          text: 'Check-in questions are not loaded. Please go back and try again.',
+        },
+      ]);
+      setTyping(false);
+      setAwaiting(false);
+      return () => {
+        mounted.current = false;
+        clearReplyTimer();
+      };
+    }
+
+    const reply = localCheckInReply({
+      mood: bootMood,
+      questions: bootQuestions,
+      answers: [],
+      messages: [],
+      ackIndex: 0,
+    });
+
+    setMessages([
+      {
+        id: makeId(),
+        role: 'bot',
+        text: reply.message,
+        helper: reply.helper ?? undefined,
+      },
+    ]);
+    setTyping(false);
+    setAwaiting(true);
+
+    return () => {
+      mounted.current = false;
+      clearReplyTimer();
+    };
+    // Only re-boot when mood or question set changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [moodId, questionKey]);
+
+  useEffect(
+    () => () => {
+      mounted.current = false;
+      clearReplyTimer();
+    },
+    [],
+  );
 
   const respond = useCallback(
     (text: string, selectedOption?: AnswerOption) => {
-      if (finished || busy.current) return;
+      if (finished || typing) return;
 
       const userText = selectedOption ? selectedOption.label : text.trim();
       if (!userText) return;
 
-      const userMsg: CheckInChatMessage = { id: makeId(), role: 'user', text: userText };
+      const userMsg: ChatMessage = { id: makeId(), role: 'user', text: userText };
       const snapshotMessages = [...messages, userMsg];
       const snapshotAnswers = answers;
 
       setMessages(snapshotMessages);
 
-      void callAssistant({
+      const reply = localCheckInReply({
+        mood: moodRef.current,
+        questions: questionsRef.current,
+        answers: snapshotAnswers,
+        messages: snapshotMessages,
         userMessage: selectedOption ? null : userText,
         selectedOption: selectedOption ?? null,
-        snapshotMessages,
-        snapshotAnswers,
+        ackIndex: ackIndex.current,
       });
+
+      deliverReply(reply, snapshotAnswers.length);
     },
-    [answers, callAssistant, finished, messages],
+    [answers, deliverReply, finished, messages, typing],
   );
 
   return {
