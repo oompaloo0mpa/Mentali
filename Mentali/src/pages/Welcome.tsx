@@ -7,29 +7,21 @@ import {
   SafeAreaView,
   Image,
 } from 'react-native';
-import { useRouter } from 'expo-router';
 
-export default function Welcome(): React.ReactElement {
-  const router = useRouter();
+interface Props {
+  onGetStarted: () => void;
+  onAlreadyHaveAccount: () => void;
+}
 
-  const handleGetStarted = (): void => {
-    router.push('/login');
-  };
-
-  const handleAlreadyHaveAccount = (): void => {
-    router.push('/signup');
-  };
-
+export default function Welcome({ onGetStarted, onAlreadyHaveAccount }: Props): React.ReactElement {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.content}>
-        {/* Header */}
         <View style={styles.header}>
           <Text style={styles.title}>Welcome to</Text>
           <Text style={styles.brandName}>mentali</Text>
         </View>
 
-        {/* Welcome Image */}
         <View style={styles.mascotContainer}>
           <Image
             source={require('../components/WelcomeImage.png')}
@@ -38,18 +30,16 @@ export default function Welcome(): React.ReactElement {
           />
         </View>
 
-        {/* Description */}
         <View style={styles.descriptionContainer}>
           <Text style={styles.description}>
             A safe space to understand and figure out your feelings, at your own pace.
           </Text>
         </View>
 
-        {/* Buttons */}
         <View style={styles.buttonContainer}>
           <TouchableOpacity
             style={styles.primaryButton}
-            onPress={handleGetStarted}
+            onPress={onGetStarted}
             activeOpacity={0.8}
           >
             <Text style={styles.primaryButtonText}>GET STARTED</Text>
@@ -57,12 +47,10 @@ export default function Welcome(): React.ReactElement {
 
           <TouchableOpacity
             style={styles.secondaryButton}
-            onPress={handleAlreadyHaveAccount}
+            onPress={onAlreadyHaveAccount}
             activeOpacity={0.8}
           >
-            <Text style={styles.secondaryButtonText}>
-              I ALREADY HAVE AN ACCOUNT
-            </Text>
+            <Text style={styles.secondaryButtonText}>I ALREADY HAVE AN ACCOUNT</Text>
           </TouchableOpacity>
         </View>
       </View>

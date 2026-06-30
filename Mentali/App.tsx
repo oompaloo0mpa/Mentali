@@ -6,6 +6,7 @@ import SignupPage from '@/pages/SignupPage';
 import ForgetPasswordPage from '@/pages/ForgetPasswordPage';
 import VerifyCodePage from '@/pages/VerifyCodePage';
 import ResetPasswordPage from '@/pages/ResetPasswordPage';
+import Welcome from '@/pages/Welcome';
 import HomePage from '@/pages/HomePage';
 import { SocialProvider } from '@/storage/socialStore';
 import { FriendChatScreenContent } from '@/components/chat/FriendChatScreenContent';
@@ -26,6 +27,7 @@ import {
 } from '@/services/api';
 
 type ScreenState =
+  | { screen: 'welcome' }
   | { screen: 'login' }
   | { screen: 'signup' }
   | { screen: 'forgot-password' }
@@ -44,7 +46,7 @@ type ScreenState =
     };
 
 export default function App() {
-  const [screenState, setScreenState] = useState<ScreenState>({ screen: 'login' });
+  const [screenState, setScreenState] = useState<ScreenState>({ screen: 'welcome' });
   const [loginMode, setLoginMode] = useState<'phone' | 'email'>('email');
   const [recoveryMode, setRecoveryMode] = useState<'phone' | 'email'>('email');
   const [recoveryValue, setRecoveryValue] = useState('');
@@ -202,7 +204,12 @@ export default function App() {
   return (
     <SafeAreaProvider>
       <SocialProvider>
-        {screenState.screen === 'login' ? (
+        {screenState.screen === 'welcome' ? (
+          <Welcome
+            onGetStarted={() => setScreenState({ screen: 'signup' })}
+            onAlreadyHaveAccount={() => setScreenState({ screen: 'login' })}
+          />
+        ) : screenState.screen === 'login' ? (
           <LoginPage
             mode={loginMode}
             onToggleMode={() => setLoginMode((current) => (current === 'phone' ? 'email' : 'phone'))}
@@ -216,7 +223,7 @@ export default function App() {
           />
         ) : screenState.screen === 'signup' ? (
           <SignupPage
-            onBackPress={() => setScreenState({ screen: 'login' })}
+            onBackPress={() => setScreenState({ screen: 'welcome' })}
             onSignInPress={() => setScreenState({ screen: 'login' })}
             onRegisterPress={handleRegister}
             onSocialAuthSuccess={handleAuthSuccess}
@@ -247,7 +254,7 @@ export default function App() {
             onOpenCheckIn={() => setScreenState({ screen: 'check-in' })}
             onLogout={() => {
               setCurrentUserId(null);
-              setScreenState({ screen: 'login' });
+              setScreenState({ screen: 'welcome' });
             }}
           />
         ) : screenState.screen === 'check-in' ? (
