@@ -119,6 +119,47 @@ export async function saveDailyCheckIn(payload: {
   });
 }
 
+export async function fetchUserPreferences(userId: string) {
+  const result = await apiRequest(`/preferences/${userId}`);
+  return result?.data ?? null;
+}
+
+export async function updateUserPreferences(
+  userId: string,
+  payload: {
+    anonymousMode?: boolean;
+    showMoodToFriends?: boolean;
+    allowFriendRequests?: boolean;
+    leaderboardNotifications?: boolean;
+    encouragementNotifications?: boolean;
+    theme?: string;
+  },
+) {
+  const result = await apiRequest(`/preferences/${userId}`, {
+    method: "PUT",
+    body: JSON.stringify(payload),
+  });
+  return result?.data ?? null;
+}
+
+export async function lookupUserByFriendCode(code: string, viewerId?: string | null) {
+  const params = new URLSearchParams({ code });
+  if (viewerId) params.set("viewerId", viewerId);
+  const result = await apiRequest(`/users/lookup-by-code?${params.toString()}`);
+  return result?.user ?? null;
+}
+
+export async function requestFriendByCode(fromUserId: string, friendCode: string) {
+  return apiRequest("/friends/request-by-code", {
+    method: "POST",
+    body: JSON.stringify({ fromUserId, friendCode }),
+  });
+}
+
+export async function deleteAccount(userId: string) {
+  return apiRequest(`/users/${userId}`, { method: 'DELETE' });
+}
+
 export async function saveChatbotSession(payload: {
   userId: string;
   responses: { questionId: string; value: number; scale: string }[];

@@ -2,6 +2,8 @@ import React from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native';
 
+import { SettingsAccessButton } from '@/components/settings/SettingsAccessButton';
+
 import { BandCard } from '@/components/wellbeing/BandCard';
 import { ScoreBar } from '@/components/wellbeing/ScoreBar';
 import { SupportCard } from '@/components/wellbeing/SupportCard';
@@ -29,6 +31,10 @@ export function SummaryScreen({ mood, streak, phq4, k10, onDeeper, onDone }: Pro
 
   return (
     <SafeAreaView style={styles.safe}>
+      <View style={styles.topBar}>
+        <View />
+        <SettingsAccessButton color={colors.textPrimary} />
+      </View>
       <ScrollView contentContainerStyle={styles.content}>
         <Text style={styles.title}>Your check-in</Text>
 
@@ -114,6 +120,13 @@ function EncouragementNote({ level }: { level: WellbeingResult['band']['level'] 
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.background },
+  topBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.sm,
+  },
   content: { padding: spacing.lg, paddingBottom: spacing.xxl, gap: spacing.lg },
   flex: { flex: 1 },
   title: { ...typography.title, color: colors.textPrimary },

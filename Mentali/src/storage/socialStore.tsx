@@ -20,8 +20,10 @@ import {
   type FriendRequest,
   type Quest,
 } from '@/data/mockData';
+import { useUserProfile } from '@/storage/userProfileStore';
 
-const STORAGE_KEY = 'mentali.social.v5';
+const STORAGE_KEY = 'mentali.social.v6';
+const LEGACY_STORAGE_KEYS = ['mentali.social.v5', 'mentali.social.v4'];
 
 /** Friends added within this many days show under the "New" filter. */
 export const NEW_FRIEND_DAYS = 7;
@@ -62,9 +64,10 @@ function freshQuests(): Quest[] {
 }
 
 function initialState(): SocialState {
+  const friends = FRIENDS.map((f) => normalizeFriend({ ...f }));
   return {
-    friends: FRIENDS.map((f) => normalizeFriend({ ...f })),
-    requests: INCOMING_REQUESTS.map((r) => ({ ...r })),
+    friends,
+    requests: normalizeIncomingRequests(friends, INCOMING_REQUESTS),
     chats: Object.fromEntries(Object.entries(INITIAL_CHATS).map(([id, msgs]) => [id, msgs.map((m) => ({ ...m }))])),
     notifications: NOTIFICATIONS.map((n) => ({ ...n })),
     quests: freshQuests(),
@@ -74,6 +77,76 @@ function initialState(): SocialState {
     fireStreak: CURRENT_USER.fireStreak,
     celebrated: {},
   };
+}
+
+function friendNameKey(name: string): string {
+  return name.trim().toLowerCase();
+}
+
+/** Drop stale demo requests and ensure the anonymous Riley demo is available. */
+function normalizeIncomingRequests(friends: Friend[], stored: FriendRequest[] | undefined): FriendRequest[] {
+  const friendNames = new Set(friends.map((f) => friendNameKey(f.name)));
+
+  const pending = (stored ?? [])
+    .map((request) => {
+      // Legacy seed stored Alex without anonymousMode — upgrade to the Riley demo.
+      if (request.id === 'r1' && friendNameKey(request.name) === 'alex' && !request.anonymousMode) {
+        return { ...INCOMING_REQUESTS[0] };
+      }
+      return request;
+    })
+    .filter((request) => !friendNames.has(friendNameKey(request.name)));
+
+  const pendingNames = new Set(pending.map((r) => friendNameKey(r.name)));
+
+  if (pending.length === 0 && !friendNames.has('riley')) {
+    return INCOMING_REQUESTS.map((r) => ({ ...r }));
+  }
+
+  for (const seed of INCOMING_REQUESTS) {
+    const key = friendNameKey(seed.name);
+    if (!friendNames.has(key) && !pendingNames.has(key)) {
+      pending.push({ ...seed });
+    }
+  }
+
+  return pending;
+}
+
+function hydrateSocialState(parsed: Partial<SocialState>): SocialState {
+  const base = initialState();
+  const friends = (parsed.friends ?? base.friends).map(normalizeFriend);
+  const questDateStale = parsed.questDate !== todayKey();
+
+  return {
+    ...base,
+    ...parsed,
+    friends,
+    requests: normalizeIncomingRequests(friends, parsed.requests),
+    quests: questDateStale ? freshQuests() : (parsed.quests ?? base.quests),
+    questDate: questDateStale ? todayKey() : (parsed.questDate ?? base.questDate),
+    chats: parsed.chats ?? base.chats,
+    notifications: parsed.notifications ?? base.notifications,
+  };
+}
+
+async function loadPersistedSocialState(): Promise<SocialState | null> {
+  for (const key of [STORAGE_KEY, ...LEGACY_STORAGE_KEYS]) {
+    const raw = await AsyncStorage.getItem(key);
+    if (!raw) continue;
+
+    const parsed = JSON.parse(raw) as Partial<SocialState>;
+    const state = hydrateSocialState(parsed);
+
+    if (key !== STORAGE_KEY) {
+      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      await AsyncStorage.removeItem(key).catch(() => {});
+    }
+
+    return state;
+  }
+
+  return null;
 }
 
 let idCounter = 0;
@@ -186,6 +259,7 @@ type SocialContextValue = {
 const SocialContext = createContext<SocialContextValue | null>(null);
 
 export function SocialProvider({ children }: { children: React.ReactNode }) {
+  const { profile } = useUserProfile();
   const [state, setState] = useState<SocialState>(initialState);
   const [hydrated, setHydrated] = useState(false);
 
@@ -197,19 +271,9 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
     let active = true;
     (async () => {
       try {
-        const raw = await AsyncStorage.getItem(STORAGE_KEY);
-        if (active && raw) {
-          const parsed = JSON.parse(raw) as SocialState;
-          // Roll the daily quests over when the stored day is stale.
-          if (parsed.questDate !== todayKey()) {
-            parsed.quests = freshQuests();
-            parsed.questDate = todayKey();
-          }
-          setState({
-            ...initialState(),
-            ...parsed,
-            friends: (parsed.friends ?? []).map(normalizeFriend),
-          });
+        const persisted = await loadPersistedSocialState();
+        if (active && persisted) {
+          setState(persisted);
         }
       } catch {
         // Ignore corrupt storage and fall back to seed data.
@@ -241,7 +305,7 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
       const normalized = code.trim().toUpperCase();
       if (!normalized) return { ok: false, message: 'Enter a friend code.' };
 
-      if (normalized === CURRENT_USER.friendCode.toUpperCase()) {
+      if (normalized === profile.friendCode.toUpperCase()) {
         return { ok: false, message: "That's your own friend code." };
       }
 
@@ -255,11 +319,13 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
         return { ok: false, message: `You're already friends with ${directoryUser.name}.` };
       }
 
+      const addedName = directoryUser.name;
+
       update((prev) => {
         const id = uid('f');
         const friend = normalizeFriend({
           id,
-          name: directoryUser.name,
+          name: addedName,
           code: directoryUser.code,
           streak: 0,
           lastSeen: 'Just now',
@@ -276,7 +342,7 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
             {
               id: uid('n'),
               icon: 'person-add',
-              title: `You added ${directoryUser.name} as a friend`,
+              title: `You added ${addedName} as a friend`,
               time: 'Just now',
               read: false,
               recent: true,
@@ -286,9 +352,9 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
         };
       });
 
-      return { ok: true, message: `Added ${directoryUser.name} as a friend.` };
+      return { ok: true, message: `Added ${addedName} as a friend.` };
     },
-    [update],
+    [profile.friendCode, update],
   );
 
   const acceptRequest = useCallback(

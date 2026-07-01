@@ -1,6 +1,7 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { SettingsAccessButton } from '@/components/settings/SettingsAccessButton';
 import { colors, radius, spacing, typography } from '@/theme/colors';
 import { ProgressDots } from './ProgressDots';
 
@@ -9,14 +10,18 @@ interface Props {
   onBack: () => void;
   total?: number;
   completed?: number;
+  showSettings?: boolean;
 }
 
-export function ChatHeader({ title, onBack, total, completed }: Props) {
+export function ChatHeader({ title, onBack, total, completed, showSettings = true }: Props) {
   const showProgress = typeof total === 'number' && typeof completed === 'number' && total > 0;
 
   return (
     <View style={styles.wrap}>
-      <Text style={styles.caption}>{title}</Text>
+      <View style={styles.titleRow}>
+        <Text style={styles.caption}>{title}</Text>
+        {showSettings ? <SettingsAccessButton color={colors.textSecondary} /> : null}
+      </View>
       <View style={styles.row}>
         <Pressable
           accessibilityRole="button"
@@ -38,6 +43,7 @@ export function ChatHeader({ title, onBack, total, completed }: Props) {
 
 const styles = StyleSheet.create({
   wrap: { paddingHorizontal: spacing.lg, paddingTop: spacing.sm, paddingBottom: spacing.md, gap: spacing.sm },
+  titleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   caption: { ...typography.caption, color: colors.textSecondary },
   row: { flexDirection: 'row', alignItems: 'center', gap: spacing.lg },
   back: {

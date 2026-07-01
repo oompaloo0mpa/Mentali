@@ -29,7 +29,7 @@ async function generateFriendCode(db) {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
   for (let attempts = 0; attempts < 20; attempts += 1) {
     let code = "";
-    for (let i = 0; i < 7; i += 1) code += chars[Math.floor(Math.random() * chars.length)];
+    for (let i = 0; i < 6; i += 1) code += chars[Math.floor(Math.random() * chars.length)];
     const exists = await db.collection("users").findOne({ friendCode: code }, { projection: { _id: 1 } });
     if (!exists) return code;
   }
@@ -40,6 +40,39 @@ function stripSensitive(user) {
   if (!user) return user;
   const { passwordHash, ...safe } = user;
   return safe;
+}
+
+async function areFriends(db, userA, userB) {
+  const a = toObjectId(userA, "userId");
+  const b = toObjectId(userB, "userId");
+  const key = friendPairKey(a, b);
+  const row = await db.collection("friends").findOne({ pairKey: key, status: "accepted" });
+  return !!row;
+}
+
+async function getUserPreferences(db, userId) {
+  const uid = toObjectId(userId, "userId");
+  return db.collection("userPreferences").findOne({ userId: uid });
+}
+
+function publicUserView(user, prefs, { isFriend }) {
+  const anonymousMode = !!prefs?.anonymousMode;
+  if (!anonymousMode || isFriend) {
+    return {
+      _id: user._id,
+      displayName: user.displayName,
+      username: user.username,
+      friendCode: user.friendCode,
+      anonymousMode: false,
+    };
+  }
+  return {
+    _id: user._id,
+    displayName: "Anonymous user",
+    username: null,
+    friendCode: user.friendCode,
+    anonymousMode: true,
+  };
 }
 
 function normalizePhone(value) {
@@ -330,6 +363,69 @@ app.get("/api/chatbot-sessions/:userId", async (req, res, next) => {
   }
 });
 
+app.get("/api/users/lookup-by-code", async (req, res, next) => {
+  try {
+    const { db } = await connectMongo();
+    const code = String(req.query.code || "")
+      .trim()
+      .toUpperCase();
+    const viewerId = req.query.viewerId;
+    if (!code) return res.status(400).json({ error: "code is required" });
+
+    const user = await db.collection("users").findOne({ friendCode: code });
+    if (!user) return res.status(404).json({ error: "No user found for that friend code" });
+
+    const prefs = await getUserPreferences(db, user._id);
+    const isFriend = viewerId ? await areFriends(db, viewerId, user._id) : false;
+    res.json({ user: publicUserView(user, prefs, { isFriend }) });
+  } catch (e) {
+    next(e);
+  }
+});
+
+app.post("/api/friends/request-by-code", async (req, res, next) => {
+  try {
+    const { db } = await connectMongo();
+    const { fromUserId, friendCode } = req.body || {};
+    const from = toObjectId(fromUserId, "fromUserId");
+    const code = String(friendCode || "")
+      .trim()
+      .toUpperCase();
+    if (!code) return res.status(400).json({ error: "friendCode is required" });
+
+    const target = await db.collection("users").findOne({ friendCode: code });
+    if (!target) return res.status(404).json({ error: "No user found for that friend code" });
+    if (String(target._id) === String(from)) {
+      return res.status(400).json({ error: "You cannot add your own friend code" });
+    }
+
+    const key = friendPairKey(from, target._id);
+    const now = new Date();
+    await db.collection("friends").updateOne(
+      { pairKey: key },
+      {
+        $setOnInsert: {
+          userAId: String(from) < String(target._id) ? from : target._id,
+          userBId: String(from) < String(target._id) ? target._id : from,
+          pairKey: key,
+          requestedBy: from,
+          status: "pending",
+          createdAt: now,
+          acceptedAt: null,
+          blockedAt: null,
+        },
+      },
+      { upsert: true }
+    );
+
+    const prefs = await getUserPreferences(db, target._id);
+    const isFriend = await areFriends(db, from, target._id);
+    res.json({ ok: true, user: publicUserView(target, prefs, { isFriend }) });
+  } catch (e) {
+    next(e);
+  }
+});
+
 app.post("/api/friends/request", async (req, res, next) => {
   try {
     const { db } = await connectMongo();
@@ -570,6 +666,26 @@ app.get("/api/leaderboard/contests/:contestId/participants", async (req, res, ne
     const contestId = toObjectId(req.params.contestId, "contestId");
     const data = await db.collection("contestParticipants").find({ contestId }).sort({ rank: 1 }).toArray();
     res.json({ data });
+  } catch (e) {
+    next(e);
+  }
+});
+
+app.delete("/api/users/:userId", async (req, res, next) => {
+  try {
+    const { db } = await connectMongo();
+    const uid = toObjectId(req.params.userId, "userId");
+
+    await Promise.all([
+      db.collection("userPreferences").deleteMany({ userId: uid }),
+      db.collection("friends").deleteMany({ $or: [{ userAId: uid }, { userBId: uid }] }),
+      db.collection("dailyCheckins").deleteMany({ userId: uid }),
+      db.collection("chatbotSessions").deleteMany({ userId: uid }),
+      db.collection("passwordResetCodes").deleteMany({ userId: uid }),
+      db.collection("users").deleteOne({ _id: uid }),
+    ]);
+
+    res.json({ ok: true });
   } catch (e) {
     next(e);
   }

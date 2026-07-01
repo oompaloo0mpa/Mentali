@@ -25,6 +25,7 @@ import {
   type StatItem,
 } from '../hooks/homepageData';
 import { FriendsScreenContent } from '../components/social/FriendsScreenContent';
+import { useSettingsOverlay } from '@/storage/settingsOverlayStore';
 import { moodFromHomeIndex } from '@/data/checkInContent';
 import type { Friend } from '@/data/mockData';
 import type { MoodOption } from '@/logic/checkin';
@@ -34,7 +35,6 @@ type HomePageProps = {
   onSelectedNavChange?: (selectedNav: string) => void;
   onOpenChat?: (friend: Friend, prefillMotivation?: boolean) => void;
   onOpenCheckIn?: (mood: MoodOption) => void;
-  onLogout?: () => void;
 };
 
 const bronzeTrophy = require('../../assets/images/BronzeTrophy.png') as ImageSourcePropType;
@@ -61,6 +61,7 @@ type MoreMenuPanelProps = {
   visible: boolean;
   onClose: () => void;
   onLogout?: () => void;
+  onOpenSettings?: () => void;
   topInset: number;
 };
 
@@ -237,7 +238,7 @@ function NotificationPanel({
   );
 }
 
-function MoreMenuPanel({ visible, onClose, onLogout, topInset }: MoreMenuPanelProps) {
+function MoreMenuPanel({ visible, onClose, onLogout, onOpenSettings, topInset }: MoreMenuPanelProps) {
   const menuItems = [
     { icon: 'stats-chart-outline' as const, label: 'Statistics', key: 'statistics' as const },
     { icon: 'settings-outline' as const, label: 'Settings', key: 'settings' as const },
@@ -263,6 +264,8 @@ function MoreMenuPanel({ visible, onClose, onLogout, topInset }: MoreMenuPanelPr
                     onClose();
                     if (item.key === 'logout') {
                       onLogout?.();
+                    } else if (item.key === 'settings') {
+                      onOpenSettings?.();
                     }
                   }}
                 >
@@ -285,8 +288,8 @@ export default function HomePage({
   onSelectedNavChange,
   onOpenChat,
   onOpenCheckIn,
-  onLogout,
 }: HomePageProps) {
+  const { openSettings, requestLogout } = useSettingsOverlay();
   const [selectedMood, setSelectedMood] = useState(0);
   const [selectedNav, setSelectedNav] = useState(initialSelectedNav);
   const [notificationsVisible, setNotificationsVisible] = useState(false);
@@ -296,6 +299,10 @@ export default function HomePage({
   const insets = useSafeAreaInsets();
   const unreadCount = notifications.filter((notification) => !notification.read).length;
   const isHomeSelected = selectedNav === 'home-outline';
+
+  useEffect(() => {
+    setSelectedNav(initialSelectedNav);
+  }, [initialSelectedNav]);
 
   useEffect(() => {
     onSelectedNavChange?.(selectedNav);
@@ -377,7 +384,8 @@ export default function HomePage({
         <MoreMenuPanel
           visible={moreMenuVisible}
           onClose={() => setMoreMenuVisible(false)}
-          onLogout={onLogout}
+          onLogout={requestLogout}
+          onOpenSettings={openSettings}
           topInset={insets.top}
         />
 

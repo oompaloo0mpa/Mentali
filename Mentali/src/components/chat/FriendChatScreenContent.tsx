@@ -21,6 +21,7 @@ import { ChatInput } from '@/components/chat/ChatInput';
 import { StreakPet } from '@/components/chat/StreakPet';
 import { SuggestionBar } from '@/components/chat/SuggestionBar';
 import { FriendOptionsModal } from '@/components/social/FriendOptionsModal';
+import { SettingsAccessButton } from '@/components/settings/SettingsAccessButton';
 import { Brand, MaxContentWidth, Radius, Spacing } from '@/theme/theme';
 import { MOTIVATIONAL_SUGGESTIONS } from '@/data/mockData';
 import { friendMood, useSocial } from '@/storage/socialStore';
@@ -150,14 +151,17 @@ export function FriendChatScreenContent({ friendId, prefill, onBack, onOpenStrea
           )}
         </View>
 
-        <Pressable
-          style={({ pressed }) => [styles.menuBtn, pressed && styles.pressed]}
-          onPress={() => setOptionsVisible(true)}
-          hitSlop={8}
-          accessibilityRole="button"
-          accessibilityLabel="Friend options">
-          <Ionicons name="ellipsis-vertical" size={20} color={Brand.text} />
-        </Pressable>
+        <View style={styles.headerActions}>
+          <SettingsAccessButton />
+          <Pressable
+            style={({ pressed }) => [styles.menuBtn, pressed && styles.pressed]}
+            onPress={() => setOptionsVisible(true)}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel="Friend options">
+            <Ionicons name="ellipsis-vertical" size={20} color={Brand.text} />
+          </Pressable>
+        </View>
       </View>
 
       <KeyboardAvoidingView
@@ -255,6 +259,7 @@ const styles = StyleSheet.create({
   headerName: { color: Brand.text, fontSize: 17, fontWeight: '700' },
   headerStreak: { color: Brand.fire, fontSize: 14, fontWeight: '700' },
   headerMood: { fontSize: 14 },
+  headerActions: { flexDirection: 'row', alignItems: 'center', gap: Spacing.one },
   menuBtn: { padding: 4 },
   pressed: { opacity: 0.7 },
   messages: {

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import LoginPage from '@/pages/LoginPage';
@@ -9,6 +9,8 @@ import ResetPasswordPage from '@/pages/ResetPasswordPage';
 import Welcome from '@/pages/Welcome';
 import HomePage from '@/pages/HomePage';
 import { SocialProvider } from '@/storage/socialStore';
+import { SettingsOverlayProvider } from '@/storage/settingsOverlayStore';
+import { UserProfileProvider, useUserProfile } from '@/storage/userProfileStore';
 import { FriendChatScreenContent } from '@/components/chat/FriendChatScreenContent';
 import { StreakGuideScreenContent } from '@/components/chat/StreakGuideScreenContent';
 import { CheckInChatScreen } from '@/pages/CheckInChatScreen';
@@ -58,6 +60,19 @@ type ScreenState =
     };
 
 export default function App() {
+  return (
+    <SafeAreaProvider>
+      <UserProfileProvider>
+        <SocialProvider>
+          <AppRoot />
+        </SocialProvider>
+      </UserProfileProvider>
+    </SafeAreaProvider>
+  );
+}
+
+function AppRoot() {
+  const { applyAuthUser, clearProfile } = useUserProfile();
   const [screenState, setScreenState] = useState<ScreenState>({ screen: 'welcome' });
   const [loginMode, setLoginMode] = useState<'phone' | 'email'>('email');
   const [recoveryMode, setRecoveryMode] = useState<'phone' | 'email'>('email');
@@ -203,6 +218,7 @@ export default function App() {
     try {
       const result = await registerWithEmail(payload);
       setCurrentUserId(result?.user?._id ?? null);
+      await applyAuthUser(result.user);
       handleAuthSuccess();
     } catch (error) {
       Alert.alert('Signup failed', error instanceof Error ? error.message : 'Unable to register user.');
@@ -217,6 +233,7 @@ export default function App() {
         password: payload.password,
       });
       setCurrentUserId(result?.user?._id ?? null);
+      await applyAuthUser(result.user);
       handleAuthSuccess();
     } catch (error) {
       Alert.alert('Login failed', error instanceof Error ? error.message : 'Unable to login.');
@@ -265,9 +282,24 @@ export default function App() {
     }
   };
 
+  const handleLogout = useCallback(() => {
+    clearProfile();
+    setCurrentUserId(null);
+    setScreenState({ screen: 'welcome' });
+  }, [clearProfile]);
+
+  const settingsActions = useMemo(
+    () => ({
+      onLogout: handleLogout,
+      onChangePassword: () => setScreenState({ screen: 'forgot-password' }),
+      onOpenWardrobe: () => setScreenState({ screen: 'home', selectedNav: 'shirt-outline' }),
+    }),
+    [handleLogout],
+  );
+
   return (
-    <SafeAreaProvider>
-      <SocialProvider>
+    <SettingsOverlayProvider actions={settingsActions}>
+      <>
         {screenState.screen === 'welcome' ? (
           <Welcome
             onGetStarted={() => setScreenState({ screen: 'signup' })}
@@ -316,10 +348,6 @@ export default function App() {
             onSelectedNavChange={setHomeNav}
             onOpenChat={(friend, prefill) => openChat(friend.id, prefill)}
             onOpenCheckIn={(mood) => setScreenState({ screen: 'check-in', scale: 'phq4', mood })}
-            onLogout={() => {
-              setCurrentUserId(null);
-              setScreenState({ screen: 'welcome' });
-            }}
           />
         ) : screenState.screen === 'check-in' ? (
           <CheckInChatScreen
@@ -397,7 +425,7 @@ export default function App() {
             }
           />
         )}
-      </SocialProvider>
-    </SafeAreaProvider>
+      </>
+    </SettingsOverlayProvider>
   );
 }

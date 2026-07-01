@@ -26,6 +26,8 @@ export type Friend = {
 export type FriendRequest = {
   id: string;
   name: string;
+  username?: string;
+  anonymousMode?: boolean;
 };
 
 export type ChatMessage = {
@@ -61,13 +63,15 @@ export type Quest = {
 
 export const CURRENT_USER = {
   name: 'Jayden',
-  friendCode: '1IHIDA2',
+  friendCode: '1IHIDA',
   fireStreak: 67,
   diamonds: 15,
   gems: 2,
 };
 
-export const INCOMING_REQUESTS: FriendRequest[] = [{ id: 'r1', name: 'Alex' }];
+export const INCOMING_REQUESTS: FriendRequest[] = [
+  { id: 'r1', name: 'Riley', username: 'riley', anonymousMode: true },
+];
 
 const todayIso = () => new Date().toISOString().slice(0, 10);
 const daysAgoMs = (days: number) => Date.now() - days * 24 * 60 * 60 * 1000;
@@ -77,7 +81,7 @@ export const FRIENDS: Friend[] = [
   {
     id: 'f1',
     name: 'Alex',
-    code: 'ALX7K2P',
+    code: 'ALX7K2',
     streak: 67,
     lastSeen: 'Last seen 3m ago',
     streakDone: true,
@@ -88,7 +92,7 @@ export const FRIENDS: Friend[] = [
   {
     id: 'f2',
     name: 'Josh',
-    code: 'JSH4M9Q',
+    code: 'JSH4M9',
     streak: 10,
     lastSeen: 'Last seen 3m ago',
     streakDone: false,
@@ -103,15 +107,20 @@ export const FRIENDS: Friend[] = [
  * The only friend codes that can be added. A typed code must match one of these
  * entries (case-insensitive), so random/made-up codes are rejected. Codes are unique.
  */
-export type DirectoryUser = { code: string; name: string };
+export type DirectoryUser = {
+  code: string;
+  name: string;
+  username: string;
+  anonymousMode: boolean;
+};
 
 export const FRIEND_DIRECTORY: DirectoryUser[] = [
-  { code: 'ALX7K2P', name: 'Alex' },
-  { code: 'JSH4M9Q', name: 'Josh' },
-  { code: 'MAYA3X1', name: 'Maya' },
-  { code: 'JRDN8V5', name: 'Jordan' },
-  { code: 'KAI22LF', name: 'Kai' },
-  { code: 'PRY6H3D', name: 'Priya' },
+  { code: 'ALX7K2', name: 'Alex', username: 'alex', anonymousMode: false },
+  { code: 'JSH4M9', name: 'Josh', username: 'josh', anonymousMode: false },
+  { code: 'MAYA3X', name: 'Maya', username: 'maya', anonymousMode: true },
+  { code: 'JRDN8V', name: 'Jordan', username: 'jordan', anonymousMode: false },
+  { code: 'KAI22L', name: 'Kai', username: 'kai', anonymousMode: true },
+  { code: 'PRY6H3', name: 'Priya', username: 'priya', anonymousMode: false },
 ];
 
 /** Looks up a directory user by friend code, ignoring case and surrounding spaces. */
