@@ -1,3 +1,3 @@
-import OnboardingPage_1 from './OnboardingPage_1';
+import LeaderboardPage from './LeaderboardPage';
 
-export default OnboardingPage_1;
+export default LeaderboardPage;
