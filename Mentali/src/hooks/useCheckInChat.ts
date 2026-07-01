@@ -1,5 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+import {
+  createConversationState,
+  type CheckInConversationState,
+} from '@/logic/checkinConversation';
 import { localCheckInReply } from '@/logic/checkinChatLocal';
 import type { AnswerOption, CheckInQuestion, MoodOption, RecordedAnswer } from '@/logic/checkin';
 
@@ -10,8 +14,7 @@ export type ChatMessage = {
   helper?: string;
 };
 
-const TYPING_MS = 350;
-const SKIP_OPTION: AnswerOption = { label: 'Prefer not to say', value: 0, skip: true };
+const TYPING_MS = 400;
 
 export interface UseCheckInChat {
   messages: ChatMessage[];
@@ -19,31 +22,42 @@ export interface UseCheckInChat {
   awaiting: boolean;
   finished: boolean;
   answers: RecordedAnswer[];
+  mood: MoodOption | null;
+  showMoodPicker: boolean;
   answerOptions: AnswerOption[];
+  selectMood: (mood: MoodOption) => void;
   selectOption: (option: AnswerOption) => void;
-  skipQuestion: () => void;
   sendMessage: (text: string) => void;
-  sendNote: (text: string) => void;
 }
 
-export function useCheckInChat(mood: MoodOption, questions: CheckInQuestion[]): UseCheckInChat {
+export function useCheckInChat(
+  initialMood: MoodOption | null,
+  questions: CheckInQuestion[],
+  sessionPlan?: { opener?: string; focus?: string },
+): UseCheckInChat {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [answers, setAnswers] = useState<RecordedAnswer[]>([]);
   const [typing, setTyping] = useState(false);
   const [awaiting, setAwaiting] = useState(false);
   const [finished, setFinished] = useState(false);
+  const [showChips, setShowChips] = useState(false);
+  const [chipOptions, setChipOptions] = useState<AnswerOption[]>([]);
+  const [showMoodPicker, setShowMoodPicker] = useState(!initialMood);
+  const [mood, setMood] = useState<MoodOption | null>(initialMood);
 
   const nextId = useRef(0);
-  const ackIndex = useRef(0);
   const replyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const mounted = useRef(true);
+  const sessionPlanRef = useRef(sessionPlan);
+  sessionPlanRef.current = sessionPlan;
 
-  const moodRef = useRef(mood);
+  const convState = useRef<CheckInConversationState>(
+    createConversationState(questions, initialMood, sessionPlan?.opener, sessionPlan?.focus),
+  );
+
   const questionsRef = useRef(questions);
-  moodRef.current = mood;
   questionsRef.current = questions;
 
-  const totalTopics = Math.max(questions.length, 1);
   const makeId = () => `m${nextId.current++}`;
 
   const clearReplyTimer = () => {
@@ -53,71 +67,75 @@ export function useCheckInChat(mood: MoodOption, questions: CheckInQuestion[]): 
     }
   };
 
-  const currentOptions = questions[answers.length]?.options ?? [];
+  const applyReply = useCallback((reply: ReturnType<typeof localCheckInReply>) => {
+    if (!mounted.current) return;
 
-  const showBotReply = useCallback(
-    (reply: ReturnType<typeof localCheckInReply>, priorAnswerCount: number) => {
-      if (!mounted.current) return;
+    convState.current = reply.state;
+    if (reply.state.mood) setMood(reply.state.mood);
 
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: makeId(),
-          role: 'bot',
-          text: reply.message,
-          helper: reply.helper ?? undefined,
-        },
-      ]);
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: makeId(),
+        role: 'bot',
+        text: reply.message,
+        helper: reply.helper ?? undefined,
+      },
+    ]);
 
-      const nextCount = reply.answer ? priorAnswerCount + 1 : priorAnswerCount;
-      const done = reply.finished || (reply.answer != null && nextCount >= totalTopics);
+    setShowMoodPicker(reply.showMoodPicker);
+    setShowChips(reply.showChips);
+    setChipOptions(reply.chipOptions);
+    setFinished(reply.finished);
+    setAwaiting(!reply.finished);
+    setTyping(false);
 
-      if (reply.answer) {
-        setAnswers((prev) => [...prev, reply.answer as RecordedAnswer]);
-      }
-
-      setFinished(done);
-      setAwaiting(!done);
-      setTyping(false);
-      ackIndex.current += 1;
-    },
-    [totalTopics],
-  );
+    if (reply.finished && reply.recordedAnswers.length > 0) {
+      setAnswers(reply.recordedAnswers);
+    }
+  }, []);
 
   const deliverReply = useCallback(
-    (reply: ReturnType<typeof localCheckInReply>, priorAnswerCount: number) => {
+    (reply: ReturnType<typeof localCheckInReply>) => {
       clearReplyTimer();
       setTyping(true);
       setAwaiting(false);
-      replyTimer.current = setTimeout(() => showBotReply(reply, priorAnswerCount), TYPING_MS);
+      setShowChips(false);
+      setShowMoodPicker(false);
+      replyTimer.current = setTimeout(() => applyReply(reply), TYPING_MS);
     },
-    [showBotReply],
+    [applyReply],
   );
 
-  const moodId = mood.id;
-  const questionKey = `${questions.length}-${questions[0]?.scale ?? 'phq4'}`;
+  const questionKey = `${questions.length}-${questions[0]?.scale ?? 'phq4'}-${sessionPlan?.focus ?? 'default'}-${questions[0]?.prompt?.slice(0, 12) ?? ''}`;
 
   useEffect(() => {
     mounted.current = true;
     clearReplyTimer();
     nextId.current = 0;
-    ackIndex.current = 0;
+    convState.current = createConversationState(
+      questionsRef.current,
+      initialMood,
+      sessionPlanRef.current?.opener,
+      sessionPlanRef.current?.focus,
+    );
     setAnswers([]);
     setFinished(false);
+    setMood(initialMood);
+    setShowChips(false);
+    setChipOptions([]);
 
-    const bootQuestions = questionsRef.current;
-    const bootMood = moodRef.current;
-
-    if (bootQuestions.length === 0) {
+    if (questionsRef.current.length === 0) {
       setMessages([
         {
           id: 'm0',
           role: 'bot',
-          text: 'Check-in questions are not loaded. Please go back and try again.',
+          text: 'Something went wrong loading the chat. Please go back and try again.',
         },
       ]);
       setTyping(false);
       setAwaiting(false);
+      setShowMoodPicker(false);
       return () => {
         mounted.current = false;
         clearReplyTimer();
@@ -125,11 +143,10 @@ export function useCheckInChat(mood: MoodOption, questions: CheckInQuestion[]): 
     }
 
     const reply = localCheckInReply({
-      mood: bootMood,
-      questions: bootQuestions,
-      answers: [],
+      mood: initialMood,
+      questions: questionsRef.current,
+      conversationState: convState.current,
       messages: [],
-      ackIndex: 0,
     });
 
     setMessages([
@@ -140,16 +157,17 @@ export function useCheckInChat(mood: MoodOption, questions: CheckInQuestion[]): 
         helper: reply.helper ?? undefined,
       },
     ]);
+    convState.current = reply.state;
+    setShowMoodPicker(reply.showMoodPicker);
     setTyping(false);
-    setAwaiting(true);
+    setAwaiting(!reply.finished);
 
     return () => {
       mounted.current = false;
       clearReplyTimer();
     };
-    // Only re-boot when mood or question set changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [moodId, questionKey]);
+  }, [initialMood?.id ?? 'none', questionKey, sessionPlan?.opener]);
 
   useEffect(
     () => () => {
@@ -159,32 +177,44 @@ export function useCheckInChat(mood: MoodOption, questions: CheckInQuestion[]): 
     [],
   );
 
-  const respond = useCallback(
-    (text: string, selectedOption?: AnswerOption) => {
+  const runTurn = useCallback(
+    (params: {
+      userMessage?: string | null;
+      selectedOption?: AnswerOption | null;
+      selectedMood?: MoodOption | null;
+      displayText?: string;
+    }) => {
       if (finished || typing) return;
 
-      const userText = selectedOption ? selectedOption.label : text.trim();
-      if (!userText) return;
+      const displayText =
+        params.displayText ??
+        (params.selectedMood
+          ? `Feeling ${params.selectedMood.label.toLowerCase()}`
+          : params.selectedOption
+            ? params.selectedOption.label
+            : params.userMessage?.trim() ?? '');
 
-      const userMsg: ChatMessage = { id: makeId(), role: 'user', text: userText };
-      const snapshotMessages = [...messages, userMsg];
-      const snapshotAnswers = answers;
+      if (!displayText && !params.selectedMood) return;
 
-      setMessages(snapshotMessages);
+      const snapshotMessages: ChatMessage[] = displayText
+        ? [...messages, { id: makeId(), role: 'user', text: displayText }]
+        : messages;
 
-      const reply = localCheckInReply({
-        mood: moodRef.current,
+      if (displayText) setMessages(snapshotMessages);
+
+      const localReply = localCheckInReply({
+        mood: mood ?? initialMood,
         questions: questionsRef.current,
-        answers: snapshotAnswers,
+        conversationState: convState.current,
         messages: snapshotMessages,
-        userMessage: selectedOption ? null : userText,
-        selectedOption: selectedOption ?? null,
-        ackIndex: ackIndex.current,
+        userMessage: params.selectedOption || params.selectedMood ? null : params.userMessage ?? null,
+        selectedOption: params.selectedOption ?? null,
+        selectedMood: params.selectedMood ?? null,
       });
 
-      deliverReply(reply, snapshotAnswers.length);
+      deliverReply(localReply);
     },
-    [answers, deliverReply, finished, messages, typing],
+    [deliverReply, finished, initialMood, messages, mood, typing],
   );
 
   return {
@@ -193,10 +223,11 @@ export function useCheckInChat(mood: MoodOption, questions: CheckInQuestion[]): 
     awaiting: awaiting && !finished,
     finished,
     answers,
-    answerOptions: awaiting && !finished ? [...currentOptions, SKIP_OPTION] : [],
-    selectOption: (option) => respond(option.label, option),
-    skipQuestion: () => respond(SKIP_OPTION.label, SKIP_OPTION),
-    sendMessage: (text) => respond(text),
-    sendNote: (text) => respond(text),
+    mood,
+    showMoodPicker,
+    answerOptions: showChips ? chipOptions : [],
+    selectMood: (selected) => runTurn({ selectedMood: selected }),
+    selectOption: (option) => runTurn({ selectedOption: option, displayText: option.label }),
+    sendMessage: (text) => runTurn({ userMessage: text }),
   };
 }

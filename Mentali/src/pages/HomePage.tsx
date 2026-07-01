@@ -25,13 +25,15 @@ import {
   type StatItem,
 } from '../hooks/homepageData';
 import { FriendsScreenContent } from '../components/social/FriendsScreenContent';
+import { moodFromHomeIndex } from '@/data/checkInContent';
 import type { Friend } from '@/data/mockData';
+import type { MoodOption } from '@/logic/checkin';
 
 type HomePageProps = {
   initialSelectedNav?: string;
   onSelectedNavChange?: (selectedNav: string) => void;
   onOpenChat?: (friend: Friend, prefillMotivation?: boolean) => void;
-  onOpenCheckIn?: () => void;
+  onOpenCheckIn?: (mood: MoodOption) => void;
   onLogout?: () => void;
 };
 
@@ -79,8 +81,11 @@ function StatPill({ icon, value, color }: StatItem) {
 
 function MoodButton({ mood, selected, onPress }: MoodButtonProps) {
   return (
-    <Pressable onPress={onPress} style={[styles.moodButton, selected && styles.moodButtonSelected, { backgroundColor: mood.color }]}>
-      <Image source={mood.image} resizeMode="contain" style={styles.moodImage} />
+    <Pressable onPress={onPress} style={styles.moodItem}>
+      <View style={[styles.moodButton, selected && styles.moodButtonSelected, { backgroundColor: mood.color }]}>
+        <Image source={mood.image} resizeMode="contain" style={styles.moodImage} />
+      </View>
+      <Text style={[styles.moodLabel, selected && styles.moodLabelSelected]}>{mood.label}</Text>
     </Pressable>
   );
 }
@@ -417,7 +422,11 @@ export default function HomePage({
                 <Text style={styles.ctaSubtitle}>It only takes a minute.</Text>
               </View>
 
-              <TouchableOpacity activeOpacity={0.9} style={styles.ctaButton} onPress={onOpenCheckIn}>
+              <TouchableOpacity
+                activeOpacity={0.9}
+                style={styles.ctaButton}
+                onPress={() => onOpenCheckIn?.(moodFromHomeIndex(selectedMood))}
+              >
                 <Text style={styles.ctaButtonText}>Start Check-in</Text>
                 <Text style={styles.ctaArrow}>→</Text>
               </TouchableOpacity>
@@ -834,8 +843,13 @@ const styles = StyleSheet.create({
   moodsRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     marginBottom: 10,
+  },
+  moodItem: {
+    alignItems: 'center',
+    gap: 6,
+    flex: 1,
   },
   moodButton: {
     width: 58,
@@ -849,6 +863,17 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     shadowOffset: { width: 0, height: 2 },
     elevation: 2,
+  },
+  moodLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#F5F1F4',
+    textAlign: 'center',
+    textTransform: 'capitalize',
+  },
+  moodLabelSelected: {
+    color: '#FF9ADA',
+    fontWeight: '700',
   },
   moodButtonSelected: {
     borderWidth: 3,

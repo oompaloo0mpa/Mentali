@@ -1,10 +1,11 @@
-import { localCheckInReply } from "@/logic/checkinChatLocal";
-import type { AnswerOption, CheckInQuestion, MoodOption, RecordedAnswer } from "@/logic/checkin";
-import { apiRequest } from "@/services/api";
+import { createConversationState } from '@/logic/checkinConversation';
+import { localCheckInReply } from '@/logic/checkinChatLocal';
+import type { AnswerOption, CheckInQuestion, MoodOption, RecordedAnswer } from '@/logic/checkin';
+import { apiRequest } from '@/services/api';
 
 export type CheckInChatMessage = {
   id: string;
-  role: "bot" | "user";
+  role: 'bot' | 'user';
   text: string;
   helper?: string;
 };
@@ -19,13 +20,12 @@ export type CheckInChatReply = {
 const CHECKIN_API_TIMEOUT_MS = 5000;
 
 function toApiBody(payload: {
-  mood: MoodOption;
+  mood: MoodOption | null;
   questions: CheckInQuestion[];
   answers: RecordedAnswer[];
   messages: CheckInChatMessage[];
   userMessage?: string | null;
   selectedOption?: AnswerOption | null;
-  ackIndex?: number;
 }) {
   return {
     mood: payload.mood,
@@ -34,7 +34,6 @@ function toApiBody(payload: {
     messages: payload.messages.map((m) => ({ role: m.role, text: m.text })),
     userMessage: payload.userMessage ?? null,
     selectedOption: payload.selectedOption ?? null,
-    ackIndex: payload.ackIndex ?? 0,
   };
 }
 
@@ -42,8 +41,8 @@ async function fetchCheckInReply(payload: Parameters<typeof resolveCheckInReply>
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), CHECKIN_API_TIMEOUT_MS);
   try {
-    return await apiRequest("/checkin/chat", {
-      method: "POST",
+    return await apiRequest('/checkin/chat', {
+      method: 'POST',
       body: JSON.stringify(toApiBody(payload)),
       signal: controller.signal,
     });
@@ -52,28 +51,35 @@ async function fetchCheckInReply(payload: Parameters<typeof resolveCheckInReply>
   }
 }
 
-/** Local fallback when API is slow/unreachable; K10 always runs on-device. */
+/** Local-first; optional API polish for PHQ-4 when reachable. */
 export async function resolveCheckInReply(payload: {
-  mood: MoodOption;
+  mood: MoodOption | null;
   questions: CheckInQuestion[];
   answers: RecordedAnswer[];
   messages: CheckInChatMessage[];
   userMessage?: string | null;
   selectedOption?: AnswerOption | null;
-  ackIndex?: number;
 }): Promise<CheckInChatReply> {
-  const fallback = () =>
-    localCheckInReply({
+  const convState = createConversationState(payload.questions, payload.mood);
+
+  const fallback = () => {
+    const local = localCheckInReply({
       mood: payload.mood,
       questions: payload.questions,
-      answers: payload.answers,
+      conversationState: convState,
       messages: payload.messages,
       userMessage: payload.userMessage,
       selectedOption: payload.selectedOption,
-      ackIndex: payload.ackIndex,
     });
+    return {
+      message: local.message,
+      helper: local.helper,
+      answer: local.recordedAnswers[0] ?? null,
+      finished: local.finished,
+    };
+  };
 
-  if (payload.questions[0]?.scale === "k10") {
+  if (payload.questions[0]?.scale === 'k10' || !payload.mood) {
     return fallback();
   }
 
@@ -81,7 +87,7 @@ export async function resolveCheckInReply(payload: {
     const remote = await fetchCheckInReply(payload);
     if (remote?.message) return remote;
   } catch {
-    // API offline, aborted, or timed out — use on-device conversation logic.
+    // API offline or timed out.
   }
 
   return fallback();

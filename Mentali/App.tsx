@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Alert } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import LoginPage from '@/pages/LoginPage';
@@ -13,8 +13,14 @@ import { FriendChatScreenContent } from '@/components/chat/FriendChatScreenConte
 import { StreakGuideScreenContent } from '@/components/chat/StreakGuideScreenContent';
 import { CheckInChatScreen } from '@/pages/CheckInChatScreen';
 import { SummaryScreen } from '@/pages/SummaryScreen';
-import { K10_QUESTIONS, MOODS, PHQ4_QUESTIONS } from '@/data/checkInContent';
+import { MOOD_OPTIONS, MOODS } from '@/data/moods';
 import { scorePhq4, scoreK10 } from '@/logic/wellbeing';
+import {
+  EMPTY_PROFILE,
+  buildPersonalizedCheckInPlan,
+  updateProfileAfterCheckIn,
+} from '@/logic/checkinPersonalization';
+import { loadCheckInProfile, saveCheckInProfile } from '@/storage/checkInProfileStorage';
 import type { MoodOption, RecordedAnswer, StreakState, WellbeingResult } from '@/logic/checkin';
 import {
   login,
@@ -38,7 +44,7 @@ type ScreenState =
   | { screen: 'streak-guide'; friendId: string; prefill?: boolean; returnToNav: string }
   | {
       screen: 'check-in';
-      mood: MoodOption;
+      mood?: MoodOption;
       scale: 'phq4' | 'k10';
       returnPhq4?: WellbeingResult;
       returnStreak?: StreakState;
@@ -64,6 +70,17 @@ export default function App() {
     longest: 0,
     lastCheckInDate: null,
   });
+  const [checkInProfile, setCheckInProfile] = useState(EMPTY_PROFILE);
+
+  useEffect(() => {
+    loadCheckInProfile().then(setCheckInProfile);
+  }, []);
+
+  const activeCheckInPlan = useMemo(() => {
+    if (screenState.screen !== 'check-in') return null;
+    const mood = screenState.mood ?? MOOD_OPTIONS[2];
+    return buildPersonalizedCheckInPlan(mood, screenState.scale, checkInProfile);
+  }, [screenState, checkInProfile]);
 
   const openChat = (friendId: string, prefill?: boolean) => {
     setScreenState({ screen: 'chat', friendId, prefill, returnToNav: homeNav });
@@ -121,6 +138,17 @@ export default function App() {
     }
     newStreak.lastCheckInDate = today;
     setStreak(newStreak);
+
+    const updatedProfile = updateProfileAfterCheckIn(
+      checkInProfile,
+      selectedMood,
+      answers,
+      phq4.band.level,
+      phq4.anxietyScore,
+      phq4.moodScore,
+    );
+    setCheckInProfile(updatedProfile);
+    saveCheckInProfile(updatedProfile).catch(() => {});
 
     setScreenState({
       screen: 'summary',
@@ -287,9 +315,7 @@ export default function App() {
             initialSelectedNav={screenState.selectedNav ?? homeNav}
             onSelectedNavChange={setHomeNav}
             onOpenChat={(friend, prefill) => openChat(friend.id, prefill)}
-            onOpenCheckIn={() =>
-              setScreenState({ screen: 'check-in', mood: MOODS[2], scale: 'phq4' })
-            }
+            onOpenCheckIn={(mood) => setScreenState({ screen: 'check-in', scale: 'phq4', mood })}
             onLogout={() => {
               setCurrentUserId(null);
               setScreenState({ screen: 'welcome' });
@@ -297,16 +323,21 @@ export default function App() {
           />
         ) : screenState.screen === 'check-in' ? (
           <CheckInChatScreen
-            key={`${screenState.scale}-${screenState.mood.id}`}
+            key={`check-in-${screenState.scale}-${checkInProfile.checkInCount}-${activeCheckInPlan?.focus ?? 'balanced'}`}
             mood={screenState.mood}
-            questions={screenState.scale === 'k10' ? K10_QUESTIONS : PHQ4_QUESTIONS}
-            headerTitle={screenState.scale === 'k10' ? 'Deeper check-in' : 'Check-in'}
-            completeLabel={screenState.scale === 'k10' ? 'See my summary' : 'Complete'}
+            questions={activeCheckInPlan?.questions ?? []}
+            sessionPlan={
+              activeCheckInPlan
+                ? { opener: activeCheckInPlan.opener, focus: activeCheckInPlan.focus }
+                : undefined
+            }
+            headerTitle={screenState.scale === 'k10' ? 'A little longer' : 'Chat'}
+            completeLabel="See my summary"
             onBack={() => {
               if (screenState.scale === 'k10' && screenState.returnPhq4 && screenState.returnStreak) {
                 setScreenState({
                   screen: 'summary',
-                  mood: screenState.mood,
+                  mood: screenState.mood ?? MOODS[2],
                   phq4: screenState.returnPhq4,
                   k10: null,
                   streak: screenState.returnStreak,
@@ -315,11 +346,11 @@ export default function App() {
                 setScreenState({ screen: 'home', selectedNav: homeNav });
               }
             }}
-            onComplete={(answers) => {
+            onComplete={(answers, mood) => {
               if (screenState.scale === 'k10' && screenState.returnPhq4 && screenState.returnStreak) {
-                handleK10Complete(answers, screenState.mood, screenState.returnPhq4, screenState.returnStreak);
+                handleK10Complete(answers, mood, screenState.returnPhq4, screenState.returnStreak);
               } else {
-                handleCheckInComplete(answers, screenState.mood);
+                handleCheckInComplete(answers, mood);
               }
             }}
           />
