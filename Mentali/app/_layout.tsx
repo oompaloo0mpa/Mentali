@@ -10,6 +10,7 @@ export default function RootLayout() {
     >
       <Stack.Screen name="index" options={{ title: 'Leaderboard' }} />
       <Stack.Screen name="LeaderboardPage" options={{ title: 'Leaderboard' }} />
+      <Stack.Screen name="RankGuide" options={{ title: 'Rank Guide' }} />
     </Stack>
   );
 }

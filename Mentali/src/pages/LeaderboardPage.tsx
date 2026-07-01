@@ -10,6 +10,7 @@ import {
   View,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
+import { useRouter } from 'expo-router';
 
 type LeaderboardUser = {
   id: string;
@@ -98,6 +99,7 @@ const users: LeaderboardUser[] = [
 ];
 
 export default function LeaderboardPage() {
+  const router = useRouter();
   const [rankIndex, setRankIndex] = React.useState(0);
   const currentRank = rankOrder[rankIndex];
   const trophyRow = getTrophySlots(currentRank);
@@ -118,9 +120,13 @@ export default function LeaderboardPage() {
             <View style={styles.circleIcon} />
           </Pressable>
 
-          <View style={styles.iconButton}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Open rank guide"
+            onPress={() => router.push('/RankGuide')}
+            style={styles.iconButton}>
             <Text style={styles.iconButtonText}>?</Text>
-          </View>
+          </Pressable>
         </View>
       </View>
 
