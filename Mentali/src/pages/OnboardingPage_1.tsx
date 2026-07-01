@@ -9,12 +9,13 @@ import {
   ScrollView,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import OnboardingProgressDots from '../components/OnboardingProgressDots';
 
 export default function OnboardingPage_1(): React.ReactElement {
   const router = useRouter();
 
   const handleContinue = (): void => {
-    router.push('/OnboardingPage_2');
+    router.push('/OnboardingPage_Username');
   };
 
   return (
@@ -56,14 +57,17 @@ export default function OnboardingPage_1(): React.ReactElement {
           {/* Divider */}
           <View style={styles.divider} />
 
-          {/* Continue Button */}
-          <TouchableOpacity
-            style={styles.continueButton}
-            onPress={handleContinue}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.continueButtonText}>CONTINUE</Text>
-          </TouchableOpacity>
+          <View style={styles.bottomArea}>
+            <OnboardingProgressDots activeIndex={0} />
+
+            <TouchableOpacity
+              style={styles.continueButton}
+              onPress={handleContinue}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.continueButtonText}>CONTINUE</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -143,9 +147,15 @@ const styles = StyleSheet.create({
     borderRadius: 2,
     marginBottom: 30,
   },
+  bottomArea: {
+    width: '100%',
+    justifyContent: 'flex-end',
+    paddingBottom: 8,
+  },
   continueButton: {
     width: '100%',
     paddingVertical: 16,
+    marginTop: 16,
     backgroundColor: '#EF8EDD',
     borderRadius: 4,
     justifyContent: 'center',

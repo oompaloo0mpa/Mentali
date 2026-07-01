@@ -9,6 +9,7 @@ import {
   StatusBar,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import OnboardingProgressDots from '../components/OnboardingProgressDots';
 
 const themeColors = ['#000000', '#D8B3F3', '#E5C8F4', '#DCC9F7', '#E8C8E8'];
 
@@ -80,13 +81,7 @@ export default function OnboardingPage_4(): React.ReactElement {
 
           <View style={styles.spacer} />
 
-          <View style={styles.dotsRow}>
-            <View style={[styles.dot, styles.dotActive]} />
-            <View style={styles.dot} />
-            <View style={styles.dot} />
-            <View style={styles.dot} />
-            <View style={styles.dot} />
-          </View>
+          <OnboardingProgressDots activeIndex={3} />
 
           <TouchableOpacity style={styles.continueButton} onPress={handleContinue} activeOpacity={0.8}>
             <Text style={styles.continueButtonText}>CONTINUE</Text>
@@ -276,23 +271,6 @@ const styles = StyleSheet.create({
   },
   spacer: {
     flex: 1,
-  },
-  dotsRow: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 24,
-    gap: 8,
-  },
-  dot: {
-    width: 11,
-    height: 3,
-    borderRadius: 2,
-    backgroundColor: '#BEB9C0',
-  },
-  dotActive: {
-    backgroundColor: '#1C1C1C',
-    width: 13,
   },
   continueButton: {
     width: '100%',

@@ -9,6 +9,7 @@ import {
   StatusBar,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import OnboardingProgressDots from '../components/OnboardingProgressDots';
 
 const emojiImages = [
   require('../components/Emoji 1.png'),
@@ -18,12 +19,16 @@ const emojiImages = [
   require('../components/Emoji 5.png'),
 ];
 
+const emojiBackgrounds = ['#8CCF5A', '#F9DA63', '#FF9438', '#C7DDF4', '#C0CFC2'];
+
 function EmojiOption({
   source,
+  backgroundColor,
   selected,
   onPress,
 }: {
   source: { uri?: string } | number;
+  backgroundColor: string;
   selected?: boolean;
   onPress: () => void;
 }): React.ReactElement {
@@ -31,11 +36,13 @@ function EmojiOption({
     <TouchableOpacity
       onPress={onPress}
       activeOpacity={0.85}
-      style={[styles.emojiCircle, selected ? styles.emojiCircleSelected : styles.emojiCircleIdle]}
+      style={[
+        styles.emojiCircle,
+        { backgroundColor: selected ? '#8CCF5A' : backgroundColor },
+        selected ? styles.emojiCircleSelected : styles.emojiCircleIdle,
+      ]}
     >
-      <View style={[styles.emojiInner, selected ? styles.emojiInnerSelected : styles.emojiInnerIdle]}>
-        <Image source={source} style={styles.emojiImage} resizeMode="contain" />
-      </View>
+      <Image source={source} style={styles.emojiImage} resizeMode="contain" />
     </TouchableOpacity>
   );
 }
@@ -76,6 +83,7 @@ export default function OnboardingPage_5(): React.ReactElement {
             <EmojiOption
               key={index}
               source={source}
+              backgroundColor={emojiBackgrounds[index]}
               selected={selectedMood === index}
               onPress={() => setSelectedMood(index)}
             />
@@ -91,13 +99,7 @@ export default function OnboardingPage_5(): React.ReactElement {
         </View>
 
         <View style={styles.bottomArea}>
-          <View style={styles.dotsRow}>
-            <View style={[styles.dot, styles.dotActive]} />
-            <View style={styles.dot} />
-            <View style={styles.dot} />
-            <View style={styles.dot} />
-            <View style={styles.dot} />
-          </View>
+          <OnboardingProgressDots activeIndex={4} />
 
           <TouchableOpacity style={styles.continueButton} onPress={handleContinue} activeOpacity={0.8}>
             <Text style={styles.continueButtonText}>GET STARTED!</Text>
@@ -169,51 +171,36 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: 8,
-    marginBottom: 14,
-    paddingHorizontal: 2,
+    marginTop: 12,
+    marginBottom: 18,
+    paddingHorizontal: 0,
   },
   emojiCircle: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
+    width: 52,
+    height: 52,
+    borderRadius: 26,
     alignItems: 'center',
     justifyContent: 'center',
   },
   emojiCircleSelected: {
-    backgroundColor: '#8CCF5A',
-    borderWidth: 3,
+    borderWidth: 4,
     borderColor: '#FF4FE0',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 2,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.18,
+    shadowRadius: 3,
+    elevation: 4,
   },
   emojiCircleIdle: {
-    backgroundColor: '#FFFFFF',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.18,
+    shadowOpacity: 0.12,
     shadowRadius: 2,
     elevation: 2,
   },
-  emojiInner: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  emojiInnerSelected: {
-    backgroundColor: '#8CCF5A',
-  },
-  emojiInnerIdle: {
-    backgroundColor: '#FFFFFF',
-  },
   emojiImage: {
-    width: 22,
-    height: 22,
+    width: 30,
+    height: 30,
   },
   imageWrap: {
     flex: 1,
@@ -230,23 +217,6 @@ const styles = StyleSheet.create({
   },
   bottomArea: {
     paddingTop: 10,
-  },
-  dotsRow: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 16,
-    gap: 8,
-  },
-  dot: {
-    width: 11,
-    height: 3,
-    borderRadius: 2,
-    backgroundColor: '#BDB7BE',
-  },
-  dotActive: {
-    width: 13,
-    backgroundColor: '#222222',
   },
   continueButton: {
     width: '100%',

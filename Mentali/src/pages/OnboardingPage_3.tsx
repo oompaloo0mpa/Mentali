@@ -10,6 +10,7 @@ import {
   Switch,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import OnboardingProgressDots from '../components/OnboardingProgressDots';
 
 export default function OnboardingPage_3(): React.ReactElement {
   const router = useRouter();
@@ -87,14 +88,18 @@ export default function OnboardingPage_3(): React.ReactElement {
           {/* Divider */}
           <View style={styles.divider} />
 
-          {/* Continue Button */}
-          <TouchableOpacity
-            style={styles.continueButton}
-            onPress={handleContinue}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.continueButtonText}>CONTINUE</Text>
-          </TouchableOpacity>
+          <View style={styles.bottomArea}>
+            <OnboardingProgressDots activeIndex={2} />
+
+            {/* Continue Button */}
+            <TouchableOpacity
+              style={styles.continueButton}
+              onPress={handleContinue}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.continueButtonText}>CONTINUE</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -207,6 +212,9 @@ const styles = StyleSheet.create({
     borderRadius: 2,
     alignSelf: 'center',
     marginBottom: 12,
+  },
+  bottomArea: {
+    justifyContent: 'flex-end',
   },
   continueButton: {
     width: '100%',

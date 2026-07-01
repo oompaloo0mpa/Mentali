@@ -9,6 +9,7 @@ export default function RootLayout() {
       }}
     >
       <Stack.Screen name="index" options={{ title: 'Onboarding' }} />
+      <Stack.Screen name="OnboardingPage_Username" options={{ title: 'Onboarding' }} />
       <Stack.Screen name="OnboardingPage_2" options={{ title: 'Onboarding' }} />
       <Stack.Screen name="OnboardingPage_3" options={{ title: 'Onboarding' }} />
       <Stack.Screen name="OnboardingPage_4" options={{ title: 'Onboarding' }} />
