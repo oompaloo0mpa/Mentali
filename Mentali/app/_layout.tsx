@@ -8,9 +8,9 @@ export default function RootLayout() {
         headerShown: false,
       }}
     >
-      <Stack.Screen name="index" options={{ title: 'Leaderboard' }} />
-      <Stack.Screen name="LeaderboardPage" options={{ title: 'Leaderboard' }} />
-      <Stack.Screen name="RankGuide" options={{ title: 'Rank Guide' }} />
+      <Stack.Screen name="StatisticPage" options={{ title: 'Statistics' }} />
+      <Stack.Screen name="ChooseEmoji" options={{ title: 'Choose Emoji' }} />
+      <Stack.Screen name="index" options={{ title: 'Statistics' }} />
     </Stack>
   );
 }
