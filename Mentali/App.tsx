@@ -8,6 +8,7 @@ import VerifyCodePage from '@/pages/VerifyCodePage';
 import ResetPasswordPage from '@/pages/ResetPasswordPage';
 import Welcome from '@/pages/Welcome';
 import HomePage from '@/pages/HomePage';
+import WardrobePage from '@/pages/WardrobePage';
 import { SocialProvider } from '@/storage/socialStore';
 import { SettingsOverlayProvider } from '@/storage/settingsOverlayStore';
 import { UserProfileProvider, useUserProfile } from '@/storage/userProfileStore';
@@ -59,7 +60,8 @@ type ScreenState =
       phq4: WellbeingResult;
       k10: WellbeingResult | null;
       streak: StreakState;
-    };
+    }
+  | { screen: 'wardrobe'; returnToNav: string };
 
 export default function App() {
   return (
@@ -315,9 +317,9 @@ function AppRoot() {
     () => ({
       onLogout: handleLogout,
       onChangePassword: () => setScreenState({ screen: 'forgot-password' }),
-      onOpenWardrobe: () => setScreenState({ screen: 'home', selectedNav: 'shirt-outline' }),
+      onOpenWardrobe: () => setScreenState({ screen: 'wardrobe', returnToNav: homeNav }),
     }),
-    [handleLogout],
+    [handleLogout, homeNav],
   );
 
   return (
@@ -371,6 +373,14 @@ function AppRoot() {
             onSelectedNavChange={setHomeNav}
             onOpenChat={(friend, prefill) => openChat(friend.id, prefill)}
             onOpenCheckIn={(mood) => setScreenState({ screen: 'check-in', scale: 'phq4', mood })}
+            onOpenWardrobe={() => setScreenState({ screen: 'wardrobe', returnToNav: homeNav })}
+          />
+        ) : screenState.screen === 'wardrobe' ? (
+          <WardrobePage
+            onNavigate={(navItem) => {
+              if (navItem === 'shirt-outline') return;
+              setScreenState({ screen: 'home', selectedNav: navItem });
+            }}
           />
         ) : screenState.screen === 'check-in' ? (
           <CheckInChatScreen

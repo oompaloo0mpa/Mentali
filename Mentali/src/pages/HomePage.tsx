@@ -25,6 +25,7 @@ import {
   type StatItem,
 } from '../hooks/homepageData';
 import { FriendsScreenContent } from '../components/social/FriendsScreenContent';
+import { BottomNav } from '@/components/nav/BottomNav';
 import { useSettingsOverlay } from '@/storage/settingsOverlayStore';
 import { moodById, moodFromHomeIndex } from '@/data/checkInContent';
 import type { Friend } from '@/data/mockData';
@@ -36,6 +37,7 @@ type HomePageProps = {
   onSelectedNavChange?: (selectedNav: string) => void;
   onOpenChat?: (friend: Friend, prefillMotivation?: boolean) => void;
   onOpenCheckIn?: (mood: MoodOption) => void;
+  onOpenWardrobe?: () => void;
 };
 
 const bronzeTrophy = require('../../assets/images/BronzeTrophy.png') as ImageSourcePropType;
@@ -104,16 +106,6 @@ function QuestCard({ item }: { item: QuestItem }) {
         <Text style={styles.pointsText}>{item.points}</Text>
       </View>
     </View>
-  );
-}
-
-function BottomNavItem({ icon, active, onPress }: { icon: string; active?: boolean; onPress: () => void }) {
-  const iconName = active ? icon.replace('-outline', '') : icon;
-
-  return (
-    <Pressable onPress={onPress} style={[styles.navItem, active && styles.navItemActive]}>
-      <Ionicons name={iconName as ComponentProps<typeof Ionicons>['name']} size={24} color={active ? '#111' : '#F4D5F2'} />
-    </Pressable>
   );
 }
 
@@ -286,6 +278,7 @@ export default function HomePage({
   onSelectedNavChange,
   onOpenChat,
   onOpenCheckIn,
+  onOpenWardrobe,
 }: HomePageProps) {
   const { openSettings, requestLogout } = useSettingsOverlay();
   const { profile, setCurrentMood } = useUserProfile();
@@ -340,7 +333,7 @@ export default function HomePage({
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
       <StatusBar barStyle="light-content" backgroundColor="#282425" />
 
-      <View style={[styles.content, { paddingTop: insets.top - 100}]}> 
+      <View style={[styles.content, { paddingTop: insets.top - 100 }]}>
         <View style={styles.topRow}>
           <View style={styles.statGroup}>
             {stats.map((item) => (
@@ -509,16 +502,16 @@ export default function HomePage({
         )}
       </View>
 
-      <View style={styles.bottomNav}>
-        {navItems.map((item) => (
-          <BottomNavItem
-            key={item.icon}
-            icon={item.icon}
-            active={selectedNav === item.icon}
-            onPress={() => setSelectedNav(item.icon)}
-          />
-        ))}
-      </View>
+      <BottomNav
+        activeIcon={selectedNav}
+        onSelect={(icon) => {
+          if (icon === 'shirt-outline') {
+            onOpenWardrobe?.();
+          } else {
+            setSelectedNav(icon);
+          }
+        }}
+      />
     </SafeAreaView>
   );
 }
@@ -1176,26 +1169,5 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     textAlign: 'center',
     lineHeight: 18,
-  },
-  bottomNav: {
-    height: 72,
-    backgroundColor: '#B02AB3',
-    borderTopWidth: 1,
-    borderTopColor: '#CC5FD0',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-around',
-    paddingHorizontal: 10,
-    paddingBottom: 4,
-  },
-  navItem: {
-    width: 54,
-    height: 42,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 18,
-  },
-  navItemActive: {
-    backgroundColor: '#F3C1F4',
   },
 });
