@@ -294,6 +294,8 @@ type SocialContextValue = {
   addFriendByCode: (code: string) => AddFriendResult;
   acceptRequest: (id: string) => void;
   rejectRequest: (id: string) => void;
+  /** Manually re-fetch friends + requests from the server (used for pull-to-refresh). */
+  refreshFriendsView: () => Promise<void>;
   sendMessage: (friendId: string, message: Omit<ChatMessage, 'id' | 'sender'> & { sender?: 'me' | 'them' }) => void;
   refreshChat: (friendId: string) => Promise<void>;
   markChatRead: (friendId: string) => void;
@@ -367,6 +369,26 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
     return () => {
       active = false;
     };
+  }, [hydrated, profile.userId]);
+
+  // Poll every 30 s so new friend requests and accepted friendships appear on both sides
+  // without requiring the user to restart the app.
+  useEffect(() => {
+    if (!hydrated || !profile.userId) return;
+    const POLL_MS = 30_000;
+    const id = setInterval(async () => {
+      try {
+        const remote = await fetchFriendsView(profile.userId!);
+        setState((prev) => ({
+          ...prev,
+          friends: remote.friends.map(fromApiFriend),
+          requests: remote.requests.map(fromApiRequest),
+        }));
+      } catch {
+        // Ignore transient network errors between polls.
+      }
+    }, POLL_MS);
+    return () => clearInterval(id);
   }, [hydrated, profile.userId]);
 
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -474,6 +496,29 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
   const acceptRequest = useCallback(
     (id: string) => {
       if (profile.userId) {
+        // Optimistically move the request to the friends list so the UI responds instantly.
+        update((prev) => {
+          const req = prev.requests.find((r) => r.id === id);
+          if (!req) return prev;
+          const friendId = uid('f');
+          const friend = normalizeFriend({
+            id: friendId,
+            name: req.name,
+            streak: 0,
+            lastSeen: 'Just now',
+            streakDone: false,
+            lastStreakDoneDate: null,
+            addedAt: Date.now(),
+            pinned: false,
+          });
+          return {
+            ...prev,
+            requests: prev.requests.filter((r) => r.id !== id),
+            friends: [...prev.friends, friend],
+            chats: { ...prev.chats, [friendId]: seedGreeting() },
+          };
+        });
+        // Confirm with the server and sync authoritative state.
         acceptFriendRequest(id)
           .then(async () => {
             const remote = await fetchFriendsView(profile.userId!);
@@ -513,21 +558,11 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
 
   const rejectRequest = useCallback(
     (id: string) => {
-      if (profile.userId) {
-        rejectFriendRequest(id)
-          .then(async () => {
-            const remote = await fetchFriendsView(profile.userId!);
-            setState((prev) => ({
-              ...prev,
-              friends: remote.friends.map(fromApiFriend),
-              requests: remote.requests.map(fromApiRequest),
-            }));
-          })
-          .catch(() => {});
-        return;
-      }
-
+      // Optimistically remove the request immediately regardless of online/offline state.
       update((prev) => ({ ...prev, requests: prev.requests.filter((r) => r.id !== id) }));
+      if (profile.userId) {
+        rejectFriendRequest(id).catch(() => {});
+      }
     },
     [profile.userId, update],
   );
@@ -587,6 +622,20 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
     },
     [profile.userId, update],
   );
+
+  const refreshFriendsView = useCallback<SocialContextValue['refreshFriendsView']>(async () => {
+    if (!profile.userId) return;
+    try {
+      const remote = await fetchFriendsView(profile.userId);
+      setState((prev) => ({
+        ...prev,
+        friends: remote.friends.map(fromApiFriend),
+        requests: remote.requests.map(fromApiRequest),
+      }));
+    } catch {
+      // Keep existing state when offline.
+    }
+  }, [profile.userId]);
 
   const refreshChat = useCallback<SocialContextValue['refreshChat']>(
     async (friendId: string) => {
@@ -739,6 +788,7 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
       addFriendByCode,
       acceptRequest,
       rejectRequest,
+      refreshFriendsView,
       sendMessage,
       refreshChat,
       markChatRead,
@@ -763,6 +813,7 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
       addFriendByCode,
       acceptRequest,
       rejectRequest,
+      refreshFriendsView,
       sendMessage,
       refreshChat,
       markChatRead,

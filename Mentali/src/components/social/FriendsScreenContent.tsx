@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useMemo, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useMemo, useState, useCallback } from 'react';
+import { Alert, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { FriendCodeInput } from '@/components/social/FriendCodeInput';
 import { FriendOptionsModal } from '@/components/social/FriendOptionsModal';
@@ -48,6 +48,7 @@ export function FriendsScreenContent({ showHeader = true, onOpenChat, onSendMoti
     addFriendByCode,
     acceptRequest,
     rejectRequest,
+    refreshFriendsView,
     togglePin,
     muteFriend,
     unmuteFriend,
@@ -69,6 +70,16 @@ export function FriendsScreenContent({ showHeader = true, onOpenChat, onSendMoti
   const [notifVisible, setNotifVisible] = useState(false);
   const [optionsFriend, setOptionsFriend] = useState<Friend | null>(null);
   const [profileFriend, setProfileFriend] = useState<Friend | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await refreshFriendsView();
+    } finally {
+      setRefreshing(false);
+    }
+  }, [refreshFriendsView]);
 
   const questActive = quests.some((q) => q.id === 'q-motivate' && q.progress < q.goal);
 
@@ -125,7 +136,15 @@ export function FriendsScreenContent({ showHeader = true, onOpenChat, onSendMoti
       <ScrollView
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}>
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            tintColor="#FF5DE7"
+            colors={['#FF5DE7']}
+          />
+        }>
         {showHeader ? (
           <StatBar
             fire={fireStreak}
