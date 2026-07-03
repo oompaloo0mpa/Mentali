@@ -168,6 +168,7 @@ export type FriendListRow = {
   lastSeen: string;
   streakDone: boolean;
   lastStreakDoneDate?: string | null;
+  lastStreakDate?: string | null;
   addedAt?: number;
   blocked?: boolean;
   moodId?: string;
@@ -251,7 +252,7 @@ export async function sendChatMessage(
     fileName?: string;
     fileUri?: string;
   },
-) {
+): Promise<{ data: ChatMessageRow; streak?: number; streakUnlocked?: boolean }> {
   return apiRequest(`/chats/${friendshipId}/messages`, {
     method: 'POST',
     body: JSON.stringify(payload),

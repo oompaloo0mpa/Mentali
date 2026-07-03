@@ -4,6 +4,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { useEffect, useRef, useState } from 'react';
 import {
   Alert,
+  Image,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -14,17 +15,17 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { AppIcon } from '@/components/AppIcon';
 import { AttachmentSheet } from '@/components/chat/AttachmentSheet';
 import { ChatBubble } from '@/components/chat/ChatBubble';
 import { ChatInput } from '@/components/chat/ChatInput';
+import { FlameIcon } from '@/components/chat/FlameIcon';
 import { StreakPet } from '@/components/chat/StreakPet';
 import { SuggestionBar } from '@/components/chat/SuggestionBar';
 import { FriendOptionsModal } from '@/components/social/FriendOptionsModal';
 import { SettingsAccessButton } from '@/components/settings/SettingsAccessButton';
 import { Brand, MaxContentWidth, Radius, Spacing, getStreakVisuals } from '@/theme/theme';
 import { MOTIVATIONAL_SUGGESTIONS } from '@/data/mockData';
-import { friendMood, useSocial } from '@/storage/socialStore';
+import { friendMoodImage, useSocial } from '@/storage/socialStore';
 
 type Props = {
   friendId: string;
@@ -39,6 +40,7 @@ export function FriendChatScreenContent({ friendId, prefill, onBack, onOpenStrea
     chatFor,
     sendMessage,
     refreshChat,
+    refreshFriendsView,
     markChatRead,
     togglePin,
     muteFriend,
@@ -58,8 +60,35 @@ export function FriendChatScreenContent({ friendId, prefill, onBack, onOpenStrea
   const [suggestionIndex, setSuggestionIndex] = useState(0);
   const [optionsVisible, setOptionsVisible] = useState(false);
   const [attachVisible, setAttachVisible] = useState(false);
+  const [streakUnlockVisible, setStreakUnlockVisible] = useState(false);
+  const mountedStreakRef = useRef<number | null>(null);
+  const unlockTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const suggestion = MOTIVATIONAL_SUGGESTIONS[suggestionIndex];
+
+  const flashStreakUnlock = () => {
+    setStreakUnlockVisible(true);
+    if (unlockTimerRef.current) clearTimeout(unlockTimerRef.current);
+    unlockTimerRef.current = setTimeout(() => setStreakUnlockVisible(false), 3500);
+  };
+
+  useEffect(() => {
+    if (!friend) return;
+    if (mountedStreakRef.current === null) {
+      mountedStreakRef.current = friend.streak;
+      return;
+    }
+    if (mountedStreakRef.current === 0 && friend.streak >= 1) {
+      flashStreakUnlock();
+    }
+    mountedStreakRef.current = friend.streak;
+  }, [friend?.streak]);
+
+  useEffect(() => {
+    return () => {
+      if (unlockTimerRef.current) clearTimeout(unlockTimerRef.current);
+    };
+  }, []);
 
   useEffect(() => {
     if (friendId) markChatRead(friendId);
@@ -67,12 +96,13 @@ export function FriendChatScreenContent({ friendId, prefill, onBack, onOpenStrea
 
   useEffect(() => {
     if (!friendId) return;
+    void refreshFriendsView();
     void refreshChat(friendId);
     const timer = setInterval(() => {
       void refreshChat(friendId);
     }, 2500);
     return () => clearInterval(timer);
-  }, [friendId, refreshChat]);
+  }, [friendId, refreshChat, refreshFriendsView]);
 
   useEffect(() => {
     if (prefill) setDraft(MOTIVATIONAL_SUGGESTIONS[0]);
@@ -155,9 +185,9 @@ export function FriendChatScreenContent({ friendId, prefill, onBack, onOpenStrea
           <Text style={styles.headerName}>{friend?.name ?? 'Friend'}</Text>
           {friend && (
             <>
-              <AppIcon name="fire" size={16} />
+              <FlameIcon streak={friend.streak} size={18} />
               <Text style={[styles.headerStreak, { color: streakVisuals.color }]}>{friend.streak}</Text>
-              <Text style={styles.headerMood}>{friendMood(friend)}</Text>
+              <Image source={friendMoodImage(friend)} resizeMode="contain" style={styles.headerMoodImage} />
             </>
           )}
         </View>
@@ -195,6 +225,14 @@ export function FriendChatScreenContent({ friendId, prefill, onBack, onOpenStrea
           {friend && (
             <View style={styles.petWrap} pointerEvents="box-none">
               <StreakPet streak={friend.streak} done={friend.streakDone} onPress={onOpenStreakGuide} />
+            </View>
+          )}
+
+          {streakUnlockVisible && friend && (
+            <View style={styles.unlockBanner} pointerEvents="none">
+              <FlameIcon streak={friend.streak} size={48} />
+              <Text style={styles.unlockTitle}>Streak unlocked!</Text>
+              <Text style={styles.unlockSubtitle}>Keep chatting daily to grow your flame</Text>
             </View>
           )}
         </View>
@@ -269,7 +307,7 @@ const styles = StyleSheet.create({
   headerTitle: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6 },
   headerName: { color: Brand.text, fontSize: 17, fontWeight: '700' },
   headerStreak: { color: Brand.fire, fontSize: 14, fontWeight: '700' },
-  headerMood: { fontSize: 14 },
+  headerMoodImage: { width: 22, height: 22 },
   headerActions: { flexDirection: 'row', alignItems: 'center', gap: Spacing.one },
   menuBtn: { padding: 4 },
   pressed: { opacity: 0.7 },
@@ -300,4 +338,19 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(229,57,53,0.12)',
   },
   blockedText: { flex: 1, color: Brand.danger, fontSize: 13, fontWeight: '600' },
+  unlockBanner: {
+    position: 'absolute',
+    top: '35%',
+    alignSelf: 'center',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 24,
+    paddingVertical: 18,
+    borderRadius: Radius.lg,
+    backgroundColor: 'rgba(31,31,31,0.92)',
+    borderWidth: 1,
+    borderColor: Brand.pink,
+  },
+  unlockTitle: { color: Brand.text, fontSize: 18, fontWeight: '800' },
+  unlockSubtitle: { color: Brand.textMuted, fontSize: 13, fontWeight: '600', textAlign: 'center' },
 });

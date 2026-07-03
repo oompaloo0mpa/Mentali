@@ -71,6 +71,37 @@ function todayIso() {
   return new Date().toISOString().slice(0, 10);
 }
 
+function yesterdayIso(today = todayIso()) {
+  const d = new Date(`${today}T00:00:00`);
+  d.setDate(d.getDate() - 1);
+  return d.toISOString().slice(0, 10);
+}
+
+/** Increment the per-friendship messaging streak when someone sends a chat message. */
+function applyFriendshipMessageStreak(friendship, today = todayIso()) {
+  const current = Number(friendship.streak || 0);
+  const lastDate = friendship.lastStreakDate || null;
+
+  if (lastDate === today) {
+    return { streak: current, lastStreakDate: today, streakUnlocked: false };
+  }
+
+  let newStreak;
+  if (!lastDate) {
+    newStreak = 1;
+  } else if (lastDate === yesterdayIso(today)) {
+    newStreak = current + 1;
+  } else {
+    newStreak = 1;
+  }
+
+  return {
+    streak: newStreak,
+    lastStreakDate: today,
+    streakUnlocked: current === 0 && newStreak >= 1,
+  };
+}
+
 async function ensureFriendBootstrapData(db, userId) {
   const uid = toObjectId(userId, "userId");
   const hasAny = await db.collection("friends").findOne({
@@ -929,10 +960,11 @@ app.get("/api/friends/view/:userId", async (req, res, next) => {
           userId: otherId,
           name: user.displayName || user.username || "Friend",
           code: user.friendCode,
-          streak: Number(user.currentStreak || 0),
+          streak: Number(r.streak ?? 0),
           lastSeen: relativeLastSeen(user.updatedAt),
           streakDone: checkInIso === today,
           lastStreakDoneDate: checkInIso,
+          lastStreakDate: r.lastStreakDate || null,
           addedAt: new Date(r.createdAt || new Date()).getTime(),
           blocked: r.status === "blocked",
           moodId: showMood ? pref?.currentMoodId || null : null,
@@ -1038,6 +1070,17 @@ app.post("/api/chats/:friendshipId/messages", async (req, res, next) => {
       createdAt: now,
     });
 
+    const streakUpdate = applyFriendshipMessageStreak(friendship);
+    await db.collection("friends").updateOne(
+      { _id: friendship._id },
+      {
+        $set: {
+          streak: streakUpdate.streak,
+          lastStreakDate: streakUpdate.lastStreakDate,
+        },
+      }
+    );
+
     await db.collection("users").updateMany(
       { _id: { $in: [viewerId, recipientUserId] } },
       { $set: { updatedAt: now } }
@@ -1055,6 +1098,8 @@ app.post("/api/chats/:friendshipId/messages", async (req, res, next) => {
         fileUri: fileUri || null,
         createdAt: now,
       },
+      streak: streakUpdate.streak,
+      streakUnlocked: streakUpdate.streakUnlocked,
     });
   } catch (e) {
     next(e);
