@@ -39,6 +39,30 @@ export function getStreakColor(streak: number): string {
   return StreakColors.orange;
 }
 
+export type StreakTier = 'warming' | 'blue' | 'purple' | 'rainbow';
+
+export function getStreakTier(streak: number): StreakTier {
+  if (streak >= 500) return 'rainbow';
+  if (streak >= 250) return 'purple';
+  if (streak >= 100) return 'blue';
+  return 'warming';
+}
+
+export function getStreakVisuals(streak: number): { tier: StreakTier; color: string; pillBg: string } {
+  const tier = getStreakTier(streak);
+  switch (tier) {
+    case 'rainbow':
+      return { tier, color: '#FF4FD8', pillBg: 'rgba(255,79,216,0.2)' };
+    case 'purple':
+      return { tier, color: '#C57BFF', pillBg: 'rgba(155,89,182,0.24)' };
+    case 'blue':
+      return { tier, color: '#70D2FF', pillBg: 'rgba(52,183,241,0.24)' };
+    case 'warming':
+    default:
+      return { tier, color: '#FFA24D', pillBg: 'rgba(255,122,26,0.22)' };
+  }
+}
+
 export const Spacing = {
   half: 4,
   one: 8,
