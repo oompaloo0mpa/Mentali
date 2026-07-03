@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { StatPill } from '@/components/social/StatPill';
-import { Brand, Radius } from '@/theme/theme';
+import { Brand, Radius, getStreakVisuals } from '@/theme/theme';
 
 type Props = {
   fire: number;
@@ -14,10 +14,11 @@ type Props = {
 };
 
 export function StatBar({ fire, diamonds, gems, unreadCount = 0, onPressNotifications, onPressMenu }: Props) {
+  const fireVisual = getStreakVisuals(fire);
   return (
     <View style={styles.container}>
       <View style={styles.stats}>
-        <StatPill icon="fire" value={fire} color={Brand.fire} />
+        <StatPill icon="fire" value={fire} color={fireVisual.color} />
         <StatPill icon="diamond" value={diamonds} color={Brand.diamond} />
         <StatPill icon="ice" value={gems} color={Brand.gem} />
       </View>

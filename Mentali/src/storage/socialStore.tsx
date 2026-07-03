@@ -2,7 +2,20 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { ImageSourcePropType } from 'react-native';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 
-import { moods } from '@/hooks/homepageData';
+import { moodById } from '@/data/moods';
+import {
+  acceptFriendRequest,
+  bootstrapFriendsIfEmpty,
+  fetchChatMessages,
+  fetchFriendsView,
+  rejectFriendRequest,
+  removeFriendship,
+  requestFriendByCode,
+  sendChatMessage,
+  type ChatMessageRow,
+  type FriendListRow,
+  type FriendRequestRow,
+} from '@/services/api';
 
 import {
   CURRENT_USER,
@@ -168,6 +181,67 @@ function normalizeFriend(friend: Friend): Friend {
   return { ...friend, addedAt, lastStreakDoneDate, streakDone };
 }
 
+function fromApiFriend(row: FriendListRow): Friend {
+  return normalizeFriend({
+    id: row.id,
+    userId: row.userId,
+    name: row.name,
+    code: row.code,
+    streak: row.streak,
+    lastSeen: row.lastSeen,
+    streakDone: row.streakDone,
+    lastStreakDoneDate: row.lastStreakDoneDate ?? null,
+    addedAt: row.addedAt,
+    pinned: false,
+    blocked: row.blocked ?? false,
+    moodId: row.moodId,
+    moodEmoji: row.moodEmoji,
+  });
+}
+
+function fromApiRequest(row: FriendRequestRow): FriendRequest {
+  return {
+    id: row.id,
+    name: row.name,
+    username: row.username ?? undefined,
+    anonymousMode: row.anonymousMode ?? false,
+  };
+}
+
+/**
+ * Merge a fresh friends list from the server into the current state, preserving
+ * existing chat threads and seeding a greeting for any friendship that has no chat yet.
+ */
+function mergeFriendsFromApi(
+  prev: SocialState,
+  remote: { friends: FriendListRow[]; requests: FriendRequestRow[] },
+): SocialState {
+  const newFriends = remote.friends.map(fromApiFriend);
+  const newChats = { ...prev.chats };
+  for (const f of newFriends) {
+    if (!newChats[f.id]) {
+      newChats[f.id] = seedGreeting();
+    }
+  }
+  return {
+    ...prev,
+    friends: newFriends,
+    requests: remote.requests.map(fromApiRequest),
+    chats: newChats,
+  };
+}
+
+function fromApiChatMessage(row: ChatMessageRow, viewerUserId: string): ChatMessage {
+  return {
+    id: row._id,
+    text: row.text ?? '',
+    imageUri: row.imageUri,
+    fileName: row.fileName,
+    fileUri: row.fileUri,
+    sender: row.senderUserId === viewerUserId ? 'me' : 'them',
+  };
+}
+
 /** Whether the friend completed their daily streak check-in today. */
 export function isStreakDoneToday(friend: Friend): boolean {
   if (friend.lastStreakDoneDate) return friend.lastStreakDoneDate === todayKey();
@@ -192,12 +266,14 @@ export function friendNeedsSupport(friend: Friend): boolean {
 
 /** Mood emoji derived from whether the friend checked in today. */
 export function friendMood(friend: Friend): string {
-  return isStreakDoneToday(friend) ? '😊' : '😢';
+  return friend.moodEmoji ?? (isStreakDoneToday(friend) ? '😊' : '😢');
 }
 
 /** Same mood face images used on the home page mood picker (used in the friends list). */
 export function friendMoodImage(friend: Friend): ImageSourcePropType {
-  return isStreakDoneToday(friend) ? moods[0].image : moods[3].image;
+  const mood = friend.moodId ? moodById(friend.moodId) : undefined;
+  if (mood?.image) return mood.image;
+  return isStreakDoneToday(friend) ? moodById('great')!.image : moodById('low')!.image;
 }
 
 export function isMuted(friend: Friend): boolean {
@@ -242,7 +318,10 @@ type SocialContextValue = {
   addFriendByCode: (code: string) => AddFriendResult;
   acceptRequest: (id: string) => void;
   rejectRequest: (id: string) => void;
+  /** Manually re-fetch friends + requests from the server (used for pull-to-refresh). */
+  refreshFriendsView: () => Promise<void>;
   sendMessage: (friendId: string, message: Omit<ChatMessage, 'id' | 'sender'> & { sender?: 'me' | 'them' }) => void;
+  refreshChat: (friendId: string) => Promise<void>;
   markChatRead: (friendId: string) => void;
   togglePin: (friendId: string) => void;
   removeFriend: (friendId: string) => void;
@@ -286,6 +365,48 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
+  useEffect(() => {
+    if (!hydrated || !profile.userId) return;
+    let active = true;
+
+    (async () => {
+      try {
+        let remote = await fetchFriendsView(profile.userId!);
+
+        // Fresh databases may not have social rows yet — bootstrap test data once.
+        if (remote.friends.length === 0 && remote.requests.length === 0) {
+          await bootstrapFriendsIfEmpty(profile.userId!);
+          remote = await fetchFriendsView(profile.userId!);
+        }
+
+        if (!active) return;
+        setState((prev) => mergeFriendsFromApi(prev, remote));
+      } catch {
+        // API optional: keep local persisted fallback when backend is unavailable.
+      }
+    })();
+
+    return () => {
+      active = false;
+    };
+  }, [hydrated, profile.userId]);
+
+  // Poll every 30 s so new friend requests and accepted friendships appear on both sides
+  // without requiring the user to restart the app.
+  useEffect(() => {
+    if (!hydrated || !profile.userId) return;
+    const POLL_MS = 30_000;
+    const id = setInterval(async () => {
+      try {
+        const remote = await fetchFriendsView(profile.userId!);
+        setState((prev) => mergeFriendsFromApi(prev, remote));
+      } catch {
+        // Ignore transient network errors between polls.
+      }
+    }, POLL_MS);
+    return () => clearInterval(id);
+  }, [hydrated, profile.userId]);
+
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
     if (!hydrated) return;
@@ -307,6 +428,33 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
 
       if (normalized === profile.friendCode.toUpperCase()) {
         return { ok: false, message: "That's your own friend code." };
+      }
+
+      if (profile.userId) {
+        requestFriendByCode(profile.userId, normalized)
+          .then(async (result) => {
+            const remote = await fetchFriendsView(profile.userId!);
+            setState((prev) => mergeFriendsFromApi(prev, remote));
+
+            if (result?.user?.displayName) {
+              update((prev) => ({
+                ...prev,
+                notifications: [
+                  {
+                    id: uid('n'),
+                    icon: 'person-add',
+                    title: `Friend request sent to ${result.user.displayName}`,
+                    time: 'Just now',
+                    read: false,
+                    recent: true,
+                  },
+                  ...prev.notifications,
+                ],
+              }));
+            }
+          })
+          .catch(() => {});
+        return { ok: true, message: 'Friend request sent.' };
       }
 
       const directoryUser = findDirectoryUser(normalized);
@@ -354,11 +502,44 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
 
       return { ok: true, message: `Added ${addedName} as a friend.` };
     },
-    [profile.friendCode, update],
+    [profile.friendCode, profile.userId, update],
   );
 
   const acceptRequest = useCallback(
     (id: string) => {
+      if (profile.userId) {
+        // Optimistically move the request to the friends list so the UI responds instantly.
+        // Use the request `id` as the friend ID — it is the MongoDB friendship _id, so the
+        // chat seeded here will match the ID returned by the server after accept.
+        update((prev) => {
+          const req = prev.requests.find((r) => r.id === id);
+          if (!req) return prev;
+          const friend = normalizeFriend({
+            id,
+            name: req.name,
+            streak: 0,
+            lastSeen: 'Just now',
+            streakDone: false,
+            lastStreakDoneDate: null,
+            addedAt: Date.now(),
+            pinned: false,
+          });
+          return {
+            ...prev,
+            requests: prev.requests.filter((r) => r.id !== id),
+            friends: [...prev.friends, friend],
+            chats: { ...prev.chats, [id]: prev.chats[id] ?? seedGreeting() },
+          };
+        });
+        // Confirm with the server and sync authoritative state (moods, streaks, etc.).
+        acceptFriendRequest(id)
+          .then(async () => {
+            const remote = await fetchFriendsView(profile.userId!);
+            setState((prev) => mergeFriendsFromApi(prev, remote));
+          })
+          .catch(() => {});
+        return;
+      }
       update((prev) => {
         const req = prev.requests.find((r) => r.id === id);
         if (!req) return prev;
@@ -381,16 +562,24 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
         };
       });
     },
-    [update],
+    [profile.userId, update],
   );
 
   const rejectRequest = useCallback(
-    (id: string) => update((prev) => ({ ...prev, requests: prev.requests.filter((r) => r.id !== id) })),
-    [update],
+    (id: string) => {
+      // Optimistically remove the request immediately regardless of online/offline state.
+      update((prev) => ({ ...prev, requests: prev.requests.filter((r) => r.id !== id) }));
+      if (profile.userId) {
+        rejectFriendRequest(id).catch(() => {});
+      }
+    },
+    [profile.userId, update],
   );
 
   const sendMessage = useCallback<SocialContextValue['sendMessage']>(
     (friendId, message) => {
+      const me = profile.userId;
+      const friend = stateRef.current.friends.find((f) => f.id === friendId);
       update((prev) => {
         const sender = message.sender ?? 'me';
         const msg: ChatMessage = { ...message, id: uid('m'), sender };
@@ -421,8 +610,55 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
 
         return next;
       });
+
+      if (me && friend?.userId && (message.sender ?? 'me') === 'me') {
+        sendChatMessage(friendId, {
+          senderUserId: me,
+          text: message.text,
+          imageUri: message.imageUri,
+          fileName: message.fileName,
+          fileUri: message.fileUri,
+        })
+          .then(async () => {
+            const rows = await fetchChatMessages(friendId, me);
+            setState((prev) => ({
+              ...prev,
+              chats: { ...prev.chats, [friendId]: rows.map((row) => fromApiChatMessage(row, me)) },
+            }));
+          })
+          .catch(() => {});
+      }
     },
-    [update],
+    [profile.userId, update],
+  );
+
+  const refreshFriendsView = useCallback<SocialContextValue['refreshFriendsView']>(async () => {
+    if (!profile.userId) return;
+    try {
+      const remote = await fetchFriendsView(profile.userId);
+      setState((prev) => mergeFriendsFromApi(prev, remote));
+    } catch {
+      // Keep existing state when offline.
+    }
+  }, [profile.userId]);
+
+  const refreshChat = useCallback<SocialContextValue['refreshChat']>(
+    async (friendId: string) => {
+      const me = profile.userId;
+      const friend = stateRef.current.friends.find((f) => f.id === friendId);
+      if (!me || !friend?.userId) return;
+
+      try {
+        const rows = await fetchChatMessages(friendId, me);
+        setState((prev) => ({
+          ...prev,
+          chats: { ...prev.chats, [friendId]: rows.map((row) => fromApiChatMessage(row, me)) },
+        }));
+      } catch {
+        // Keep local chat fallback while offline.
+      }
+    },
+    [profile.userId],
   );
 
   const markChatRead = useCallback(
@@ -444,13 +680,18 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
   );
 
   const removeFriend = useCallback(
-    (friendId: string) =>
+    (friendId: string) => {
       update((prev) => {
         const rest = { ...prev.chats };
         delete rest[friendId];
         return { ...prev, friends: prev.friends.filter((f) => f.id !== friendId), chats: rest };
-      }),
-    [update],
+      });
+      // Delete the friendship document on the server so either user can re-add the other.
+      if (profile.userId) {
+        removeFriendship(friendId).catch(() => {});
+      }
+    },
+    [profile.userId, update],
   );
 
   const blockFriend = useCallback(
@@ -557,7 +798,9 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
       addFriendByCode,
       acceptRequest,
       rejectRequest,
+      refreshFriendsView,
       sendMessage,
+      refreshChat,
       markChatRead,
       togglePin,
       removeFriend,
@@ -580,7 +823,9 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
       addFriendByCode,
       acceptRequest,
       rejectRequest,
+      refreshFriendsView,
       sendMessage,
+      refreshChat,
       markChatRead,
       togglePin,
       removeFriend,

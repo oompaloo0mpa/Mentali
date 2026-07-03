@@ -3,7 +3,7 @@ import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { AppIcon } from '@/components/AppIcon';
 import { Avatar } from '@/components/Avatar';
-import { Brand, Radius } from '@/theme/theme';
+import { Brand, Radius, getStreakVisuals } from '@/theme/theme';
 import { friendMoodImage, isMuted, isStreakDoneToday, type FriendBadge } from '@/storage/socialStore';
 import type { Friend } from '@/data/mockData';
 
@@ -25,6 +25,7 @@ const BADGE_STYLES = {
 /** Tap opens chat; tap avatar opens the profile sheet; long-press opens friend options. */
 export function FriendRow({ friend, badges = [], onPress, onLongPress, onPressProfile, onSendMotivation }: Props) {
   const muted = isMuted(friend);
+  const streakVisuals = getStreakVisuals(friend.streak);
 
   return (
     <Pressable
@@ -51,8 +52,10 @@ export function FriendRow({ friend, badges = [], onPress, onLongPress, onPressPr
           {friend.pinned && <MaterialCommunityIcons name="pin" size={14} color={Brand.pink} />}
           {friend.blocked && <Ionicons name="ban" size={13} color={Brand.danger} />}
           {muted && <Ionicons name="notifications-off" size={13} color={Brand.textMuted} />}
-          <AppIcon name="fire" size={14} />
-          <Text style={styles.streak}>{friend.streak}</Text>
+          <View style={[styles.streakPill, { backgroundColor: streakVisuals.pillBg }]}>
+            <AppIcon name="fire" size={14} />
+            <Text style={[styles.streak, { color: streakVisuals.color }]}>{friend.streak}</Text>
+          </View>
           <Image
             source={friendMoodImage(friend)}
             resizeMode="contain"
@@ -107,7 +110,15 @@ const styles = StyleSheet.create({
   info: { flex: 1, gap: 3 },
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   name: { color: Brand.text, fontSize: 16, fontWeight: '700', flexShrink: 1 },
-  streak: { color: Brand.fire, fontSize: 14, fontWeight: '700' },
+  streakPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    borderRadius: Radius.pill,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+  },
+  streak: { fontSize: 14, fontWeight: '700' },
   moodImage: { width: 24, height: 24 },
   lastSeen: { color: Brand.textSecondary, fontSize: 13 },
   badgeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 4 },

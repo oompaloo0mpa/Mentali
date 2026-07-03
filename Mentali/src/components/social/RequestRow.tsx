@@ -4,7 +4,6 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Avatar } from '@/components/Avatar';
 import { Brand, Radius } from '@/theme/theme';
 import type { FriendRequest } from '@/data/mockData';
-import { publicDisplayName } from '@/logic/anonymousMode';
 
 type Props = {
   request: FriendRequest;
@@ -13,14 +12,8 @@ type Props = {
 };
 
 export function RequestRow({ request, onAccept, onReject }: Props) {
-  const label = publicDisplayName(
-    {
-      displayName: request.name,
-      username: request.username ?? request.name.toLowerCase(),
-      anonymousMode: request.anonymousMode,
-    },
-    { isFriend: false },
-  );
+  // Always show the real name — anonymous mode only applies to the leaderboard.
+  const label = request.name;
 
   return (
     <View style={styles.row}>

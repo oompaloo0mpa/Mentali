@@ -12,6 +12,9 @@ export type UserProfile = {
   username: string;
   displayName: string;
   friendCode: string;
+  /** Current mood chosen on homepage; shared across profile and friends visibility. */
+  currentMoodId: string;
+  currentMoodEmoji: string;
   anonymousMode: boolean;
   hideMoodFromFriends: boolean;
   allowFriendRequests: boolean;
@@ -24,6 +27,8 @@ const DEFAULT_PROFILE: UserProfile = {
   username: CURRENT_USER.name.toLowerCase(),
   displayName: CURRENT_USER.name,
   friendCode: CURRENT_USER.friendCode,
+  currentMoodId: 'okay',
+  currentMoodEmoji: '😐',
   anonymousMode: false,
   hideMoodFromFriends: false,
   allowFriendRequests: true,
@@ -40,6 +45,7 @@ type PreferenceKey =
 type UserProfileContextValue = {
   profile: UserProfile;
   hydrated: boolean;
+  setCurrentMood: (mood: { id: string; emoji: string }) => void;
   setAnonymousMode: (enabled: boolean) => void;
   setHideMoodFromFriends: (enabled: boolean) => void;
   setAllowFriendRequests: (enabled: boolean) => void;
@@ -59,7 +65,13 @@ const UserProfileContext = createContext<UserProfileContextValue | null>(null);
 
 function prefsFromApi(prefs: Record<string, unknown> | null | undefined): Pick<
   UserProfile,
-  'anonymousMode' | 'hideMoodFromFriends' | 'allowFriendRequests' | 'allowNotifications' | 'colorTheme'
+  | 'anonymousMode'
+  | 'hideMoodFromFriends'
+  | 'allowFriendRequests'
+  | 'allowNotifications'
+  | 'colorTheme'
+  | 'currentMoodId'
+  | 'currentMoodEmoji'
 > {
   const theme = prefs?.theme;
   const colorTheme: ColorThemeId =
@@ -71,6 +83,9 @@ function prefsFromApi(prefs: Record<string, unknown> | null | undefined): Pick<
     allowFriendRequests: prefs?.allowFriendRequests !== false,
     allowNotifications: prefs?.leaderboardNotifications !== false,
     colorTheme,
+    currentMoodId: typeof prefs?.currentMoodId === 'string' ? prefs.currentMoodId : DEFAULT_PROFILE.currentMoodId,
+    currentMoodEmoji:
+      typeof prefs?.currentMoodEmoji === 'string' ? prefs.currentMoodEmoji : DEFAULT_PROFILE.currentMoodEmoji,
   };
 }
 
@@ -164,6 +179,18 @@ export function UserProfileProvider({ children }: { children: React.ReactNode })
     });
   }, []);
 
+  const setCurrentMood = useCallback((mood: { id: string; emoji: string }) => {
+    setProfile((prev) => {
+      if (prev.userId) {
+        updateUserPreferences(prev.userId, {
+          currentMoodId: mood.id,
+          currentMoodEmoji: mood.emoji,
+        }).catch(() => {});
+      }
+      return { ...prev, currentMoodId: mood.id, currentMoodEmoji: mood.emoji };
+    });
+  }, []);
+
   const setAnonymousMode = useCallback(
     (enabled: boolean) => setPreference('anonymousMode', enabled),
     [setPreference],
@@ -200,6 +227,7 @@ export function UserProfileProvider({ children }: { children: React.ReactNode })
       profile,
       hydrated,
       setAnonymousMode,
+      setCurrentMood,
       setHideMoodFromFriends,
       setAllowFriendRequests,
       setAllowNotifications,
@@ -211,6 +239,7 @@ export function UserProfileProvider({ children }: { children: React.ReactNode })
       profile,
       hydrated,
       setAnonymousMode,
+      setCurrentMood,
       setHideMoodFromFriends,
       setAllowFriendRequests,
       setAllowNotifications,

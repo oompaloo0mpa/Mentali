@@ -31,6 +31,7 @@ function resolveApiBaseUrl(): string {
 const API_BASE_URL = resolveApiBaseUrl();
 
 type AuthMode = "phone" | "email";
+type SocialProvider = "apple" | "google";
 
 export async function apiRequest(path: string, options?: RequestInit) {
   let response: Response;
@@ -70,6 +71,20 @@ export async function registerWithEmail(payload: {
 
 export async function login(payload: { mode: AuthMode; identifier: string; password: string }) {
   return apiRequest("/auth/login", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function loginWithSocial(payload: {
+  provider: SocialProvider;
+  email?: string;
+  fullName?: string;
+  identityToken?: string;
+  authorizationCode?: string;
+  accessToken?: string;
+}) {
+  return apiRequest("/auth/social", {
     method: "POST",
     body: JSON.stringify(payload),
   });
@@ -133,6 +148,8 @@ export async function updateUserPreferences(
     leaderboardNotifications?: boolean;
     encouragementNotifications?: boolean;
     theme?: string;
+    currentMoodId?: string;
+    currentMoodEmoji?: string;
   },
 ) {
   const result = await apiRequest(`/preferences/${userId}`, {
@@ -140,6 +157,44 @@ export async function updateUserPreferences(
     body: JSON.stringify(payload),
   });
   return result?.data ?? null;
+}
+
+export type FriendListRow = {
+  id: string;
+  userId: string;
+  name: string;
+  code?: string;
+  streak: number;
+  lastSeen: string;
+  streakDone: boolean;
+  lastStreakDoneDate?: string | null;
+  addedAt?: number;
+  blocked?: boolean;
+  moodId?: string;
+  moodEmoji?: string;
+};
+
+export type FriendRequestRow = {
+  id: string;
+  userId: string;
+  name: string;
+  username?: string | null;
+  anonymousMode?: boolean;
+};
+
+export async function fetchFriendsView(userId: string): Promise<{
+  friends: FriendListRow[];
+  requests: FriendRequestRow[];
+}> {
+  const result = await apiRequest(`/friends/view/${userId}`);
+  return {
+    friends: result?.friends ?? [],
+    requests: result?.requests ?? [],
+  };
+}
+
+export async function bootstrapFriendsIfEmpty(userId: string) {
+  return apiRequest(`/friends/bootstrap/${userId}`, { method: 'POST' });
 }
 
 export async function lookupUserByFriendCode(code: string, viewerId?: string | null) {
@@ -153,6 +208,53 @@ export async function requestFriendByCode(fromUserId: string, friendCode: string
   return apiRequest("/friends/request-by-code", {
     method: "POST",
     body: JSON.stringify({ fromUserId, friendCode }),
+  });
+}
+
+export async function acceptFriendRequest(requestId: string) {
+  return apiRequest(`/friends/${requestId}/accept`, { method: 'POST' });
+}
+
+export async function rejectFriendRequest(requestId: string) {
+  return apiRequest(`/friends/${requestId}/reject`, { method: 'POST' });
+}
+
+/** Delete the friendship document so either user can re-add the other later. */
+export async function removeFriendship(friendshipId: string) {
+  return apiRequest(`/friends/${friendshipId}/reject`, { method: 'POST' });
+}
+
+export type ChatMessageRow = {
+  _id: string;
+  friendshipId: string;
+  senderUserId: string;
+  recipientUserId: string;
+  text: string;
+  imageUri?: string;
+  fileName?: string;
+  fileUri?: string;
+  createdAt: string;
+};
+
+export async function fetchChatMessages(friendshipId: string, viewerUserId: string): Promise<ChatMessageRow[]> {
+  const params = new URLSearchParams({ viewerUserId });
+  const result = await apiRequest(`/chats/${friendshipId}/messages?${params.toString()}`);
+  return result?.data ?? [];
+}
+
+export async function sendChatMessage(
+  friendshipId: string,
+  payload: {
+    senderUserId: string;
+    text: string;
+    imageUri?: string;
+    fileName?: string;
+    fileUri?: string;
+  },
+) {
+  return apiRequest(`/chats/${friendshipId}/messages`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
   });
 }
 

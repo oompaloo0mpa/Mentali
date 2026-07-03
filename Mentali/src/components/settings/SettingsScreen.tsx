@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { type ReactNode } from 'react';
 import {
   Alert,
+  Image,
   Modal,
   Pressable,
   ScrollView,
@@ -13,6 +14,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { COLOR_THEME_OPTIONS } from '@/data/colorThemes';
+import { moodById } from '@/data/moods';
 import { useUserProfile } from '@/storage/userProfileStore';
 import { Spacing } from '@/theme/theme';
 
@@ -114,6 +116,7 @@ export function SettingsScreen({
     setAllowNotifications,
     setColorTheme,
   } = useUserProfile();
+  const activeMood = moodById(profile.currentMoodId);
 
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
@@ -161,6 +164,13 @@ export function SettingsScreen({
 
           <SettingsSection title="Appearance">
             <LinkRow label="Edit your mentality" onPress={onOpenWardrobe} />
+            <View style={styles.linkRow}>
+              <Text style={styles.cardText}>Current mood</Text>
+              <View style={styles.moodValue}>
+                {activeMood ? <Image source={activeMood.image} resizeMode="contain" style={styles.moodImage} /> : null}
+                <Text style={styles.cardText}>{profile.currentMoodEmoji}</Text>
+              </View>
+            </View>
           </SettingsSection>
 
           <SettingsSection title="Account Management">
@@ -309,6 +319,8 @@ const styles = StyleSheet.create({
     borderColor: Screen.cardText,
     opacity: 0.35,
   },
+  moodValue: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  moodImage: { width: 20, height: 20 },
   pressed: {
     opacity: 0.8,
   },

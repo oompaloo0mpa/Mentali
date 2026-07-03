@@ -1,8 +1,9 @@
 import React from 'react';
-import { Ionicons } from '@expo/vector-icons';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { AppIcon } from '@/components/AppIcon';
 import { colors, radius, spacing, typography } from '@/theme/colors';
+import { getStreakVisuals } from '@/theme/theme';
 
 interface Props {
   current: number;
@@ -15,6 +16,7 @@ interface Props {
 export function StreakBadge({ current, longest, checkedInToday, onReset }: Props) {
   const active = current > 0;
   const headline = active ? `${current}-day streak` : 'Start your streak today';
+  const visuals = getStreakVisuals(current);
 
   return (
     <Pressable
@@ -23,9 +25,11 @@ export function StreakBadge({ current, longest, checkedInToday, onReset }: Props
       android_ripple={onReset ? { color: 'rgba(255,255,255,0.06)' } : undefined}
       style={styles.card}
     >
-      <Ionicons name="flame" size={36} color={active ? '#FF7A1A' : colors.textSecondary} style={!active ? styles.flameDim : undefined} />
+      <View style={[styles.flameWrap, { backgroundColor: active ? visuals.pillBg : 'rgba(255,255,255,0.06)' }]}>
+        <AppIcon name="fire" size={26} />
+      </View>
       <View style={styles.body}>
-        <Text style={styles.headline}>{headline}</Text>
+        <Text style={[styles.headline, active && { color: visuals.color }]}>{headline}</Text>
         <Text style={styles.sub}>
           {checkedInToday
             ? 'Checked in today — see you tomorrow!'
@@ -47,7 +51,13 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     padding: spacing.lg,
   },
-  flameDim: { opacity: 0.35 },
+  flameWrap: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   body: { flex: 1 },
   headline: { ...typography.heading, color: colors.textPrimary },
   sub: { ...typography.caption, color: colors.textSecondary, marginTop: 2 },
