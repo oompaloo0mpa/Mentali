@@ -22,6 +22,8 @@ export type Friend = {
   mutedUntil?: number | null;
   /** Epoch ms of the last message sent to this friend, used for badges and quest progress. */
   lastMessagedAt?: number | null;
+  /** ISO date when this friendship's messaging streak was last incremented. */
+  lastStreakDate?: string | null;
   hasUnread?: boolean;
   /** Current daily mood selected on the friend's homepage. */
   moodId?: string;

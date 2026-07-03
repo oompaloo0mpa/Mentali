@@ -10,9 +10,9 @@ type Props = {
   size?: number;
 };
 
-/** Unlocks at 10 days; colour scales with streak. Tap opens the streak guide. */
+/** Unlocks at day 1; colour scales with streak. Tap opens the streak guide. */
 export function StreakPet({ streak, done = true, onPress, size = 56 }: Props) {
-  if (streak < 10) return null;
+  if (streak < 1) return null;
 
   const color = getStreakColor(streak);
 

@@ -72,6 +72,37 @@ function todayKey(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
+function yesterdayKey(today = todayKey()): string {
+  const d = new Date(`${today}T00:00:00`);
+  d.setDate(d.getDate() - 1);
+  return d.toISOString().slice(0, 10);
+}
+
+function applyMessageStreak(
+  friend: Friend,
+  today = todayKey(),
+): { streak: number; lastStreakDate: string; unlocked: boolean } {
+  const lastDate = friend.lastStreakDate ?? null;
+  if (lastDate === today) {
+    return { streak: friend.streak, lastStreakDate: today, unlocked: false };
+  }
+
+  let newStreak: number;
+  if (!lastDate) {
+    newStreak = 1;
+  } else if (lastDate === yesterdayKey(today)) {
+    newStreak = friend.streak + 1;
+  } else {
+    newStreak = 1;
+  }
+
+  return {
+    streak: newStreak,
+    lastStreakDate: today,
+    unlocked: friend.streak === 0 && newStreak >= 1,
+  };
+}
+
 function freshQuests(): Quest[] {
   return DAILY_QUESTS.map((q) => ({ ...q, progress: 0, rewarded: false }));
 }
@@ -196,6 +227,7 @@ function fromApiFriend(row: FriendListRow): Friend {
     blocked: row.blocked ?? false,
     moodId: row.moodId,
     moodEmoji: row.moodEmoji,
+    lastStreakDate: row.lastStreakDate ?? null,
   });
 }
 
@@ -395,7 +427,7 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
   // without requiring the user to restart the app.
   useEffect(() => {
     if (!hydrated || !profile.userId) return;
-    const POLL_MS = 30_000;
+    const POLL_MS = 10_000;
     const id = setInterval(async () => {
       try {
         const remote = await fetchFriendsView(profile.userId!);
@@ -591,10 +623,22 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
 
         if (sender !== 'me') return next;
 
-        const alreadyMessagedToday = isSameDay(prev.friends.find((f) => f.id === friendId)?.lastMessagedAt);
-        next.friends = prev.friends.map((f) =>
-          f.id === friendId ? { ...f, lastMessagedAt: Date.now(), hasUnread: false } : f,
-        );
+        const today = todayKey();
+        const targetFriend = prev.friends.find((f) => f.id === friendId);
+        const alreadyMessagedToday = isSameDay(targetFriend?.lastMessagedAt);
+        const streakResult = targetFriend ? applyMessageStreak(targetFriend, today) : null;
+
+        next.friends = prev.friends.map((f) => {
+          if (f.id !== friendId) return f;
+          return {
+            ...f,
+            lastMessagedAt: Date.now(),
+            hasUnread: false,
+            ...(streakResult
+              ? { streak: streakResult.streak, lastStreakDate: streakResult.lastStreakDate }
+              : {}),
+          };
+        });
 
         let gained = 0;
         next.quests = prev.quests.map((q) => {
@@ -619,12 +663,26 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
           fileName: message.fileName,
           fileUri: message.fileUri,
         })
-          .then(async () => {
-            const rows = await fetchChatMessages(friendId, me);
-            setState((prev) => ({
-              ...prev,
-              chats: { ...prev.chats, [friendId]: rows.map((row) => fromApiChatMessage(row, me)) },
-            }));
+          .then(async (result) => {
+            const [rows, remote] = await Promise.all([
+              fetchChatMessages(friendId, me),
+              fetchFriendsView(me),
+            ]);
+            setState((prev) => {
+              const merged = mergeFriendsFromApi(prev, remote);
+              if (typeof result?.streak === 'number') {
+                merged.friends = merged.friends.map((f) =>
+                  f.id === friendId ? { ...f, streak: result.streak! } : f,
+                );
+              }
+              return {
+                ...merged,
+                chats: {
+                  ...merged.chats,
+                  [friendId]: rows.map((row) => fromApiChatMessage(row, me)),
+                },
+              };
+            });
           })
           .catch(() => {});
       }
