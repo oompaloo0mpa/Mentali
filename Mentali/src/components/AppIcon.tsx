@@ -1,9 +1,9 @@
 import { Image } from 'expo-image';
 
 const SOURCES = {
-  fire: require('@/assets/images/icons/fire.png'),
-  diamond: require('@/assets/images/icons/diamond.png'),
-  ice: require('@/assets/images/icons/ice.png'),
+  fire: require('../../assets/images/icons/fire.png'),
+  diamond: require('../../assets/images/icons/diamond.png'),
+  ice: require('../../assets/images/icons/ice.png'),
 };
 
 export type AppIconName = keyof typeof SOURCES;

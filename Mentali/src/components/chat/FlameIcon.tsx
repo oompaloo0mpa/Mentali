@@ -6,10 +6,10 @@ type Props = {
 };
 
 const SOURCES = {
-  orange: require('@/assets/images/streak/orange.png'),
-  blue: require('@/assets/images/streak/blue.png'),
-  purple: require('@/assets/images/streak/purple.png'),
-  rainbow: require('@/assets/images/streak/rainbow.png'),
+  orange: require('../../../assets/images/streak/orange.png'),
+  blue: require('../../../assets/images/streak/blue.png'),
+  purple: require('../../../assets/images/streak/purple.png'),
+  rainbow: require('../../../assets/images/streak/rainbow.png'),
 };
 
 export type StreakTier = keyof typeof SOURCES;
