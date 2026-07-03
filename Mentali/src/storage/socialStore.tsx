@@ -207,6 +207,29 @@ function fromApiRequest(row: FriendRequestRow): FriendRequest {
   };
 }
 
+/**
+ * Merge a fresh friends list from the server into the current state, preserving
+ * existing chat threads and seeding a greeting for any friendship that has no chat yet.
+ */
+function mergeFriendsFromApi(
+  prev: SocialState,
+  remote: { friends: FriendListRow[]; requests: FriendRequestRow[] },
+): SocialState {
+  const newFriends = remote.friends.map(fromApiFriend);
+  const newChats = { ...prev.chats };
+  for (const f of newFriends) {
+    if (!newChats[f.id]) {
+      newChats[f.id] = seedGreeting();
+    }
+  }
+  return {
+    ...prev,
+    friends: newFriends,
+    requests: remote.requests.map(fromApiRequest),
+    chats: newChats,
+  };
+}
+
 function fromApiChatMessage(row: ChatMessageRow, viewerUserId: string): ChatMessage {
   return {
     id: row._id,
@@ -356,11 +379,7 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
         }
 
         if (!active) return;
-        setState((prev) => ({
-          ...prev,
-          friends: remote.friends.map(fromApiFriend),
-          requests: remote.requests.map(fromApiRequest),
-        }));
+        setState((prev) => mergeFriendsFromApi(prev, remote));
       } catch {
         // API optional: keep local persisted fallback when backend is unavailable.
       }
@@ -379,11 +398,7 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
     const id = setInterval(async () => {
       try {
         const remote = await fetchFriendsView(profile.userId!);
-        setState((prev) => ({
-          ...prev,
-          friends: remote.friends.map(fromApiFriend),
-          requests: remote.requests.map(fromApiRequest),
-        }));
+        setState((prev) => mergeFriendsFromApi(prev, remote));
       } catch {
         // Ignore transient network errors between polls.
       }
@@ -418,11 +433,7 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
         requestFriendByCode(profile.userId, normalized)
           .then(async (result) => {
             const remote = await fetchFriendsView(profile.userId!);
-            setState((prev) => ({
-              ...prev,
-              friends: remote.friends.map(fromApiFriend),
-              requests: remote.requests.map(fromApiRequest),
-            }));
+            setState((prev) => mergeFriendsFromApi(prev, remote));
 
             if (result?.user?.displayName) {
               update((prev) => ({
@@ -497,12 +508,13 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
     (id: string) => {
       if (profile.userId) {
         // Optimistically move the request to the friends list so the UI responds instantly.
+        // Use the request `id` as the friend ID — it is the MongoDB friendship _id, so the
+        // chat seeded here will match the ID returned by the server after accept.
         update((prev) => {
           const req = prev.requests.find((r) => r.id === id);
           if (!req) return prev;
-          const friendId = uid('f');
           const friend = normalizeFriend({
-            id: friendId,
+            id,
             name: req.name,
             streak: 0,
             lastSeen: 'Just now',
@@ -515,18 +527,14 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
             ...prev,
             requests: prev.requests.filter((r) => r.id !== id),
             friends: [...prev.friends, friend],
-            chats: { ...prev.chats, [friendId]: seedGreeting() },
+            chats: { ...prev.chats, [id]: prev.chats[id] ?? seedGreeting() },
           };
         });
-        // Confirm with the server and sync authoritative state.
+        // Confirm with the server and sync authoritative state (moods, streaks, etc.).
         acceptFriendRequest(id)
           .then(async () => {
             const remote = await fetchFriendsView(profile.userId!);
-            setState((prev) => ({
-              ...prev,
-              friends: remote.friends.map(fromApiFriend),
-              requests: remote.requests.map(fromApiRequest),
-            }));
+            setState((prev) => mergeFriendsFromApi(prev, remote));
           })
           .catch(() => {});
         return;
@@ -627,11 +635,7 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
     if (!profile.userId) return;
     try {
       const remote = await fetchFriendsView(profile.userId);
-      setState((prev) => ({
-        ...prev,
-        friends: remote.friends.map(fromApiFriend),
-        requests: remote.requests.map(fromApiRequest),
-      }));
+      setState((prev) => mergeFriendsFromApi(prev, remote));
     } catch {
       // Keep existing state when offline.
     }
