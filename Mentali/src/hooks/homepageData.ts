@@ -9,9 +9,11 @@ export type StatItem = {
 };
 
 export type MoodItem = {
+  id: string;
   label: string;
   image: ImageSourcePropType;
   color: string;
+  homeKey: string;
 };
 
 export type QuestItem = {
@@ -47,9 +49,11 @@ export const stats: StatItem[] = [
 
 /** Homepage mood strip — same faces as the chatbot. */
 export const moods: MoodItem[] = MOOD_OPTIONS.map((m) => ({
+  id: m.id,
   label: m.label,
   image: m.image,
   color: m.color,
+  homeKey: m.homeKey,
 }));
 
 export const quests: QuestItem[] = [

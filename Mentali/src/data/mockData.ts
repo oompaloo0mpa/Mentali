@@ -2,6 +2,8 @@
 
 export type Friend = {
   id: string;
+  /** Backing user record id from MongoDB when fetched from API. */
+  userId?: string;
   name: string;
   /** Unique friend code used to add this person. Must match a directory entry. */
   code?: string;
@@ -21,6 +23,9 @@ export type Friend = {
   /** Epoch ms of the last message sent to this friend, used for badges and quest progress. */
   lastMessagedAt?: number | null;
   hasUnread?: boolean;
+  /** Current daily mood selected on the friend's homepage. */
+  moodId?: string;
+  moodEmoji?: string;
 };
 
 export type FriendRequest = {
@@ -80,6 +85,7 @@ const daysAgoIso = (days: number) => new Date(daysAgoMs(days)).toISOString().sli
 export const FRIENDS: Friend[] = [
   {
     id: 'f1',
+    userId: 'seed-alex',
     name: 'Alex',
     code: 'ALX7K2',
     streak: 67,
@@ -88,9 +94,12 @@ export const FRIENDS: Friend[] = [
     lastStreakDoneDate: todayIso(),
     addedAt: daysAgoMs(45),
     pinned: false,
+    moodId: 'great',
+    moodEmoji: '😄',
   },
   {
     id: 'f2',
+    userId: 'seed-josh',
     name: 'Josh',
     code: 'JSH4M9',
     streak: 10,
@@ -100,6 +109,8 @@ export const FRIENDS: Friend[] = [
     addedAt: daysAgoMs(20),
     pinned: false,
     hasUnread: true,
+    moodId: 'low',
+    moodEmoji: '😟',
   },
 ];
 

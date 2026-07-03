@@ -2,6 +2,7 @@ require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 const bcrypt = require("bcryptjs");
+const { Buffer } = require("node:buffer");
 const { ObjectId } = require("mongodb");
 const { connectMongo } = require("./mongodb");
 
@@ -55,6 +56,205 @@ async function getUserPreferences(db, userId) {
   return db.collection("userPreferences").findOne({ userId: uid });
 }
 
+function relativeLastSeen(dateValue) {
+  const ts = dateValue ? new Date(dateValue).getTime() : Date.now();
+  const diffMs = Math.max(0, Date.now() - ts);
+  const mins = Math.round(diffMs / 60000);
+  if (mins < 1) return "Last seen just now";
+  if (mins < 60) return `Last seen ${mins}m ago`;
+  const hours = Math.round(mins / 60);
+  if (hours < 24) return `Last seen ${hours}h ago`;
+  return `Last seen ${Math.round(hours / 24)}d ago`;
+}
+
+function todayIso() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+async function ensureFriendBootstrapData(db, userId) {
+  const uid = toObjectId(userId, "userId");
+  const hasAny = await db.collection("friends").findOne({
+    $or: [{ userAId: uid }, { userBId: uid }],
+    status: { $in: ["accepted", "pending"] },
+  });
+  if (hasAny) return { seeded: false };
+
+  const now = new Date();
+  const sampleUsers = [
+    {
+      email: "alex.seed@mentali.dev",
+      username: "alex_seed",
+      displayName: "Alex",
+      friendCode: "ALX7K2",
+      currentStreak: 142,
+      longestStreak: 142,
+      moodId: "great",
+      moodEmoji: "😄",
+      checkedInToday: true,
+      anonymousMode: false,
+      phone: "+6591000101",
+    },
+    {
+      email: "josh.seed@mentali.dev",
+      username: "josh_seed",
+      displayName: "Josh",
+      friendCode: "JSH4M9",
+      currentStreak: 312,
+      longestStreak: 350,
+      moodId: "sad",
+      moodEmoji: "😟",
+      checkedInToday: false,
+      anonymousMode: false,
+      phone: "+6591000102",
+    },
+    {
+      email: "maya.seed@mentali.dev",
+      username: "maya_seed",
+      displayName: "Maya",
+      friendCode: "MAYA3X",
+      currentStreak: 18,
+      longestStreak: 33,
+      moodId: "good",
+      moodEmoji: "🙂",
+      checkedInToday: true,
+      anonymousMode: true,
+      phone: "+6591000103",
+    },
+  ];
+
+  const ids = [];
+  for (const seed of sampleUsers) {
+    const existing = await db.collection("users").findOne({ username: seed.username });
+    let outId = existing?._id;
+    if (!outId) {
+      const inserted = await db.collection("users").insertOne({
+        email: seed.email,
+        username: seed.username,
+        displayName: seed.displayName,
+        authProvider: "email",
+        passwordHash: await bcrypt.hash("SeedUser123!", 10),
+        friendCode: seed.friendCode,
+        currentTier: "Bronze",
+        points: 0,
+        currentStreak: seed.currentStreak,
+        longestStreak: seed.longestStreak,
+        phone: seed.phone,
+        createdAt: now,
+        updatedAt: now,
+      });
+      outId = inserted.insertedId;
+    } else {
+      await db.collection("users").updateOne(
+        { _id: outId },
+        {
+          $set: {
+            displayName: seed.displayName,
+            friendCode: seed.friendCode,
+            currentStreak: seed.currentStreak,
+            longestStreak: seed.longestStreak,
+            updatedAt: now,
+          },
+        }
+      );
+    }
+
+    await db.collection("userPreferences").updateOne(
+      { userId: outId },
+      {
+        $set: {
+          userId: outId,
+          anonymousMode: seed.anonymousMode,
+          theme: "pastel",
+          dailyReminderEnabled: true,
+          reminderTime: "20:00",
+          encouragementNotifications: true,
+          leaderboardNotifications: true,
+          showMoodToFriends: true,
+          allowFriendRequests: true,
+          currentMoodId: seed.moodId,
+          currentMoodEmoji: seed.moodEmoji,
+          updatedAt: now,
+        },
+      },
+      { upsert: true }
+    );
+
+    const dateIso = seed.checkedInToday ? todayIso() : new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+    await db.collection("dailyCheckIns").updateOne(
+      { userId: outId, checkInDate: new Date(dateIso) },
+      {
+        $set: {
+          userId: outId,
+          moodEmoji: seed.moodEmoji,
+          moodScore: 2,
+          reflectionText: null,
+          checkInDate: new Date(dateIso),
+          createdAt: now,
+        },
+      },
+      { upsert: true }
+    );
+    ids.push(outId);
+  }
+
+  const [alexId, joshId, mayaId] = ids;
+  for (const otherId of [alexId, joshId]) {
+    const key = friendPairKey(uid, otherId);
+    await db.collection("friends").updateOne(
+      { pairKey: key },
+      {
+        $set: {
+          userAId: String(uid) < String(otherId) ? uid : otherId,
+          userBId: String(uid) < String(otherId) ? otherId : uid,
+          pairKey: key,
+          requestedBy: uid,
+          status: "accepted",
+          createdAt: now,
+          acceptedAt: now,
+          blockedAt: null,
+        },
+      },
+      { upsert: true }
+    );
+  }
+
+  const pendingKey = friendPairKey(uid, mayaId);
+  await db.collection("friends").updateOne(
+    { pairKey: pendingKey },
+    {
+      $set: {
+        userAId: String(uid) < String(mayaId) ? uid : mayaId,
+        userBId: String(uid) < String(mayaId) ? mayaId : uid,
+        pairKey: pendingKey,
+        requestedBy: mayaId,
+        status: "pending",
+        createdAt: now,
+        acceptedAt: null,
+        blockedAt: null,
+      },
+    },
+    { upsert: true }
+  );
+
+  return { seeded: true };
+}
+
+async function loadFriendshipForUser(db, friendshipId, viewerUserId) {
+  const fid = toObjectId(friendshipId, "friendshipId");
+  const uid = toObjectId(viewerUserId, "viewerUserId");
+  const friendship = await db.collection("friends").findOne({
+    _id: fid,
+    status: { $in: ["accepted", "blocked"] },
+    $or: [{ userAId: uid }, { userBId: uid }],
+  });
+  if (!friendship) {
+    const err = new Error("Friendship not found");
+    err.status = 404;
+    throw err;
+  }
+  return { friendship, viewerId: uid };
+}
+
 function publicUserView(user, prefs, { isFriend }) {
   const anonymousMode = !!prefs?.anonymousMode;
   if (!anonymousMode || isFriend) {
@@ -79,6 +279,39 @@ function normalizePhone(value) {
   const compact = String(value || "").trim().replace(/[\s()-]/g, "");
   if (!/^\+[1-9]\d{6,14}$/.test(compact)) return null;
   return compact;
+}
+
+function decodeJwtPayload(token) {
+  try {
+    if (!token || typeof token !== "string") return null;
+    const parts = token.split(".");
+    if (parts.length < 2) return null;
+    const payload = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+    const decoded = Buffer.from(payload, "base64").toString("utf8");
+    return JSON.parse(decoded);
+  } catch {
+    return null;
+  }
+}
+
+function sanitizeUsernameBase(value) {
+  const base = String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]/g, "")
+    .slice(0, 20);
+  return base || "user";
+}
+
+async function ensureUniqueUsername(db, seed) {
+  const base = sanitizeUsernameBase(seed);
+  let candidate = base;
+  for (let i = 0; i < 1000; i += 1) {
+    const exists = await db.collection("users").findOne({ username: candidate }, { projection: { _id: 1 } });
+    if (!exists) return candidate;
+    candidate = `${base}${Math.floor(100 + Math.random() * 900)}`;
+  }
+  return `user${Date.now().toString(36)}`;
 }
 
 app.get("/api/health", async (_req, res, next) => {
@@ -153,6 +386,8 @@ app.post("/api/auth/register", async (req, res, next) => {
           leaderboardNotifications: true,
           showMoodToFriends: true,
           allowFriendRequests: true,
+          currentMoodId: "okay",
+          currentMoodEmoji: "😐",
           updatedAt: now,
         },
       },
@@ -188,6 +423,105 @@ app.post("/api/auth/login", async (req, res, next) => {
     }
     const ok = await bcrypt.compare(String(password), user.passwordHash || "");
     if (!ok) return res.status(401).json({ error: "Invalid credentials" });
+
+    res.json({ user: stripSensitive(user) });
+  } catch (e) {
+    next(e);
+  }
+});
+
+app.post("/api/auth/social", async (req, res, next) => {
+  try {
+    const { db } = await connectMongo();
+    const {
+      provider,
+      email,
+      fullName,
+      identityToken,
+      authorizationCode,
+      accessToken,
+    } = req.body || {};
+
+    if (provider !== "apple" && provider !== "google") {
+      return res.status(400).json({ error: "provider must be apple or google" });
+    }
+
+    const claims = decodeJwtPayload(identityToken);
+    const providerSub =
+      String(claims?.sub || "").trim() ||
+      String(authorizationCode || "").trim() ||
+      String(accessToken || "").trim() ||
+      null;
+    const providerEmail = String(claims?.email || email || "")
+      .trim()
+      .toLowerCase();
+
+    const providerKey = provider === "apple" ? "appleSub" : "googleSub";
+
+    let user = null;
+    if (providerSub) {
+      user = await db.collection("users").findOne({ [providerKey]: providerSub });
+    }
+    if (!user && providerEmail) {
+      user = await db.collection("users").findOne({ email: providerEmail });
+    }
+
+    const now = new Date();
+
+    if (!user) {
+      const displayName =
+        String(fullName || claims?.name || "").trim() ||
+        (providerEmail ? providerEmail.split("@")[0] : "Mentali user");
+
+      const usernameSeed = providerEmail ? providerEmail.split("@")[0] : `${provider}_user`;
+      const username = await ensureUniqueUsername(db, usernameSeed);
+      const fallbackEmail = providerEmail || `${provider}.${Date.now()}@mentali.local`;
+
+      const doc = {
+        email: fallbackEmail,
+        username,
+        displayName,
+        authProvider: provider,
+        friendCode: await generateFriendCode(db),
+        currentTier: "Bronze",
+        points: 0,
+        currentStreak: 0,
+        longestStreak: 0,
+        createdAt: now,
+        updatedAt: now,
+        [providerKey]: providerSub,
+      };
+
+      const insert = await db.collection("users").insertOne(doc);
+      user = await db.collection("users").findOne({ _id: insert.insertedId });
+    } else {
+      const patch = { updatedAt: now };
+      if (providerSub && !user[providerKey]) patch[providerKey] = providerSub;
+      if (fullName && String(fullName).trim()) patch.displayName = String(fullName).trim();
+      await db.collection("users").updateOne({ _id: user._id }, { $set: patch });
+      user = { ...user, ...patch };
+    }
+
+    await db.collection("userPreferences").updateOne(
+      { userId: user._id },
+      {
+        $set: {
+          userId: user._id,
+          anonymousMode: false,
+          theme: "pastel",
+          dailyReminderEnabled: true,
+          reminderTime: "20:00",
+          encouragementNotifications: true,
+          leaderboardNotifications: true,
+          showMoodToFriends: true,
+          allowFriendRequests: true,
+          currentMoodId: "okay",
+          currentMoodEmoji: "😐",
+          updatedAt: now,
+        },
+      },
+      { upsert: true }
+    );
 
     res.json({ user: stripSensitive(user) });
   } catch (e) {
@@ -470,6 +804,16 @@ app.post("/api/friends/:id/accept", async (req, res, next) => {
   }
 });
 
+app.post("/api/friends/:id/reject", async (req, res, next) => {
+  try {
+    const { db } = await connectMongo();
+    await db.collection("friends").deleteOne({ _id: toObjectId(req.params.id) });
+    res.json({ ok: true });
+  } catch (e) {
+    next(e);
+  }
+});
+
 app.post("/api/friends/:id/block", async (req, res, next) => {
   try {
     const { db } = await connectMongo();
@@ -483,7 +827,7 @@ app.post("/api/friends/:id/block", async (req, res, next) => {
   }
 });
 
-app.get("/api/friends/:userId", async (req, res, next) => {
+app.get("/api/friends/raw/:userId", async (req, res, next) => {
   try {
     const { db } = await connectMongo();
     const userId = toObjectId(req.params.userId, "userId");
@@ -496,6 +840,202 @@ app.get("/api/friends/:userId", async (req, res, next) => {
       .sort({ createdAt: -1 })
       .toArray();
     res.json({ data });
+  } catch (e) {
+    next(e);
+  }
+});
+
+app.get("/api/friends/view/:userId", async (req, res, next) => {
+  try {
+    const { db } = await connectMongo();
+    const userId = toObjectId(req.params.userId, "userId");
+    const today = todayIso();
+
+    const rows = await db
+      .collection("friends")
+      .find({
+        status: { $in: ["pending", "accepted", "blocked"] },
+        $or: [{ userAId: userId }, { userBId: userId }],
+      })
+      .sort({ createdAt: -1 })
+      .toArray();
+
+    const accepted = rows.filter((r) => r.status === "accepted" || r.status === "blocked");
+    const incoming = rows.filter(
+      (r) => r.status === "pending" && String(r.requestedBy) !== String(userId)
+    );
+
+    const otherIds = [
+      ...new Set(
+        [...accepted, ...incoming].map((r) =>
+          String(r.userAId) === String(userId) ? String(r.userBId) : String(r.userAId)
+        )
+      ),
+    ].map((id) => new ObjectId(id));
+
+    const users = await db
+      .collection("users")
+      .find({ _id: { $in: otherIds } })
+      .project({ displayName: 1, username: 1, friendCode: 1, currentStreak: 1, updatedAt: 1 })
+      .toArray();
+    const userMap = new Map(users.map((u) => [String(u._id), u]));
+
+    const prefs = await db.collection("userPreferences").find({ userId: { $in: otherIds } }).toArray();
+    const prefMap = new Map(prefs.map((p) => [String(p.userId), p]));
+
+    const checkins = await db
+      .collection("dailyCheckIns")
+      .find({ userId: { $in: otherIds } })
+      .sort({ checkInDate: -1, createdAt: -1 })
+      .toArray();
+    const latestCheckin = new Map();
+    for (const c of checkins) {
+      const key = String(c.userId);
+      if (!latestCheckin.has(key)) latestCheckin.set(key, c);
+    }
+
+    const friends = accepted
+      .map((r) => {
+        const otherId = String(r.userAId) === String(userId) ? String(r.userBId) : String(r.userAId);
+        const user = userMap.get(otherId);
+        if (!user) return null;
+        const pref = prefMap.get(otherId);
+        const checkin = latestCheckin.get(otherId);
+        const checkInIso = checkin?.checkInDate ? new Date(checkin.checkInDate).toISOString().slice(0, 10) : null;
+        const showMood = pref?.showMoodToFriends !== false;
+
+        return {
+          id: String(r._id),
+          userId: otherId,
+          name: user.displayName || user.username || "Friend",
+          code: user.friendCode,
+          streak: Number(user.currentStreak || 0),
+          lastSeen: relativeLastSeen(user.updatedAt),
+          streakDone: checkInIso === today,
+          lastStreakDoneDate: checkInIso,
+          addedAt: new Date(r.createdAt || new Date()).getTime(),
+          blocked: r.status === "blocked",
+          moodId: showMood ? pref?.currentMoodId || null : null,
+          moodEmoji: showMood ? pref?.currentMoodEmoji || checkin?.moodEmoji || null : null,
+        };
+      })
+      .filter(Boolean);
+
+    const requests = incoming
+      .map((r) => {
+        const otherId = String(r.userAId) === String(userId) ? String(r.userBId) : String(r.userAId);
+        const user = userMap.get(otherId);
+        const pref = prefMap.get(otherId);
+        if (!user) return null;
+        return {
+          id: String(r._id),
+          userId: otherId,
+          name: user.displayName || user.username || "Friend",
+          username: user.username || null,
+          anonymousMode: !!pref?.anonymousMode,
+        };
+      })
+      .filter(Boolean);
+
+    res.json({ friends, requests });
+  } catch (e) {
+    next(e);
+  }
+});
+
+app.post("/api/friends/bootstrap/:userId", async (req, res, next) => {
+  try {
+    const { db } = await connectMongo();
+    const result = await ensureFriendBootstrapData(db, req.params.userId);
+    res.json({ ok: true, ...result });
+  } catch (e) {
+    next(e);
+  }
+});
+
+app.get("/api/chats/:friendshipId/messages", async (req, res, next) => {
+  try {
+    const { db } = await connectMongo();
+    const viewerUserId = String(req.query.viewerUserId || "");
+    if (!viewerUserId) return res.status(400).json({ error: "viewerUserId is required" });
+
+    const { friendship } = await loadFriendshipForUser(db, req.params.friendshipId, viewerUserId);
+    if (friendship.status === "blocked") {
+      return res.json({ data: [] });
+    }
+
+    const rows = await db
+      .collection("chatMessages")
+      .find({ friendshipId: friendship._id })
+      .sort({ createdAt: 1 })
+      .limit(500)
+      .toArray();
+
+    res.json({
+      data: rows.map((r) => ({
+        _id: String(r._id),
+        friendshipId: String(r.friendshipId),
+        senderUserId: String(r.senderUserId),
+        recipientUserId: String(r.recipientUserId),
+        text: r.text || "",
+        imageUri: r.imageUri || null,
+        fileName: r.fileName || null,
+        fileUri: r.fileUri || null,
+        createdAt: r.createdAt,
+      })),
+    });
+  } catch (e) {
+    next(e);
+  }
+});
+
+app.post("/api/chats/:friendshipId/messages", async (req, res, next) => {
+  try {
+    const { db } = await connectMongo();
+    const { senderUserId, text = "", imageUri = null, fileName = null, fileUri = null } = req.body || {};
+    if (!senderUserId) return res.status(400).json({ error: "senderUserId is required" });
+    if (!String(text).trim() && !imageUri && !fileName) {
+      return res.status(400).json({ error: "Message content is required" });
+    }
+
+    const { friendship, viewerId } = await loadFriendshipForUser(db, req.params.friendshipId, senderUserId);
+    if (friendship.status === "blocked") {
+      return res.status(403).json({ error: "This friendship is blocked" });
+    }
+
+    const recipientUserId =
+      String(friendship.userAId) === String(viewerId) ? friendship.userBId : friendship.userAId;
+    const now = new Date();
+
+    const out = await db.collection("chatMessages").insertOne({
+      friendshipId: friendship._id,
+      senderUserId: viewerId,
+      recipientUserId,
+      text: String(text || ""),
+      imageUri: imageUri || null,
+      fileName: fileName || null,
+      fileUri: fileUri || null,
+      createdAt: now,
+    });
+
+    await db.collection("users").updateMany(
+      { _id: { $in: [viewerId, recipientUserId] } },
+      { $set: { updatedAt: now } }
+    );
+
+    res.status(201).json({
+      data: {
+        _id: String(out.insertedId),
+        friendshipId: String(friendship._id),
+        senderUserId: String(viewerId),
+        recipientUserId: String(recipientUserId),
+        text: String(text || ""),
+        imageUri: imageUri || null,
+        fileName: fileName || null,
+        fileUri: fileUri || null,
+        createdAt: now,
+      },
+    });
   } catch (e) {
     next(e);
   }

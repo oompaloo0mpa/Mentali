@@ -26,9 +26,10 @@ import {
 } from '../hooks/homepageData';
 import { FriendsScreenContent } from '../components/social/FriendsScreenContent';
 import { useSettingsOverlay } from '@/storage/settingsOverlayStore';
-import { moodFromHomeIndex } from '@/data/checkInContent';
+import { moodById, moodFromHomeIndex } from '@/data/checkInContent';
 import type { Friend } from '@/data/mockData';
 import type { MoodOption } from '@/logic/checkin';
+import { useUserProfile } from '@/storage/userProfileStore';
 
 type HomePageProps = {
   initialSelectedNav?: string;
@@ -42,9 +43,6 @@ const thinkingMascot = require('../../assets/images/thinkingMascot.png') as Imag
 const arrowIcon = require('../../assets/images/ArrowIcon.png') as ImageSourcePropType;
 const statsIcon = require('../../assets/images/StatsIcon.png') as ImageSourcePropType;
 const diamondIcon = require('../../assets/images/DiamondIcon.png') as ImageSourcePropType;
-
-const moodStripWidth = 364;
-const moodFaceWidth = moodStripWidth / moods.length;
 
 type NotificationPanelProps = {
   visible: boolean;
@@ -175,7 +173,7 @@ function NotificationPanel({
 
           {notifications.length === 0 ? (
             <View style={styles.notificationsEmptyState}>
-              <Text style={styles.notificationsEmptyText}>You're all caught up!</Text>
+              <Text style={styles.notificationsEmptyText}>You are all caught up!</Text>
             </View>
           ) : (
             <>
@@ -290,7 +288,7 @@ export default function HomePage({
   onOpenCheckIn,
 }: HomePageProps) {
   const { openSettings, requestLogout } = useSettingsOverlay();
-  const [selectedMood, setSelectedMood] = useState(0);
+  const { profile, setCurrentMood } = useUserProfile();
   const [selectedNav, setSelectedNav] = useState(initialSelectedNav);
   const [notificationsVisible, setNotificationsVisible] = useState(false);
   const [moreMenuVisible, setMoreMenuVisible] = useState(false);
@@ -299,6 +297,10 @@ export default function HomePage({
   const insets = useSafeAreaInsets();
   const unreadCount = notifications.filter((notification) => !notification.read).length;
   const isHomeSelected = selectedNav === 'home-outline';
+  const selectedMood = Math.max(
+    0,
+    moods.findIndex((m) => m.id === profile.currentMoodId),
+  );
 
   useEffect(() => {
     setSelectedNav(initialSelectedNav);
@@ -406,7 +408,10 @@ export default function HomePage({
                   key={mood.label}
                   mood={mood}
                   selected={selectedMood === index}
-                  onPress={() => setSelectedMood(index)}
+                  onPress={() => {
+                    const picked = moodById(mood.id) ?? moodFromHomeIndex(index);
+                    setCurrentMood({ id: picked.id, emoji: picked.emoji });
+                  }}
                 />
               ))}
             </View>

@@ -1,10 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Image, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { AppIcon } from '@/components/AppIcon';
 import { Avatar } from '@/components/Avatar';
-import { Brand, Radius, Spacing } from '@/theme/theme';
-import { friendMood, highestMilestone, isMuted } from '@/storage/socialStore';
+import { Brand, Radius, Spacing, getStreakVisuals } from '@/theme/theme';
+import { friendMood, friendMoodImage, highestMilestone, isMuted } from '@/storage/socialStore';
 import type { Friend } from '@/data/mockData';
 
 type Props = {
@@ -27,6 +27,7 @@ function relativeTime(epoch?: number | null): string {
 
 export function FriendProfileSheet({ friend, lastMotivation, onClose, onMessage }: Props) {
   const milestone = friend ? highestMilestone(friend.streak) : 0;
+  const streakVisuals = getStreakVisuals(friend?.streak ?? 0);
 
   return (
     <Modal visible={friend !== null} transparent animationType="slide" onRequestClose={onClose}>
@@ -52,7 +53,7 @@ export function FriendProfileSheet({ friend, lastMotivation, onClose, onMessage 
               <View style={styles.stats}>
                 <View style={styles.stat}>
                   <AppIcon name="fire" size={20} />
-                  <Text style={styles.statValue}>{friend.streak}</Text>
+                  <Text style={[styles.statValue, { color: streakVisuals.color }]}>{friend.streak}</Text>
                   <Text style={styles.statLabel}>Day streak</Text>
                 </View>
                 <View style={styles.statDivider} />
@@ -63,8 +64,8 @@ export function FriendProfileSheet({ friend, lastMotivation, onClose, onMessage 
                 </View>
                 <View style={styles.statDivider} />
                 <View style={styles.stat}>
-                  <Text style={styles.statMood}>{friendMood(friend)}</Text>
-                  <Text style={styles.statLabel}>Today's mood</Text>
+                  <Image source={friendMoodImage(friend)} resizeMode="contain" style={styles.statMoodImage} />
+                  <Text style={styles.statLabel}>Mood today</Text>
                 </View>
               </View>
 
@@ -121,6 +122,7 @@ const styles = StyleSheet.create({
   statDivider: { width: StyleSheet.hairlineWidth, height: '70%', backgroundColor: Brand.divider },
   statValue: { color: Brand.text, fontSize: 18, fontWeight: '800' },
   statMood: { fontSize: 20 },
+  statMoodImage: { width: 24, height: 24 },
   statLabel: { color: Brand.textSecondary, fontSize: 11, fontWeight: '600' },
   lastMessage: { gap: 4 },
   sectionLabel: { color: Brand.textSecondary, fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },

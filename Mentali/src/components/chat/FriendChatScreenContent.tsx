@@ -22,7 +22,7 @@ import { StreakPet } from '@/components/chat/StreakPet';
 import { SuggestionBar } from '@/components/chat/SuggestionBar';
 import { FriendOptionsModal } from '@/components/social/FriendOptionsModal';
 import { SettingsAccessButton } from '@/components/settings/SettingsAccessButton';
-import { Brand, MaxContentWidth, Radius, Spacing } from '@/theme/theme';
+import { Brand, MaxContentWidth, Radius, Spacing, getStreakVisuals } from '@/theme/theme';
 import { MOTIVATIONAL_SUGGESTIONS } from '@/data/mockData';
 import { friendMood, useSocial } from '@/storage/socialStore';
 
@@ -38,6 +38,7 @@ export function FriendChatScreenContent({ friendId, prefill, onBack, onOpenStrea
     friendById,
     chatFor,
     sendMessage,
+    refreshChat,
     markChatRead,
     togglePin,
     muteFriend,
@@ -50,6 +51,7 @@ export function FriendChatScreenContent({ friendId, prefill, onBack, onOpenStrea
   const friend = friendById(friendId);
   const messages = friendId ? chatFor(friendId) : [];
   const isBlocked = !!friend?.blocked;
+  const streakVisuals = getStreakVisuals(friend?.streak ?? 0);
 
   const scrollRef = useRef<ScrollView>(null);
   const [draft, setDraft] = useState('');
@@ -62,6 +64,15 @@ export function FriendChatScreenContent({ friendId, prefill, onBack, onOpenStrea
   useEffect(() => {
     if (friendId) markChatRead(friendId);
   }, [friendId, markChatRead]);
+
+  useEffect(() => {
+    if (!friendId) return;
+    void refreshChat(friendId);
+    const timer = setInterval(() => {
+      void refreshChat(friendId);
+    }, 2500);
+    return () => clearInterval(timer);
+  }, [friendId, refreshChat]);
 
   useEffect(() => {
     if (prefill) setDraft(MOTIVATIONAL_SUGGESTIONS[0]);
@@ -145,7 +156,7 @@ export function FriendChatScreenContent({ friendId, prefill, onBack, onOpenStrea
           {friend && (
             <>
               <AppIcon name="fire" size={16} />
-              <Text style={styles.headerStreak}>{friend.streak}</Text>
+              <Text style={[styles.headerStreak, { color: streakVisuals.color }]}>{friend.streak}</Text>
               <Text style={styles.headerMood}>{friendMood(friend)}</Text>
             </>
           )}

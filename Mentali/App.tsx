@@ -26,6 +26,7 @@ import { loadCheckInProfile, saveCheckInProfile } from '@/storage/checkInProfile
 import type { MoodOption, RecordedAnswer, StreakState, WellbeingResult } from '@/logic/checkin';
 import {
   login,
+  loginWithSocial,
   registerWithEmail,
   requestResetCode,
   resetPassword,
@@ -33,6 +34,7 @@ import {
   saveDailyCheckIn,
   verifyResetCode,
 } from '@/services/api';
+import type { SocialAuthResult } from '@/hooks/useSocialAuth';
 
 type ScreenState =
   | { screen: 'welcome' }
@@ -208,6 +210,27 @@ function AppRoot() {
     setScreenState({ screen: 'home', selectedNav: homeNav });
   };
 
+  const handleSocialAuthSuccess = async (session: SocialAuthResult) => {
+    try {
+      const result = await loginWithSocial({
+        provider: session.provider,
+        email: session.email,
+        fullName: session.fullName,
+        identityToken: session.identityToken,
+        authorizationCode: session.authorizationCode,
+        accessToken: session.accessToken,
+      });
+      setCurrentUserId(result?.user?._id ?? null);
+      await applyAuthUser(result.user);
+      handleAuthSuccess();
+    } catch (error) {
+      Alert.alert(
+        `${session.provider === 'apple' ? 'Apple' : 'Google'} sign-in failed`,
+        error instanceof Error ? error.message : 'Unable to complete social sign-in.',
+      );
+    }
+  };
+
   const handleRegister = async (payload: {
     email: string;
     username: string;
@@ -315,14 +338,14 @@ function AppRoot() {
               setScreenState({ screen: 'forgot-password' });
             }}
             onLoginPress={handleLogin}
-            onSocialAuthSuccess={handleAuthSuccess}
+            onSocialAuthSuccess={handleSocialAuthSuccess}
           />
         ) : screenState.screen === 'signup' ? (
           <SignupPage
             onBackPress={() => setScreenState({ screen: 'welcome' })}
             onSignInPress={() => setScreenState({ screen: 'login' })}
             onRegisterPress={handleRegister}
-            onSocialAuthSuccess={handleAuthSuccess}
+            onSocialAuthSuccess={handleSocialAuthSuccess}
           />
         ) : screenState.screen === 'forgot-password' ? (
           <ForgetPasswordPage

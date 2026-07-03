@@ -137,6 +137,31 @@ const collectionConfigs = [
     ],
   },
   {
+    name: "chatMessages",
+    validator: {
+      $jsonSchema: {
+        bsonType: "object",
+        required: ["friendshipId", "senderUserId", "recipientUserId", "text", "createdAt"],
+        properties: {
+          _id: OID,
+          friendshipId: OID,
+          senderUserId: OID,
+          recipientUserId: OID,
+          text: STR,
+          imageUri: { bsonType: ["string", "null"] },
+          fileName: { bsonType: ["string", "null"] },
+          fileUri: { bsonType: ["string", "null"] },
+          createdAt: DATE,
+        },
+      },
+    },
+    indexes: [
+      { key: { friendshipId: 1, createdAt: 1 }, options: {} },
+      { key: { senderUserId: 1, createdAt: -1 }, options: {} },
+      { key: { recipientUserId: 1, createdAt: -1 }, options: {} },
+    ],
+  },
+  {
     name: "supportMessagesTemplates",
     validator: {
       $jsonSchema: {
