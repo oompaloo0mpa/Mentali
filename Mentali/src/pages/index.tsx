@@ -1,3 +1,3 @@
-import LeaderboardPage from './LeaderboardPage';
+import StatisticPage from './StatisticPage';
 
-export default LeaderboardPage;
+export default StatisticPage;
