@@ -219,6 +219,11 @@ export async function rejectFriendRequest(requestId: string) {
   return apiRequest(`/friends/${requestId}/reject`, { method: 'POST' });
 }
 
+/** Delete the friendship document so either user can re-add the other later. */
+export async function removeFriendship(friendshipId: string) {
+  return apiRequest(`/friends/${friendshipId}/reject`, { method: 'POST' });
+}
+
 export type ChatMessageRow = {
   _id: string;
   friendshipId: string;

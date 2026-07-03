@@ -735,22 +735,42 @@ app.post("/api/friends/request-by-code", async (req, res, next) => {
 
     const key = friendPairKey(from, target._id);
     const now = new Date();
-    await db.collection("friends").updateOne(
-      { pairKey: key },
-      {
-        $setOnInsert: {
-          userAId: String(from) < String(target._id) ? from : target._id,
-          userBId: String(from) < String(target._id) ? target._id : from,
-          pairKey: key,
-          requestedBy: from,
-          status: "pending",
-          createdAt: now,
-          acceptedAt: null,
-          blockedAt: null,
-        },
-      },
-      { upsert: true }
-    );
+    const userA = String(from) < String(target._id) ? from : target._id;
+    const userB = String(from) < String(target._id) ? target._id : from;
+
+    // If a non-blocked document already exists (e.g. a removed friendship), reset it to
+    // pending so the recipient sees a fresh incoming request instead of nothing.
+    const existing = await db.collection("friends").findOne({ pairKey: key });
+    if (existing) {
+      if (existing.status === "blocked") {
+        return res.status(403).json({ error: "Unable to send friend request" });
+      }
+      if (existing.status !== "pending") {
+        await db.collection("friends").updateOne(
+          { pairKey: key },
+          {
+            $set: {
+              requestedBy: from,
+              status: "pending",
+              createdAt: now,
+              acceptedAt: null,
+              blockedAt: null,
+            },
+          }
+        );
+      }
+    } else {
+      await db.collection("friends").insertOne({
+        userAId: userA,
+        userBId: userB,
+        pairKey: key,
+        requestedBy: from,
+        status: "pending",
+        createdAt: now,
+        acceptedAt: null,
+        blockedAt: null,
+      });
+    }
 
     const prefs = await getUserPreferences(db, target._id);
     const isFriend = await areFriends(db, from, target._id);

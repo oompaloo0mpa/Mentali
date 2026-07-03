@@ -9,6 +9,7 @@ import {
   fetchChatMessages,
   fetchFriendsView,
   rejectFriendRequest,
+  removeFriendship,
   requestFriendByCode,
   sendChatMessage,
   type ChatMessageRow,
@@ -679,13 +680,18 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
   );
 
   const removeFriend = useCallback(
-    (friendId: string) =>
+    (friendId: string) => {
       update((prev) => {
         const rest = { ...prev.chats };
         delete rest[friendId];
         return { ...prev, friends: prev.friends.filter((f) => f.id !== friendId), chats: rest };
-      }),
-    [update],
+      });
+      // Delete the friendship document on the server so either user can re-add the other.
+      if (profile.userId) {
+        removeFriendship(friendId).catch(() => {});
+      }
+    },
+    [profile.userId, update],
   );
 
   const blockFriend = useCallback(
