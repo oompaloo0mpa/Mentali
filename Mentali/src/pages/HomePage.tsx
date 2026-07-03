@@ -1,5 +1,6 @@
 import { useState, type ComponentProps } from 'react';
 import {
+  Alert,
   Modal,
   Image,
   type ImageSourcePropType,
@@ -60,7 +61,11 @@ type MoodButtonProps = {
 function StatPill({ icon, value, color }: StatItem) {
   return (
     <View style={styles.statPill}>
-      <Image source={icon} resizeMode="contain" style={[styles.statIconImage, { tintColor: color }]} />
+      <Image
+        source={icon}
+        resizeMode="contain"
+        style={[styles.statIconImage, icon === diamondIcon ? null : { tintColor: color }]}
+      />
       <Text style={[styles.statValue, { color }]}>{value}</Text>
     </View>
   );
@@ -75,6 +80,8 @@ function MoodButton({ mood, selected, onPress }: MoodButtonProps) {
 }
 
 function QuestCard({ item }: { item: QuestItem }) {
+  const rewardText = item.points.replace(/\s*pts$/i, '');
+
   return (
     <View style={[styles.questCard, item.active ? styles.questCardActive : styles.questCardInactive]}>
       <View style={styles.questTextWrap}>
@@ -86,10 +93,18 @@ function QuestCard({ item }: { item: QuestItem }) {
         </Text>
       </View>
       <View style={styles.pointsPill}>
-        <Text style={styles.pointsText}>{item.points}</Text>
+        <Text style={styles.pointsText}>{rewardText}</Text>
+        <Image source={diamondIcon} resizeMode="contain" style={styles.pointsIcon} />
       </View>
     </View>
   );
+}
+
+function confirmMoodSelection(mood: MoodItem, onConfirm: () => void) {
+  Alert.alert('Confirm mood', `Are you sure you want to select ${mood.label} for today?`, [
+    { text: 'Cancel', style: 'cancel' },
+    { text: 'Yes', style: 'default', onPress: onConfirm },
+  ]);
 }
 
 function BottomNavItem({ icon, active, onPress }: { icon: string; active?: boolean; onPress: () => void }) {
@@ -297,7 +312,11 @@ export default function HomePage() {
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
       <StatusBar barStyle="light-content" backgroundColor="#282425" />
 
-      <View style={[styles.content, { paddingTop: insets.top - 100}]}> 
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={[styles.content, { paddingTop: insets.top - 100, paddingBottom: 92 }]}
+        showsVerticalScrollIndicator={false}
+      >
         <View style={styles.topRow}>
           <View style={styles.statGroup}>
             {stats.map((item) => (
@@ -359,7 +378,7 @@ export default function HomePage() {
                   key={mood.label}
                   mood={mood}
                   selected={selectedMood === index}
-                  onPress={() => setSelectedMood(index)}
+                  onPress={() => confirmMoodSelection(mood, () => setSelectedMood(index))}
                 />
               ))}
             </View>
@@ -445,7 +464,7 @@ export default function HomePage() {
         ) : (
           <NavPlaceholder title={navLabels[selectedNav].title} icon={navLabels[selectedNav].icon} />
         )}
-      </View>
+      </ScrollView>
 
       <View style={styles.bottomNav}>
         {navItems.map((item) => (
@@ -467,9 +486,12 @@ const styles = StyleSheet.create({
     backgroundColor: '#282425',
   },
   content: {
-    flex: 1,
+    flexGrow: 1,
     paddingHorizontal: 16,
     paddingBottom: 8,
+  },
+  scrollView: {
+    flex: 1,
   },
   topRow: {
     flexDirection: 'row',
@@ -492,7 +514,7 @@ const styles = StyleSheet.create({
     marginRight: 6,
   },
   statValue: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '800',
   },
   actionGroup: {
@@ -547,7 +569,7 @@ const styles = StyleSheet.create({
   },
   notificationBadgeText: {
     color: '#fff',
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: '800',
     lineHeight: 12,
   },
@@ -583,7 +605,7 @@ const styles = StyleSheet.create({
   },
   notificationsTitle: {
     color: '#fff',
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: '800',
   },
   notificationsHeaderActions: {
@@ -592,7 +614,7 @@ const styles = StyleSheet.create({
   },
   markAllReadText: {
     color: '#FF6DEB',
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '800',
     marginRight: 12,
   },
@@ -612,7 +634,7 @@ const styles = StyleSheet.create({
   },
   notificationsSectionLabel: {
     color: '#BCAFC2',
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: '800',
     letterSpacing: 1,
     marginBottom: 8,
@@ -640,7 +662,7 @@ const styles = StyleSheet.create({
   },
   notificationItemTitle: {
     color: '#fff',
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '800',
   },
   notificationItemTitleUnread: {
@@ -648,7 +670,7 @@ const styles = StyleSheet.create({
   },
   notificationTime: {
     color: '#BCAFC2',
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '600',
     marginTop: 2,
   },
@@ -680,7 +702,7 @@ const styles = StyleSheet.create({
   },
   clearAllText: {
     color: '#fff',
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '800',
     marginLeft: 8,
   },
@@ -742,7 +764,7 @@ const styles = StyleSheet.create({
   },
   moreMenuItemText: {
     color: '#fff',
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '800',
     marginLeft: 12,
   },
@@ -770,9 +792,9 @@ const styles = StyleSheet.create({
   },
   quoteText: {
     color: '#F59AD3',
-    fontSize: 15,
+    fontSize: 17,
     fontWeight: '800',
-    lineHeight: 19,
+    lineHeight: 21,
   },
   quoteTail: {
     position: 'absolute',
@@ -826,12 +848,12 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     color: '#fff',
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: '800',
   },
   sectionMeta: {
     color: '#fff',
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '600',
   },
   sectionMetaHighlight: {
@@ -872,28 +894,36 @@ const styles = StyleSheet.create({
   },
   questTitle: {
     color: '#111',
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '800',
     marginBottom: 1,
   },
   questSubtitle: {
     color: '#6E6E6E',
-    fontSize: 9,
+    fontSize: 10,
     fontWeight: '700',
   },
   pointsPill: {
-    minWidth: 62,
+    minWidth: 0,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#F48FD4',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 16,
+    backgroundColor: 'transparent',
+    paddingHorizontal: 0,
+    paddingVertical: 0,
+    borderRadius: 0,
+    flexDirection: 'row',
+    flexShrink: 0,
+    flexWrap: 'nowrap',
+    gap: 3,
   },
   pointsText: {
     color: '#8F2A86',
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: '800',
+  },
+  pointsIcon: {
+    width: 15,
+    height: 15,
   },
   ctaCard: {
     backgroundColor: '#F8C9FA',
@@ -914,14 +944,14 @@ const styles = StyleSheet.create({
   },
   ctaTitle: {
     color: '#111',
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: '800',
-    lineHeight: 20,
+    lineHeight: 22,
     marginBottom: 4,
   },
   ctaSubtitle: {
     color: '#7E6679',
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '700',
   },
   ctaButton: {
@@ -934,13 +964,13 @@ const styles = StyleSheet.create({
   },
   ctaButtonText: {
     color: '#fff',
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '800',
     marginRight: 10,
   },
   ctaArrow: {
     color: '#fff',
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '800',
   },
   rankRow: {
@@ -960,7 +990,7 @@ const styles = StyleSheet.create({
   },
   rankLabel: {
     color: '#C150D2',
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '800',
     marginBottom: 8,
   },
@@ -984,7 +1014,7 @@ const styles = StyleSheet.create({
   },
   rankName: {
     color: '#8B5C35',
-    fontSize: 18,
+    fontSize: 19,
     fontWeight: '800',
   },
   progressBarTrack: {
@@ -1003,13 +1033,13 @@ const styles = StyleSheet.create({
   },
   rankPoints: {
     color: '#C150D2',
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '800',
     alignSelf: 'flex-end',
   },
   rankPosition: {
     color: '#8B5C35',
-    fontSize: 18,
+    fontSize: 19,
     fontWeight: '800',
     marginLeft: 8,
   },
@@ -1087,14 +1117,14 @@ const styles = StyleSheet.create({
   },
   placeholderTitle: {
     color: '#fff',
-    fontSize: 24,
+    fontSize: 26,
     fontWeight: '800',
     marginTop: 14,
     marginBottom: 8,
   },
   placeholderSubtitle: {
     color: '#D2C6CC',
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '600',
     textAlign: 'center',
     lineHeight: 18,
