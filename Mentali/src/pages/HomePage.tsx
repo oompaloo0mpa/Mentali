@@ -25,13 +25,16 @@ import {
   type StatItem,
 } from '../hooks/homepageData';
 import { FriendsScreenContent } from '../components/social/FriendsScreenContent';
+import { useSettingsOverlay } from '@/storage/settingsOverlayStore';
+import { moodFromHomeIndex } from '@/data/checkInContent';
 import type { Friend } from '@/data/mockData';
+import type { MoodOption } from '@/logic/checkin';
 
 type HomePageProps = {
   initialSelectedNav?: string;
   onSelectedNavChange?: (selectedNav: string) => void;
   onOpenChat?: (friend: Friend, prefillMotivation?: boolean) => void;
-  onOpenCheckIn?: () => void;
+  onOpenCheckIn?: (mood: MoodOption) => void;
 };
 
 const bronzeTrophy = require('../../assets/images/BronzeTrophy.png') as ImageSourcePropType;
@@ -57,6 +60,8 @@ type NotificationPanelProps = {
 type MoreMenuPanelProps = {
   visible: boolean;
   onClose: () => void;
+  onLogout?: () => void;
+  onOpenSettings?: () => void;
   topInset: number;
 };
 
@@ -77,8 +82,11 @@ function StatPill({ icon, value, color }: StatItem) {
 
 function MoodButton({ mood, selected, onPress }: MoodButtonProps) {
   return (
-    <Pressable onPress={onPress} style={[styles.moodButton, selected && styles.moodButtonSelected, { backgroundColor: mood.color }]}>
-      <Image source={mood.image} resizeMode="contain" style={styles.moodImage} />
+    <Pressable onPress={onPress} style={styles.moodItem}>
+      <View style={[styles.moodButton, selected && styles.moodButtonSelected, { backgroundColor: mood.color }]}>
+        <Image source={mood.image} resizeMode="contain" style={styles.moodImage} />
+      </View>
+      <Text style={[styles.moodLabel, selected && styles.moodLabelSelected]}>{mood.label}</Text>
     </Pressable>
   );
 }
@@ -230,11 +238,11 @@ function NotificationPanel({
   );
 }
 
-function MoreMenuPanel({ visible, onClose, topInset }: MoreMenuPanelProps) {
+function MoreMenuPanel({ visible, onClose, onLogout, onOpenSettings, topInset }: MoreMenuPanelProps) {
   const menuItems = [
-    { icon: 'stats-chart-outline' as const, label: 'Statistics' },
-    { icon: 'settings-outline' as const, label: 'Settings' },
-    { icon: 'log-out-outline' as const, label: 'Logout' },
+    { icon: 'stats-chart-outline' as const, label: 'Statistics', key: 'statistics' as const },
+    { icon: 'settings-outline' as const, label: 'Settings', key: 'settings' as const },
+    { icon: 'log-out-outline' as const, label: 'Logout', key: 'logout' as const },
   ];
 
   return (
@@ -250,7 +258,17 @@ function MoreMenuPanel({ visible, onClose, topInset }: MoreMenuPanelProps) {
           <View style={styles.moreMenuList}>
             {menuItems.map((item, index) => (
               <View key={item.label}>
-                <Pressable style={styles.moreMenuItem} onPress={onClose}>
+                <Pressable
+                  style={styles.moreMenuItem}
+                  onPress={() => {
+                    onClose();
+                    if (item.key === 'logout') {
+                      onLogout?.();
+                    } else if (item.key === 'settings') {
+                      onOpenSettings?.();
+                    }
+                  }}
+                >
                   <Ionicons name={item.icon} size={28} color="#FF5DE7" />
                   <Text style={styles.moreMenuItemText}>{item.label}</Text>
                 </Pressable>
@@ -271,6 +289,7 @@ export default function HomePage({
   onOpenChat,
   onOpenCheckIn,
 }: HomePageProps) {
+  const { openSettings, requestLogout } = useSettingsOverlay();
   const [selectedMood, setSelectedMood] = useState(0);
   const [selectedNav, setSelectedNav] = useState(initialSelectedNav);
   const [notificationsVisible, setNotificationsVisible] = useState(false);
@@ -280,6 +299,10 @@ export default function HomePage({
   const insets = useSafeAreaInsets();
   const unreadCount = notifications.filter((notification) => !notification.read).length;
   const isHomeSelected = selectedNav === 'home-outline';
+
+  useEffect(() => {
+    setSelectedNav(initialSelectedNav);
+  }, [initialSelectedNav]);
 
   useEffect(() => {
     onSelectedNavChange?.(selectedNav);
@@ -358,7 +381,13 @@ export default function HomePage({
           topInset={insets.top}
         />
 
-        <MoreMenuPanel visible={moreMenuVisible} onClose={() => setMoreMenuVisible(false)} topInset={insets.top} />
+        <MoreMenuPanel
+          visible={moreMenuVisible}
+          onClose={() => setMoreMenuVisible(false)}
+          onLogout={requestLogout}
+          onOpenSettings={openSettings}
+          topInset={insets.top}
+        />
 
         {isHomeSelected ? (
           <>
@@ -401,7 +430,11 @@ export default function HomePage({
                 <Text style={styles.ctaSubtitle}>It only takes a minute.</Text>
               </View>
 
-              <TouchableOpacity activeOpacity={0.9} style={styles.ctaButton} onPress={onOpenCheckIn}>
+              <TouchableOpacity
+                activeOpacity={0.9}
+                style={styles.ctaButton}
+                onPress={() => onOpenCheckIn?.(moodFromHomeIndex(selectedMood))}
+              >
                 <Text style={styles.ctaButtonText}>Start Check-in</Text>
                 <Text style={styles.ctaArrow}>→</Text>
               </TouchableOpacity>
@@ -818,8 +851,13 @@ const styles = StyleSheet.create({
   moodsRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     marginBottom: 10,
+  },
+  moodItem: {
+    alignItems: 'center',
+    gap: 6,
+    flex: 1,
   },
   moodButton: {
     width: 58,
@@ -833,6 +871,17 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     shadowOffset: { width: 0, height: 2 },
     elevation: 2,
+  },
+  moodLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#F5F1F4',
+    textAlign: 'center',
+    textTransform: 'capitalize',
+  },
+  moodLabelSelected: {
+    color: '#FF9ADA',
+    fontWeight: '700',
   },
   moodButtonSelected: {
     borderWidth: 3,

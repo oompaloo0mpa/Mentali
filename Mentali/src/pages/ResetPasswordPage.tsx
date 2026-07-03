@@ -16,7 +16,7 @@ import { isStrongPassword } from "../utils/authValidation";
 const mascotSource = require("../../assets/images/LoginMascot.png");
 
 type ResetPasswordPageProps = {
-  onDonePress: () => void;
+  onDonePress: (newPassword: string) => void | Promise<void>;
   onBackPress: () => void;
 };
 
@@ -58,7 +58,7 @@ export default function ResetPasswordPage({ onDonePress, onBackPress }: ResetPas
       return;
     }
 
-    onDonePress();
+    onDonePress(password);
   };
 
   return (

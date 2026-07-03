@@ -3,11 +3,19 @@
 export type Friend = {
   id: string;
   name: string;
+  /** Unique friend code used to add this person. Must match a directory entry. */
+  code?: string;
   streak: number;
   lastSeen: string;
-  /** Single source of truth for the friend's mood across the row, chat header, and streak pet. */
+  /** Derived from lastStreakDoneDate === today; kept for persisted snapshots. */
   streakDone: boolean;
+  /** ISO date (YYYY-MM-DD) when the friend last completed their daily streak. */
+  lastStreakDoneDate?: string | null;
+  /** Epoch ms when this friendship was created. */
+  addedAt?: number;
   pinned: boolean;
+  /** When true, the chat is disabled until the user unblocks them. The friend is kept, not deleted. */
+  blocked?: boolean;
   /** Epoch ms until which the friend is muted, or null when not muted. */
   mutedUntil?: number | null;
   /** Epoch ms of the last message sent to this friend, used for badges and quest progress. */
@@ -18,6 +26,8 @@ export type Friend = {
 export type FriendRequest = {
   id: string;
   name: string;
+  username?: string;
+  anonymousMode?: boolean;
 };
 
 export type ChatMessage = {
@@ -53,33 +63,71 @@ export type Quest = {
 
 export const CURRENT_USER = {
   name: 'Jayden',
-  friendCode: '1IHIDA2',
+  friendCode: '1IHIDA',
   fireStreak: 67,
   diamonds: 15,
   gems: 2,
 };
 
-export const INCOMING_REQUESTS: FriendRequest[] = [{ id: 'r1', name: 'Alex' }];
+export const INCOMING_REQUESTS: FriendRequest[] = [
+  { id: 'r1', name: 'Riley', username: 'riley', anonymousMode: true },
+];
+
+const todayIso = () => new Date().toISOString().slice(0, 10);
+const daysAgoMs = (days: number) => Date.now() - days * 24 * 60 * 60 * 1000;
+const daysAgoIso = (days: number) => new Date(daysAgoMs(days)).toISOString().slice(0, 10);
 
 export const FRIENDS: Friend[] = [
   {
     id: 'f1',
     name: 'Alex',
+    code: 'ALX7K2',
     streak: 67,
     lastSeen: 'Last seen 3m ago',
     streakDone: true,
+    lastStreakDoneDate: todayIso(),
+    addedAt: daysAgoMs(45),
     pinned: false,
   },
   {
     id: 'f2',
     name: 'Josh',
+    code: 'JSH4M9',
     streak: 10,
     lastSeen: 'Last seen 3m ago',
     streakDone: false,
+    lastStreakDoneDate: daysAgoIso(1),
+    addedAt: daysAgoMs(20),
     pinned: false,
     hasUnread: true,
   },
 ];
+
+/**
+ * The only friend codes that can be added. A typed code must match one of these
+ * entries (case-insensitive), so random/made-up codes are rejected. Codes are unique.
+ */
+export type DirectoryUser = {
+  code: string;
+  name: string;
+  username: string;
+  anonymousMode: boolean;
+};
+
+export const FRIEND_DIRECTORY: DirectoryUser[] = [
+  { code: 'ALX7K2', name: 'Alex', username: 'alex', anonymousMode: false },
+  { code: 'JSH4M9', name: 'Josh', username: 'josh', anonymousMode: false },
+  { code: 'MAYA3X', name: 'Maya', username: 'maya', anonymousMode: true },
+  { code: 'JRDN8V', name: 'Jordan', username: 'jordan', anonymousMode: false },
+  { code: 'KAI22L', name: 'Kai', username: 'kai', anonymousMode: true },
+  { code: 'PRY6H3', name: 'Priya', username: 'priya', anonymousMode: false },
+];
+
+/** Looks up a directory user by friend code, ignoring case and surrounding spaces. */
+export function findDirectoryUser(code: string): DirectoryUser | undefined {
+  const normalized = code.trim().toUpperCase();
+  return FRIEND_DIRECTORY.find((entry) => entry.code === normalized);
+}
 
 const GREETING: ChatMessage[] = [
   { id: 'm1', text: "Hey there, Jayden! I'm here to check in with you.", sender: 'them' },

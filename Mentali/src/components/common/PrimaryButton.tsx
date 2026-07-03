@@ -1,48 +1,72 @@
-import { Pressable, StyleSheet, Text, ViewStyle } from 'react-native';
+import React from 'react';
+import { ActivityIndicator, Pressable, StyleSheet, Text, ViewStyle } from 'react-native';
 
-import { Brand, Radius } from '@/theme/theme';
+import { colors, radius, spacing } from '@/theme/colors';
 
-type Props = {
+type Variant = 'solid' | 'soft' | 'ghost';
+
+interface Props {
   label: string;
   onPress: () => void;
+  variant?: Variant;
   disabled?: boolean;
-  variant?: 'solid' | 'soft' | 'ghost';
-  style?: ViewStyle | ViewStyle[];
-};
+  loading?: boolean;
+  style?: ViewStyle;
+}
 
-export function PrimaryButton({ label, onPress, disabled, variant = 'solid', style }: Props) {
+export function PrimaryButton({
+  label,
+  onPress,
+  variant = 'solid',
+  disabled = false,
+  loading = false,
+  style,
+}: Props) {
+  const isDisabled = disabled || loading;
+
   return (
     <Pressable
+      accessibilityRole="button"
+      accessibilityState={{ disabled: isDisabled }}
       onPress={onPress}
-      disabled={disabled}
+      disabled={isDisabled}
       style={({ pressed }) => [
         styles.base,
-        variant === 'soft' && styles.soft,
-        variant === 'ghost' && styles.ghost,
-        disabled && styles.disabled,
-        pressed && !disabled && styles.pressed,
+        variantStyle[variant],
+        pressed && !isDisabled && styles.pressed,
+        isDisabled && styles.disabled,
         style,
-      ]}>
-      <Pressable>
-        <Text style={[styles.label, variant === 'ghost' && styles.ghostLabel]}>{label}</Text>
-      </Pressable>
+      ]}
+    >
+      {loading ? (
+        <ActivityIndicator color={variant === 'solid' ? colors.white : colors.primary} />
+      ) : (
+        <Text style={[styles.label, variant === 'solid' ? styles.labelSolid : styles.labelTinted]}>
+          {label}
+        </Text>
+      )}
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
   base: {
-    minHeight: 48,
-    borderRadius: Radius.pill,
-    backgroundColor: Brand.magenta,
+    minHeight: 44,
+    borderRadius: radius.pill,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.xl,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 18,
   },
-  soft: { backgroundColor: Brand.surfaceElevated },
-  ghost: { backgroundColor: 'transparent', borderWidth: 1, borderColor: Brand.divider },
-  label: { color: '#FFFFFF', fontSize: 15, fontWeight: '800' },
-  ghostLabel: { color: Brand.text },
-  pressed: { opacity: 0.82 },
+  pressed: { opacity: 0.85, transform: [{ scale: 0.99 }] },
   disabled: { opacity: 0.45 },
+  label: { fontSize: 15, fontWeight: '600' },
+  labelSolid: { color: colors.white },
+  labelTinted: { color: colors.primarySoft },
 });
+
+const variantStyle: Record<Variant, ViewStyle> = {
+  solid: { backgroundColor: colors.primary },
+  soft: { backgroundColor: colors.surfaceMuted },
+  ghost: { backgroundColor: 'transparent', borderWidth: 1.5, borderColor: colors.chipBorder },
+};

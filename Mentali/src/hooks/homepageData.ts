@@ -1,14 +1,6 @@
 import type { ImageSourcePropType } from 'react-native';
 
-const streakIcon = require('../../assets/images/StreakIcon.png') as ImageSourcePropType;
-const diamondIcon = require('../../assets/images/DiamondIcon.png') as ImageSourcePropType;
-const brainfreezeIcon = require('../../assets/images/BrainfreezeIcon.png') as ImageSourcePropType;
-
-const happyFeeling = require('../../assets/images/happyFeeling.png') as ImageSourcePropType;
-const contentFeeling = require('../../assets/images/contentFeeling.png') as ImageSourcePropType;
-const averageFeeling = require('../../assets/images/averageFeeling.png') as ImageSourcePropType;
-const sadFeeling = require('../../assets/images/sadFeeling.png') as ImageSourcePropType;
-const depressedFeeling = require('../../assets/images/depressedFeeling.png') as ImageSourcePropType;
+import { MOOD_OPTIONS } from '@/data/moods';
 
 export type StatItem = {
   icon: ImageSourcePropType;
@@ -43,19 +35,22 @@ export type AppNotification = {
   recent: boolean;
 };
 
+const streakIcon = require('../../assets/images/StreakIcon.png') as ImageSourcePropType;
+const diamondIcon = require('../../assets/images/DiamondIcon.png') as ImageSourcePropType;
+const brainfreezeIcon = require('../../assets/images/BrainfreezeIcon.png') as ImageSourcePropType;
+
 export const stats: StatItem[] = [
   { icon: streakIcon, value: '67', color: '#FF9800' },
-  { icon: diamondIcon, value: '15', color: '#C86BFF' },
+  { icon: diamondIcon, value: '15', color: '#C86BFE' },
   { icon: brainfreezeIcon, value: '2', color: '#71BFEA' },
 ];
 
-export const moods: MoodItem[] = [
-  { label: 'great', image: happyFeeling, color: '#7CD957' },
-  { label: 'good', image: contentFeeling, color: '#FFE06D' },
-  { label: 'meh', image: averageFeeling, color: '#FF8C42' },
-  { label: 'sad', image: sadFeeling, color: '#B8DCF5' },
-  { label: 'cry', image: depressedFeeling, color: '#B6C9B7' },
-];
+/** Homepage mood strip — same faces as the chatbot. */
+export const moods: MoodItem[] = MOOD_OPTIONS.map((m) => ({
+  label: m.label,
+  image: m.image,
+  color: m.color,
+}));
 
 export const quests: QuestItem[] = [
   {

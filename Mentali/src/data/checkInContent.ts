@@ -9,35 +9,29 @@ import type {
 
 export const USER_NAME = 'Jayden';
 
-/** One-tap mood options used for daily check-ins. */
-export const MOODS: MoodOption[] = [
-  { id: 'great', emoji: '😄', label: 'Great', value: 4 },
-  { id: 'good', emoji: '🙂', label: 'Good', value: 3 },
-  { id: 'okay', emoji: '😐', label: 'Okay', value: 2 },
-  { id: 'low', emoji: '😟', label: 'Low', value: 1 },
-  { id: 'rough', emoji: '😢', label: 'Rough', value: 0 },
-];
+export { MOODS, MOOD_OPTIONS, moodFromHomeIndex, moodById } from '@/data/moods';
 
-/** Shared 0-3 response scale for the short check-in questions. */
-const FREQUENCY_0_3: AnswerOption[] = [
+export const FREQUENCY_0_3_OPTIONS: AnswerOption[] = [
   { label: 'Not really', value: 0 },
   { label: 'A little', value: 1 },
   { label: 'Quite a bit', value: 2 },
   { label: 'A lot', value: 3 },
 ];
 
+const FREQUENCY_0_3 = FREQUENCY_0_3_OPTIONS;
+
 /** Default daily flow: 4 short questions, total score 0-12. */
 export const PHQ4_QUESTIONS: CheckInQuestion[] = [
   {
     id: 'phq4_anx_1',
-    prompt: 'Over the last little while, have you felt nervous or on edge?',
+    prompt: 'Have you felt more keyed up or on edge than usual?',
     scale: 'phq4',
     dimension: 'anxiety',
     options: FREQUENCY_0_3,
   },
   {
     id: 'phq4_anx_2',
-    prompt: 'Has worrying been hard to switch off?',
+    prompt: 'When worries show up, do they tend to stick around for a while?',
     helper: 'Like your mind keeps circling back to something.',
     scale: 'phq4',
     dimension: 'anxiety',
@@ -45,14 +39,14 @@ export const PHQ4_QUESTIONS: CheckInQuestion[] = [
   },
   {
     id: 'phq4_mood_1',
-    prompt: 'Have you been feeling down or low?',
+    prompt: 'Have there been moments where things felt a bit heavy or low?',
     scale: 'phq4',
     dimension: 'mood',
     options: FREQUENCY_0_3,
   },
   {
     id: 'phq4_mood_2',
-    prompt: 'Have things you usually enjoy felt a bit flat?',
+    prompt: 'Have the things you usually enjoy felt less exciting lately?',
     helper: 'Little interest or pleasure in doing things.',
     scale: 'phq4',
     dimension: 'mood',
@@ -69,6 +63,19 @@ const FREQUENCY_1_5: AnswerOption[] = [
   { label: 'All of the time', value: 5 },
 ];
 
+const K10_SUBTLE_PROMPTS = [
+  'Has tiredness been showing up even when you have not been doing much?',
+  'Have you felt nervous or on edge more than usual?',
+  'Have there been times when anxiety felt hard to calm down?',
+  'Have moments of hopelessness come up at all?',
+  'Have you felt restless, like it is hard to settle?',
+  'Has restlessness ever made it tough to sit still?',
+  'Have low or down moments been part of the picture?',
+  'Has everything felt like more of an effort than usual?',
+  'Have sad feelings been hard to shake?',
+  'Have you had thoughts about not feeling good enough or worthless?',
+];
+
 export const K10_QUESTIONS: CheckInQuestion[] = [
   'tired for no clear reason',
   'nervous',
@@ -82,7 +89,9 @@ export const K10_QUESTIONS: CheckInQuestion[] = [
   'worthless',
 ].map((phrase, i) => ({
   id: `k10_${i + 1}`,
-  prompt: `In the past 2 weeks, how often did you feel ${phrase}?`,
+  prompt:
+    K10_SUBTLE_PROMPTS[i] ??
+    `Lately, has feeling ${phrase} been part of your experience?`,
   scale: 'k10' as const,
   dimension: 'distress' as const,
   options: FREQUENCY_1_5,
@@ -95,8 +104,7 @@ export const COPY = {
     'No worries, I am always here if you change your mind!',
   moodPrompt: 'First, which emoji feels closest to your day?',
   moodThanks: (label: string, emoji: string) =>
-    `Thanks for sharing ${emoji} — let's keep it light. Just a few quick taps.`,
-  // Rotated between questions to keep the flow conversational.
+    `Thanks for sharing ${emoji} — let's chat for a minute, nice and easy.`,
   acks: [
     'Thanks for being honest.',
     'Got it — no right or wrong answers here.',
@@ -109,25 +117,34 @@ export const COPY = {
   deeperInviteStrong:
     'A few answers stood out today. A slightly longer check-in can give a clearer picture — only if you feel up to it.',
   disclaimer:
-    'This is a supportive wellbeing check-in, not a diagnosis. If anything here worries you, please talk to someone you trust or a professional.',
+    'This is a supportive wellbeing check-in, not a diagnosis. If anything here worries you, please talk to someone you trust or a professional in Singapore.',
 } as const;
 
 /** Quick replies shown as suggestion chips. */
 export const QUICK_REPLIES = ['Thank you!', 'Goodbye!', 'Actually...'] as const;
 
 /**
- * Crisis and support contacts shown on the escalation card.
- * Numbers vary by region — replace these defaults with local services.
+ * Crisis and support contacts for Singapore.
  */
 export const SUPPORT_RESOURCES: SupportResource[] = [
   {
-    label: 'Emergency services',
-    description: 'If you feel unsafe or in danger right now.',
-    phone: '112',
+    label: 'Samaritans of Singapore (SOS)',
+    description: '24-hour emotional support — confidential and free.',
+    phone: '1767',
   },
   {
-    label: 'Find a helpline',
-    description: 'Free, confidential support lines worldwide.',
-    url: 'https://findahelpline.com',
+    label: 'National Care Hotline',
+    description: 'Emotional support during difficult times.',
+    phone: '18002026868',
+  },
+  {
+    label: 'IMH Mental Health Helpline',
+    description: 'Institute of Mental Health — professional support.',
+    phone: '63892222',
+  },
+  {
+    label: 'Emergency (ambulance)',
+    description: 'If you or someone else is in immediate danger.',
+    phone: '995',
   },
 ];

@@ -1,6 +1,7 @@
-import { isStrongPassword, isValidEmail } from "../utils/authValidation";
+import { isStrongPassword, isValidEmail, toE164Phone } from "../utils/authValidation";
 import { useMemo, useState } from "react";
 import {
+  Alert,
   Image,
   KeyboardAvoidingView,
   Platform,
@@ -31,7 +32,7 @@ type LoginPageProps = {
   onToggleMode: () => void;
   onSignupPress: () => void;
   onForgotPasswordPress: () => void;
-  onLoginPress: () => void;
+  onLoginPress: (payload: { mode: "phone" | "email"; identifier: string; password: string }) => void | Promise<void>;
   onSocialAuthSuccess: (session: SocialAuthResult) => void;
 };
 
@@ -107,16 +108,16 @@ export default function LoginPage({
   const subtitleText = useMemo(() => {
     if (isPhoneMode) {
       return {
-        prefix: "Enter your mobile number or ",
+        prefix: "Enter your mobile number or switch to ",
         highlight: "email",
         suffix: "",
       };
     }
 
     return {
-      prefix: "Enter your ",
+      prefix: "Enter your email or switch to ",
       highlight: "mobile number",
-      suffix: " or email",
+      suffix: "",
     };
   }, [isPhoneMode]);
 
@@ -135,6 +136,9 @@ export default function LoginPage({
   const passwordError = password.length > 0 && !isStrongPassword(password)
     ? "Use at least 8 characters with a number, capital letter, and special symbol."
     : "";
+  const canSubmitLogin =
+    password.length > 0 &&
+    (isPhoneMode ? isPhoneValid : emailAddress.length > 0 && isValidEmail(emailAddress));
 
   const formatPhoneDisplay = (text: string, nextCountryCode = phoneCountryCode) => {
     const digits = text.replace(/\D/g, "").slice(0, 15);
@@ -251,8 +255,22 @@ export default function LoginPage({
             </Pressable>
 
             <Pressable
-              onPress={onLoginPress}
-              style={({ pressed }) => [styles.loginButton, pressed && styles.loginButtonPressed]}
+              disabled={!canSubmitLogin}
+              onPress={() => {
+                const identifier = isPhoneMode
+                  ? toE164Phone(phoneNumber, phoneCountryCode, callingCode)
+                  : emailAddress.trim().toLowerCase();
+                if (isPhoneMode && !identifier) {
+                  Alert.alert("Invalid phone number", "Enter a valid mobile number for the selected country.");
+                  return;
+                }
+                onLoginPress({ mode, identifier: identifier!, password });
+              }}
+              style={({ pressed }) => [
+                styles.loginButton,
+                !canSubmitLogin && styles.buttonDisabled,
+                pressed && canSubmitLogin && styles.loginButtonPressed,
+              ]}
             >
               <Text style={styles.loginButtonText}>LOGIN</Text>
             </Pressable>
@@ -518,6 +536,9 @@ const styles = StyleSheet.create({
   loginButtonPressed: {
     transform: [{ translateY: 2 }],
     borderBottomWidth: 3,
+  },
+  buttonDisabled: {
+    opacity: 0.45,
   },
   loginButtonText: {
     color: "#FFFFFF",

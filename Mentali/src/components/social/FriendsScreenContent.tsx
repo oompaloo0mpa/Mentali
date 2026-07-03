@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { FriendCodeInput } from '@/components/social/FriendCodeInput';
 import { FriendOptionsModal } from '@/components/social/FriendOptionsModal';
@@ -14,8 +14,10 @@ import { SearchBar } from '@/components/social/SearchBar';
 import { SortFilterBar, type FriendFilter, type FriendSort } from '@/components/social/SortFilterBar';
 import { StatBar } from '@/components/social/StatBar';
 import { Brand, MaxContentWidth, Spacing } from '@/theme/theme';
-import { CURRENT_USER, type Friend } from '@/data/mockData';
-import { friendBadges, useSocial } from '@/storage/socialStore';
+import { type Friend } from '@/data/mockData';
+import { friendBadges, friendNeedsSupport, isFriendAtRisk, isNewFriend, useSocial } from '@/storage/socialStore';
+import { useUserProfile } from '@/storage/userProfileStore';
+import { useSettingsOverlay } from '@/storage/settingsOverlayStore';
 
 function lastMotivationText(messages: { text: string; sender: 'me' | 'them' }[]): string | null {
   for (let i = messages.length - 1; i >= 0; i--) {
@@ -50,11 +52,15 @@ export function FriendsScreenContent({ showHeader = true, onOpenChat, onSendMoti
     muteFriend,
     unmuteFriend,
     removeFriend,
+    blockFriend,
+    unblockFriend,
     markNotificationRead,
     markAllNotificationsRead,
     clearNotifications,
     dismissMilestone,
   } = useSocial();
+  const { profile } = useUserProfile();
+  const { openSettings, requestLogout } = useSettingsOverlay();
 
   const [search, setSearch] = useState('');
   const [sort, setSort] = useState<FriendSort>('recent');
@@ -73,11 +79,11 @@ export function FriendsScreenContent({ showHeader = true, onOpenChat, onSendMoti
     list = list.filter((f) => {
       switch (filter) {
         case 'at-risk':
-          return f.streak >= 10 && !f.streakDone;
+          return isFriendAtRisk(f);
         case 'needs-support':
-          return !f.streakDone;
+          return friendNeedsSupport(f);
         case 'new':
-          return f.streak === 0;
+          return isNewFriend(f);
         default:
           return true;
       }
@@ -109,6 +115,11 @@ export function FriendsScreenContent({ showHeader = true, onOpenChat, onSendMoti
   const openProfile = (friend: Friend) => setProfileFriend(friend);
   const hasNoFriends = friends.length === 0;
 
+  const handleAddFriend = (code: string) => {
+    const result = addFriendByCode(code);
+    Alert.alert(result.ok ? 'Friend added' : 'Could not add friend', result.message);
+  };
+
   return (
     <>
       <ScrollView
@@ -126,10 +137,10 @@ export function FriendsScreenContent({ showHeader = true, onOpenChat, onSendMoti
           />
         ) : null}
 
-        <FriendCodeInput onSubmit={addFriendByCode} />
+        <FriendCodeInput onSubmit={handleAddFriend} />
 
         <Text style={styles.friendCode}>
-          Your Friend Code: <Text style={styles.friendCodeValue}>{CURRENT_USER.friendCode}</Text>
+          Your Friend Code: <Text style={styles.friendCodeValue}>{profile.friendCode}</Text>
         </Text>
 
         {requests.length > 0 ? (
@@ -183,7 +194,17 @@ export function FriendsScreenContent({ showHeader = true, onOpenChat, onSendMoti
         onClear={clearNotifications}
       />
 
-      <MoreMenu visible={menuVisible} onClose={() => setMenuVisible(false)} />
+      <MoreMenu
+        visible={menuVisible}
+        onClose={() => setMenuVisible(false)}
+        onSelect={(key) => {
+          if (key === 'settings') openSettings();
+          if (key === 'logout') requestLogout();
+          if (key === 'statistics') {
+            Alert.alert('Statistics', 'Your wellbeing stats will appear here soon.');
+          }
+        }}
+      />
 
       <FriendProfileSheet
         friend={profileFriend}
@@ -203,7 +224,8 @@ export function FriendsScreenContent({ showHeader = true, onOpenChat, onSendMoti
         onMute={(f, duration) => muteFriend(f.id, duration)}
         onUnmute={(f) => unmuteFriend(f.id)}
         onRemove={(f) => removeFriend(f.id)}
-        onBlock={(f) => removeFriend(f.id)}
+        onBlock={(f) => blockFriend(f.id)}
+        onUnblock={(f) => unblockFriend(f.id)}
       />
 
       <MilestoneModal

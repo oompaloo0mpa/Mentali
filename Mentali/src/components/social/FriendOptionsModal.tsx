@@ -1,4 +1,4 @@
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { Fragment, useEffect, useState } from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 
@@ -15,7 +15,12 @@ type Props = {
   onUnmute: (friend: Friend) => void;
   onRemove: (friend: Friend) => void;
   onBlock: (friend: Friend) => void;
+  onUnblock: (friend: Friend) => void;
 };
+
+type MenuIcon =
+  | { family: 'ion'; name: keyof typeof Ionicons.glyphMap }
+  | { family: 'mc'; name: keyof typeof MaterialCommunityIcons.glyphMap };
 
 type Stage = 'menu' | 'mute' | 'confirm-remove' | 'confirm-block';
 
@@ -34,6 +39,7 @@ export function FriendOptionsModal({
   onUnmute,
   onRemove,
   onBlock,
+  onUnblock,
 }: Props) {
   const [stage, setStage] = useState<Stage>('menu');
 
@@ -50,11 +56,11 @@ export function FriendOptionsModal({
     onClose();
   };
 
-  const menuItems: { key: string; label: string; icon: keyof typeof Ionicons.glyphMap; danger?: boolean; onPress: () => void }[] = [
+  const menuItems: { key: string; label: string; icon: MenuIcon; danger?: boolean; onPress: () => void }[] = [
     {
       key: 'pin',
       label: friend.pinned ? 'Unpin friend' : 'Pin to top',
-      icon: friend.pinned ? 'pin' : 'pin-outline',
+      icon: { family: 'mc', name: friend.pinned ? 'pin-off' : 'pin' },
       onPress: () => {
         onTogglePin(friend);
         close();
@@ -63,7 +69,7 @@ export function FriendOptionsModal({
     {
       key: 'mute',
       label: muted ? 'Unmute' : 'Mute',
-      icon: muted ? 'notifications' : 'notifications-off',
+      icon: { family: 'ion', name: muted ? 'notifications' : 'notifications-off' },
       onPress: () => {
         if (muted) {
           onUnmute(friend);
@@ -73,17 +79,27 @@ export function FriendOptionsModal({
         }
       },
     },
-    {
-      key: 'block',
-      label: 'Block',
-      icon: 'ban',
-      danger: true,
-      onPress: () => setStage('confirm-block'),
-    },
+    friend.blocked
+      ? {
+          key: 'unblock',
+          label: 'Unblock',
+          icon: { family: 'mc', name: 'account-check' },
+          onPress: () => {
+            onUnblock(friend);
+            close();
+          },
+        }
+      : {
+          key: 'block',
+          label: 'Block',
+          icon: { family: 'ion', name: 'ban' },
+          danger: true,
+          onPress: () => setStage('confirm-block'),
+        },
     {
       key: 'remove',
       label: 'Remove as friend',
-      icon: 'person-remove',
+      icon: { family: 'ion', name: 'person-remove' },
       danger: true,
       onPress: () => setStage('confirm-remove'),
     },
@@ -104,11 +120,19 @@ export function FriendOptionsModal({
                     onPress={item.onPress}
                     accessibilityRole="button"
                     accessibilityLabel={item.label}>
-                    <Ionicons
-                      name={item.icon}
-                      size={18}
-                      color={item.danger ? Brand.danger : Brand.text}
-                    />
+                    {item.icon.family === 'mc' ? (
+                      <MaterialCommunityIcons
+                        name={item.icon.name}
+                        size={18}
+                        color={item.danger ? Brand.danger : Brand.text}
+                      />
+                    ) : (
+                      <Ionicons
+                        name={item.icon.name}
+                        size={18}
+                        color={item.danger ? Brand.danger : Brand.text}
+                      />
+                    )}
                     <Text style={[styles.label, item.danger && styles.danger]}>{item.label}</Text>
                   </Pressable>
                 </Fragment>
@@ -151,7 +175,7 @@ export function FriendOptionsModal({
               <Text style={styles.subheading}>
                 {stage === 'confirm-remove'
                   ? `${friend.name} will be removed from your friends and your chat history will be cleared.`
-                  : `${friend.name} won’t be able to reach you, and they’ll be removed from your friends.`}
+                  : `Your chat with ${friend.name} will be disabled. They stay in your friends list and you can unblock anytime.`}
               </Text>
               <View style={styles.confirmActions}>
                 <Pressable

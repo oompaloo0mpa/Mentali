@@ -40,6 +40,12 @@ export interface RecordedAnswer {
   label: string;
   /** True when the user chose not to answer; excluded from scoring. */
   skipped?: boolean;
+  /** How confident the inference was (0–1). Omitted for explicit chip answers. */
+  confidence?: number;
+  /** Short snippet that informed the score. */
+  evidence?: string;
+  /** How the answer was captured. */
+  source?: 'free_text' | 'chip' | 'inferred' | 'skipped';
 }
 
 export type BandLevel = 'calm' | 'mild' | 'moderate' | 'high';

@@ -1,9 +1,13 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import type { ImageSourcePropType } from 'react-native';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+
+import { moods } from '@/hooks/homepageData';
 
 import {
   CURRENT_USER,
   DAILY_QUESTS,
+  findDirectoryUser,
   FRIENDS,
   INCOMING_REQUESTS,
   INITIAL_CHATS,
@@ -16,8 +20,18 @@ import {
   type FriendRequest,
   type Quest,
 } from '@/data/mockData';
+import { useUserProfile } from '@/storage/userProfileStore';
 
-const STORAGE_KEY = 'mentali.social.v3';
+const STORAGE_KEY = 'mentali.social.v6';
+const LEGACY_STORAGE_KEYS = ['mentali.social.v5', 'mentali.social.v4'];
+
+/** Friends added within this many days show under the "New" filter. */
+export const NEW_FRIEND_DAYS = 7;
+
+/** Minimum streak length before a missed day is considered "at risk". */
+export const AT_RISK_MIN_STREAK = 7;
+
+export type AddFriendResult = { ok: boolean; message: string };
 
 export type MuteDuration = '8h' | '24h' | '1w';
 
@@ -50,9 +64,10 @@ function freshQuests(): Quest[] {
 }
 
 function initialState(): SocialState {
+  const friends = FRIENDS.map((f) => normalizeFriend({ ...f }));
   return {
-    friends: FRIENDS.map((f) => ({ ...f })),
-    requests: INCOMING_REQUESTS.map((r) => ({ ...r })),
+    friends,
+    requests: normalizeIncomingRequests(friends, INCOMING_REQUESTS),
     chats: Object.fromEntries(Object.entries(INITIAL_CHATS).map(([id, msgs]) => [id, msgs.map((m) => ({ ...m }))])),
     notifications: NOTIFICATIONS.map((n) => ({ ...n })),
     quests: freshQuests(),
@@ -62,6 +77,76 @@ function initialState(): SocialState {
     fireStreak: CURRENT_USER.fireStreak,
     celebrated: {},
   };
+}
+
+function friendNameKey(name: string): string {
+  return name.trim().toLowerCase();
+}
+
+/** Drop stale demo requests and ensure the anonymous Riley demo is available. */
+function normalizeIncomingRequests(friends: Friend[], stored: FriendRequest[] | undefined): FriendRequest[] {
+  const friendNames = new Set(friends.map((f) => friendNameKey(f.name)));
+
+  const pending = (stored ?? [])
+    .map((request) => {
+      // Legacy seed stored Alex without anonymousMode — upgrade to the Riley demo.
+      if (request.id === 'r1' && friendNameKey(request.name) === 'alex' && !request.anonymousMode) {
+        return { ...INCOMING_REQUESTS[0] };
+      }
+      return request;
+    })
+    .filter((request) => !friendNames.has(friendNameKey(request.name)));
+
+  const pendingNames = new Set(pending.map((r) => friendNameKey(r.name)));
+
+  if (pending.length === 0 && !friendNames.has('riley')) {
+    return INCOMING_REQUESTS.map((r) => ({ ...r }));
+  }
+
+  for (const seed of INCOMING_REQUESTS) {
+    const key = friendNameKey(seed.name);
+    if (!friendNames.has(key) && !pendingNames.has(key)) {
+      pending.push({ ...seed });
+    }
+  }
+
+  return pending;
+}
+
+function hydrateSocialState(parsed: Partial<SocialState>): SocialState {
+  const base = initialState();
+  const friends = (parsed.friends ?? base.friends).map(normalizeFriend);
+  const questDateStale = parsed.questDate !== todayKey();
+
+  return {
+    ...base,
+    ...parsed,
+    friends,
+    requests: normalizeIncomingRequests(friends, parsed.requests),
+    quests: questDateStale ? freshQuests() : (parsed.quests ?? base.quests),
+    questDate: questDateStale ? todayKey() : (parsed.questDate ?? base.questDate),
+    chats: parsed.chats ?? base.chats,
+    notifications: parsed.notifications ?? base.notifications,
+  };
+}
+
+async function loadPersistedSocialState(): Promise<SocialState | null> {
+  for (const key of [STORAGE_KEY, ...LEGACY_STORAGE_KEYS]) {
+    const raw = await AsyncStorage.getItem(key);
+    if (!raw) continue;
+
+    const parsed = JSON.parse(raw) as Partial<SocialState>;
+    const state = hydrateSocialState(parsed);
+
+    if (key !== STORAGE_KEY) {
+      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      await AsyncStorage.removeItem(key).catch(() => {});
+    }
+
+    return state;
+  }
+
+  return null;
 }
 
 let idCounter = 0;
@@ -75,9 +160,44 @@ function isSameDay(epoch: number | null | undefined): boolean {
   return new Date(epoch).toISOString().slice(0, 10) === todayKey();
 }
 
-/** Mood emoji derived from the friend's streak state. Shared by the row, chat header, and pet. */
+function normalizeFriend(friend: Friend): Friend {
+  const addedAt = friend.addedAt ?? Date.now() - 30 * 24 * 60 * 60 * 1000;
+  const lastStreakDoneDate =
+    friend.lastStreakDoneDate ?? (friend.streakDone ? todayKey() : null);
+  const streakDone = lastStreakDoneDate === todayKey();
+  return { ...friend, addedAt, lastStreakDoneDate, streakDone };
+}
+
+/** Whether the friend completed their daily streak check-in today. */
+export function isStreakDoneToday(friend: Friend): boolean {
+  if (friend.lastStreakDoneDate) return friend.lastStreakDoneDate === todayKey();
+  return friend.streakDone;
+}
+
+/** Added within the last NEW_FRIEND_DAYS days. */
+export function isNewFriend(friend: Friend): boolean {
+  const addedAt = friend.addedAt ?? 0;
+  return Date.now() - addedAt < NEW_FRIEND_DAYS * 24 * 60 * 60 * 1000;
+}
+
+/** Long streak (7+ days) but hasn't checked in today — streak may break. */
+export function isFriendAtRisk(friend: Friend): boolean {
+  return friend.streak >= AT_RISK_MIN_STREAK && !isStreakDoneToday(friend);
+}
+
+/** Hasn't checked in today and you haven't messaged them yet — worth reaching out. */
+export function friendNeedsSupport(friend: Friend): boolean {
+  return !isStreakDoneToday(friend) && !isSameDay(friend.lastMessagedAt);
+}
+
+/** Mood emoji derived from whether the friend checked in today. */
 export function friendMood(friend: Friend): string {
-  return friend.streakDone ? '😊' : '😢';
+  return isStreakDoneToday(friend) ? '😊' : '😢';
+}
+
+/** Same mood face images used on the home page mood picker (used in the friends list). */
+export function friendMoodImage(friend: Friend): ImageSourcePropType {
+  return isStreakDoneToday(friend) ? moods[0].image : moods[3].image;
 }
 
 export function isMuted(friend: Friend): boolean {
@@ -92,7 +212,10 @@ export type FriendBadge = { label: string; tone: BadgeTone };
 export function friendBadges(friend: Friend, questActive: boolean): FriendBadge[] {
   const badges: FriendBadge[] = [];
   if (friend.hasUnread) badges.push({ label: 'New message', tone: 'info' });
-  if (friend.streak >= 10 && !friend.streakDone) badges.push({ label: 'Streak at risk', tone: 'warning' });
+  if (isFriendAtRisk(friend)) badges.push({ label: 'Streak at risk', tone: 'warning' });
+  if (friendNeedsSupport(friend) && !isFriendAtRisk(friend)) {
+    badges.push({ label: 'Reach out', tone: 'warning' });
+  }
   if (questActive && !isSameDay(friend.lastMessagedAt)) badges.push({ label: 'Quest partner', tone: 'quest' });
   return badges;
 }
@@ -116,13 +239,15 @@ type SocialContextValue = {
   pendingMilestone: { friend: Friend; milestone: number } | null;
   chatFor: (friendId: string) => ChatMessage[];
   friendById: (friendId?: string) => Friend | undefined;
-  addFriendByCode: (code: string) => void;
+  addFriendByCode: (code: string) => AddFriendResult;
   acceptRequest: (id: string) => void;
   rejectRequest: (id: string) => void;
   sendMessage: (friendId: string, message: Omit<ChatMessage, 'id' | 'sender'> & { sender?: 'me' | 'them' }) => void;
   markChatRead: (friendId: string) => void;
   togglePin: (friendId: string) => void;
   removeFriend: (friendId: string) => void;
+  blockFriend: (friendId: string) => void;
+  unblockFriend: (friendId: string) => void;
   muteFriend: (friendId: string, duration: MuteDuration) => void;
   unmuteFriend: (friendId: string) => void;
   markNotificationRead: (id: string) => void;
@@ -134,22 +259,21 @@ type SocialContextValue = {
 const SocialContext = createContext<SocialContextValue | null>(null);
 
 export function SocialProvider({ children }: { children: React.ReactNode }) {
+  const { profile } = useUserProfile();
   const [state, setState] = useState<SocialState>(initialState);
   const [hydrated, setHydrated] = useState(false);
+
+  // Mirror of the latest state so stable callbacks can read current values without re-creating.
+  const stateRef = useRef(state);
+  stateRef.current = state;
 
   useEffect(() => {
     let active = true;
     (async () => {
       try {
-        const raw = await AsyncStorage.getItem(STORAGE_KEY);
-        if (active && raw) {
-          const parsed = JSON.parse(raw) as SocialState;
-          // Roll the daily quests over when the stored day is stale.
-          if (parsed.questDate !== todayKey()) {
-            parsed.quests = freshQuests();
-            parsed.questDate = todayKey();
-          }
-          setState({ ...initialState(), ...parsed });
+        const persisted = await loadPersistedSocialState();
+        if (active && persisted) {
+          setState(persisted);
         }
       } catch {
         // Ignore corrupt storage and fall back to seed data.
@@ -176,21 +300,40 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
 
   const update = useCallback((fn: (prev: SocialState) => SocialState) => setState(fn), []);
 
-  const addFriendByCode = useCallback(
+  const addFriendByCode = useCallback<SocialContextValue['addFriendByCode']>(
     (code: string) => {
-      const trimmed = code.trim();
-      if (!trimmed) return;
+      const normalized = code.trim().toUpperCase();
+      if (!normalized) return { ok: false, message: 'Enter a friend code.' };
+
+      if (normalized === profile.friendCode.toUpperCase()) {
+        return { ok: false, message: "That's your own friend code." };
+      }
+
+      const directoryUser = findDirectoryUser(normalized);
+      if (!directoryUser) {
+        return { ok: false, message: 'No user found for that friend code.' };
+      }
+
+      const alreadyFriend = stateRef.current.friends.some((f) => f.code?.toUpperCase() === normalized);
+      if (alreadyFriend) {
+        return { ok: false, message: `You're already friends with ${directoryUser.name}.` };
+      }
+
+      const addedName = directoryUser.name;
+
       update((prev) => {
         const id = uid('f');
-        const name = trimmed.toUpperCase();
-        const friend: Friend = {
+        const friend = normalizeFriend({
           id,
-          name,
+          name: addedName,
+          code: directoryUser.code,
           streak: 0,
           lastSeen: 'Just now',
           streakDone: false,
+          lastStreakDoneDate: null,
+          addedAt: Date.now(),
           pinned: false,
-        };
+        });
         return {
           ...prev,
           friends: [...prev.friends, friend],
@@ -199,7 +342,7 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
             {
               id: uid('n'),
               icon: 'person-add',
-              title: `You added ${name} as a friend`,
+              title: `You added ${addedName} as a friend`,
               time: 'Just now',
               read: false,
               recent: true,
@@ -208,8 +351,10 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
           ],
         };
       });
+
+      return { ok: true, message: `Added ${addedName} as a friend.` };
     },
-    [update],
+    [profile.friendCode, update],
   );
 
   const acceptRequest = useCallback(
@@ -218,14 +363,16 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
         const req = prev.requests.find((r) => r.id === id);
         if (!req) return prev;
         const friendId = uid('f');
-        const friend: Friend = {
+        const friend = normalizeFriend({
           id: friendId,
           name: req.name,
           streak: 0,
           lastSeen: 'Just now',
           streakDone: false,
+          lastStreakDoneDate: null,
+          addedAt: Date.now(),
           pinned: false,
-        };
+        });
         return {
           ...prev,
           requests: prev.requests.filter((r) => r.id !== id),
@@ -303,6 +450,24 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
         delete rest[friendId];
         return { ...prev, friends: prev.friends.filter((f) => f.id !== friendId), chats: rest };
       }),
+    [update],
+  );
+
+  const blockFriend = useCallback(
+    (friendId: string) =>
+      update((prev) => ({
+        ...prev,
+        friends: prev.friends.map((f) => (f.id === friendId ? { ...f, blocked: true } : f)),
+      })),
+    [update],
+  );
+
+  const unblockFriend = useCallback(
+    (friendId: string) =>
+      update((prev) => ({
+        ...prev,
+        friends: prev.friends.map((f) => (f.id === friendId ? { ...f, blocked: false } : f)),
+      })),
     [update],
   );
 
@@ -396,6 +561,8 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
       markChatRead,
       togglePin,
       removeFriend,
+      blockFriend,
+      unblockFriend,
       muteFriend,
       unmuteFriend,
       markNotificationRead,
@@ -417,6 +584,8 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
       markChatRead,
       togglePin,
       removeFriend,
+      blockFriend,
+      unblockFriend,
       muteFriend,
       unmuteFriend,
       markNotificationRead,

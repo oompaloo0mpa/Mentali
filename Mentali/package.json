@@ -4,7 +4,9 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
+    "prestart": "node backend/setup-database-optional.js",
     "start": "expo start",
+    "start:no-db": "expo start",
     "start:dev": "expo start --dev-client",
     "reset-project": "node ./scripts/reset-project.js",
     "android": "expo start --android",
@@ -12,7 +14,11 @@
     "web": "expo start --web",
     "android:dev": "expo start --dev-client --android",
     "ios:dev": "expo start --dev-client --ios",
-    "lint": "expo lint"
+    "lint": "expo lint",
+    "db:test": "node backend/test-connection.js",
+    "db:setup": "node backend/setup-database.js",
+    "db:clear-users": "node backend/clear-users.js",
+    "api:start": "node backend/server.js"
   },
   "dependencies": {
     "@expo/ngrok": "^4.1.3",
@@ -20,11 +26,15 @@
     "@react-native-async-storage/async-storage": "2.2.0",
     "@react-navigation/native": "^7.1.8",
     "babel-preset-expo": "~54.0.10",
+    "bcryptjs": "^3.0.3",
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.2",
     "expo": "54.0.35",
     "expo-apple-authentication": "~8.0.8",
     "expo-auth-session": "~7.0.11",
     "expo-constants": "~18.0.13",
     "expo-dev-client": "~6.0.21",
+    "expo-device": "~8.0.10",
     "expo-document-picker": "~14.0.8",
     "expo-font": "~14.0.12",
     "expo-image": "~3.0.11",
@@ -36,20 +46,27 @@
     "expo-system-ui": "~6.0.9",
     "expo-updates": "~29.0.18",
     "expo-web-browser": "~15.0.11",
+    "express": "^5.2.1",
     "libphonenumber-js": "1.13.7",
+    "mongodb": "^7.4.0",
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "react-native": "0.81.0",
     "react-native-country-picker-modal": "^2.0.0",
     "react-native-gesture-handler": "~2.28.0",
+    "react-native-reanimated": "~4.1.1",
     "react-native-safe-area-context": "5.7.0",
     "react-native-screens": "~4.16.0",
-    "react-native-web": "0.21.0"
+    "react-native-web": "0.21.0",
+    "react-native-worklets": "0.5.1"
   },
   "devDependencies": {
     "@babel/core": "^7.20.0",
     "@types/react": "~19.2.2",
+    "babel-plugin-module-resolver": "^5.0.3",
     "eas-cli": "^20.3.0",
+    "eslint": "^9.0.0",
+    "eslint-config-expo": "~10.0.0",
     "typescript": "~5.9.2"
   }
 }

@@ -1,6 +1,8 @@
 import React from 'react';
-import { Image, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native';
+
+import { SettingsAccessButton } from '@/components/settings/SettingsAccessButton';
 
 import { BandCard } from '@/components/wellbeing/BandCard';
 import { ScoreBar } from '@/components/wellbeing/ScoreBar';
@@ -12,8 +14,6 @@ import { COPY } from '@/data/checkInContent';
 import { reflectionLine, shouldRecommendDeeper, subscaleLabel } from '@/logic/wellbeing';
 import type { MoodOption, StreakState, WellbeingResult } from '@/logic/checkin';
 import { colors, radius, spacing, typography } from '@/theme/colors';
-
-const FLAME = require('../../assets/flame.png');
 
 interface Props {
   mood: MoodOption;
@@ -31,6 +31,10 @@ export function SummaryScreen({ mood, streak, phq4, k10, onDeeper, onDone }: Pro
 
   return (
     <SafeAreaView style={styles.safe}>
+      <View style={styles.topBar}>
+        <View />
+        <SettingsAccessButton color={colors.textPrimary} />
+      </View>
       <ScrollView contentContainerStyle={styles.content}>
         <Text style={styles.title}>Your check-in</Text>
 
@@ -39,7 +43,7 @@ export function SummaryScreen({ mood, streak, phq4, k10, onDeeper, onDone }: Pro
           <View style={styles.flex}>
             <Text style={styles.todayMood}>Today you felt {mood.label.toLowerCase()}</Text>
             <View style={styles.streakRow}>
-              <Image source={FLAME} style={styles.streakFlame} resizeMode="contain" />
+              <Text style={styles.streakFlame}>🔥</Text>
               <Text style={styles.streak}>{streak.current}-day streak</Text>
             </View>
           </View>
@@ -116,6 +120,13 @@ function EncouragementNote({ level }: { level: WellbeingResult['band']['level'] 
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.background },
+  topBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.sm,
+  },
   content: { padding: spacing.lg, paddingBottom: spacing.xxl, gap: spacing.lg },
   flex: { flex: 1 },
   title: { ...typography.title, color: colors.textPrimary },
@@ -125,7 +136,7 @@ const styles = StyleSheet.create({
   todayEmoji: { fontSize: 40 },
   todayMood: { ...typography.subheading, color: colors.textPrimary },
   streakRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
-  streakFlame: { width: 18, height: 18 },
+  streakFlame: { fontSize: 18, lineHeight: 18 },
   streak: { ...typography.body, color: colors.textSecondary },
   bars: {
     backgroundColor: colors.surface,
