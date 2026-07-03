@@ -1,6 +1,6 @@
 import React from 'react';
-import OnboardingPage_1 from '../src/pages/OnboardingPage_1';
+import { Redirect } from 'expo-router';
 
 export default function Home() {
-  return <OnboardingPage_1 />;
+  return <Redirect href="/LeaderboardPage" />;
 }
