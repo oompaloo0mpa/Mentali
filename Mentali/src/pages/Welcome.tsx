@@ -8,6 +8,8 @@ import {
   Image,
 } from 'react-native';
 
+const welcomeMascot = require('../../assets/images/LoginMascot.png');
+
 interface Props {
   onGetStarted: () => void;
   onAlreadyHaveAccount: () => void;
@@ -24,7 +26,7 @@ export default function Welcome({ onGetStarted, onAlreadyHaveAccount }: Props): 
 
         <View style={styles.mascotContainer}>
           <Image
-            source={require('../components/WelcomeImage.png')}
+            source={welcomeMascot}
             style={styles.welcomeImage}
             resizeMode="contain"
           />
