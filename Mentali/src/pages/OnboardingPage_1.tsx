@@ -6,7 +6,6 @@ import {
   StyleSheet,
   SafeAreaView,
   Image,
-  ScrollView,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import OnboardingProgressDots from '../components/OnboardingProgressDots';
@@ -29,8 +28,7 @@ export default function OnboardingPage_1({ onContinue }: OnboardingPage1Props): 
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        <View style={styles.content}>
+      <View style={styles.content}>
           {/* Title Section */}
           <View style={styles.titleSection}>
             <Text style={styles.mainTitle}>Check in with</Text>
@@ -77,8 +75,7 @@ export default function OnboardingPage_1({ onContinue }: OnboardingPage1Props): 
               <Text style={styles.continueButtonText}>CONTINUE</Text>
             </TouchableOpacity>
           </View>
-        </View>
-      </ScrollView>
+      </View>
     </SafeAreaView>
   );
 }
@@ -87,9 +84,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#FFF0F7',
-  },
-  scrollContent: {
-    flexGrow: 1,
   },
   content: {
     flex: 1,

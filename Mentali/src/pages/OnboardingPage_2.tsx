@@ -6,7 +6,6 @@ import {
   StyleSheet,
   SafeAreaView,
   Image,
-  ScrollView,
   Switch,
 } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -49,8 +48,7 @@ export default function OnboardingPage_2({ onContinue, onBack }: OnboardingPage2
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        <View style={styles.content}>
+      <View style={styles.content}>
           {/* Back Arrow */}
           <View style={styles.header}>
             <TouchableOpacity
@@ -127,8 +125,7 @@ export default function OnboardingPage_2({ onContinue, onBack }: OnboardingPage2
               <Text style={styles.continueButtonText}>CONTINUE</Text>
             </TouchableOpacity>
           </View>
-        </View>
-      </ScrollView>
+      </View>
     </SafeAreaView>
   );
 }
@@ -137,9 +134,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#FFF0F7',
-  },
-  scrollContent: {
-    flexGrow: 1,
   },
   content: {
     flex: 1,
