@@ -11,15 +11,30 @@ import {
 import { useRouter } from 'expo-router';
 import OnboardingProgressDots from '../components/OnboardingProgressDots';
 
-export default function OnboardingPage_Username(): React.ReactElement {
+type OnboardingPageUsernameProps = {
+  onContinue?: () => void;
+  onBack?: () => void;
+};
+
+export default function OnboardingPage_Username({ onContinue, onBack }: OnboardingPageUsernameProps): React.ReactElement {
   const router = useRouter();
   const [username, setUsername] = useState('');
 
   const handleGoBack = (): void => {
+    if (onBack) {
+      onBack();
+      return;
+    }
+
     router.push('/');
   };
 
   const handleContinue = (): void => {
+    if (onContinue) {
+      onContinue();
+      return;
+    }
+
     router.push('/OnboardingPage_2');
   };
 

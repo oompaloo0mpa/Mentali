@@ -47,15 +47,30 @@ function EmojiOption({
   );
 }
 
-export default function OnboardingPage_5(): React.ReactElement {
+type OnboardingPage5Props = {
+  onContinue?: () => void;
+  onBack?: () => void;
+};
+
+export default function OnboardingPage_5({ onContinue, onBack }: OnboardingPage5Props): React.ReactElement {
   const router = useRouter();
   const [selectedMood, setSelectedMood] = useState(0);
 
   const handleContinue = (): void => {
+    if (onContinue) {
+      onContinue();
+      return;
+    }
+
     router.push('/HomePage' as never);
   };
 
   const handleGoBack = (): void => {
+    if (onBack) {
+      onBack();
+      return;
+    }
+
     router.replace('/OnboardingPage_4');
   };
 

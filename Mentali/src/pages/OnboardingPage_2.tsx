@@ -12,15 +12,30 @@ import {
 import { useRouter } from 'expo-router';
 import OnboardingProgressDots from '../components/OnboardingProgressDots';
 
-export default function OnboardingPage_2(): React.ReactElement {
+type OnboardingPage2Props = {
+  onContinue?: (isAnonymous: boolean) => void;
+  onBack?: () => void;
+};
+
+export default function OnboardingPage_2({ onContinue, onBack }: OnboardingPage2Props): React.ReactElement {
   const router = useRouter();
   const [isAnonymous, setIsAnonymous] = useState(true);
 
   const handleGoBack = (): void => {
+    if (onBack) {
+      onBack();
+      return;
+    }
+
     router.push('/OnboardingPage_Username');
   };
 
   const handleContinue = (): void => {
+    if (onContinue) {
+      onContinue(isAnonymous);
+      return;
+    }
+
     if (isAnonymous) {
       router.push('/OnboardingPage_3');
     } else {

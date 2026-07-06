@@ -28,14 +28,29 @@ function ThemeSwatch({ color, selected }: { color: string; selected?: boolean })
   );
 }
 
-export default function OnboardingPage_4(): React.ReactElement {
+type OnboardingPage4Props = {
+  onContinue?: () => void;
+  onBack?: () => void;
+};
+
+export default function OnboardingPage_4({ onContinue, onBack }: OnboardingPage4Props): React.ReactElement {
   const router = useRouter();
 
   const handleGoBack = (): void => {
+    if (onBack) {
+      onBack();
+      return;
+    }
+
     router.push('/OnboardingPage_3');
   };
 
   const handleContinue = (): void => {
+    if (onContinue) {
+      onContinue();
+      return;
+    }
+
     router.push('/OnboardingPage_5');
   };
 

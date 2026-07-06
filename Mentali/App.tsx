@@ -7,6 +7,13 @@ import ForgetPasswordPage from '@/pages/ForgetPasswordPage';
 import VerifyCodePage from '@/pages/VerifyCodePage';
 import ResetPasswordPage from '@/pages/ResetPasswordPage';
 import Welcome from '@/pages/Welcome';
+import OnboardingPage_1 from '@/pages/OnboardingPage_1';
+import OnboardingPage_Username from '@/pages/OnboardingPage_Username';
+import OnboardingPage_2 from '@/pages/OnboardingPage_2';
+import OnboardingPage_3 from '@/pages/OnboardingPage_3';
+import OnboardingPage_4 from '@/pages/OnboardingPage_4';
+import OnboardingPage_5 from '@/pages/OnboardingPage_5';
+import NonAnonymousWarningPage from '@/pages/NonAnonymousWarningPage';
 import HomePage from '@/pages/HomePage';
 import WardrobePage from '@/pages/WardrobePage';
 import { SocialProvider } from '@/storage/socialStore';
@@ -44,6 +51,13 @@ type ScreenState =
   | { screen: 'forgot-password' }
   | { screen: 'verify-code' }
   | { screen: 'reset-password' }
+  | { screen: 'onboarding-1' }
+  | { screen: 'onboarding-username' }
+  | { screen: 'onboarding-2' }
+  | { screen: 'onboarding-warning' }
+  | { screen: 'onboarding-3' }
+  | { screen: 'onboarding-4' }
+  | { screen: 'onboarding-5' }
   | { screen: 'home'; selectedNav?: string }
   | { screen: 'chat'; friendId: string; prefill?: boolean; returnToNav: string }
   | { screen: 'streak-guide'; friendId: string; prefill?: boolean; returnToNav: string }
@@ -212,6 +226,10 @@ function AppRoot() {
     setScreenState({ screen: 'home', selectedNav: homeNav });
   };
 
+  const handleOnboardingComplete = () => {
+    handleAuthSuccess();
+  };
+
   const handleSocialAuthSuccess = async (session: SocialAuthResult) => {
     try {
       const result = await loginWithSocial({
@@ -244,7 +262,7 @@ function AppRoot() {
       const result = await registerWithEmail(payload);
       setCurrentUserId(result?.user?._id ?? null);
       await applyAuthUser(result.user);
-      handleAuthSuccess();
+      setScreenState({ screen: 'onboarding-1' });
     } catch (error) {
       Alert.alert('Signup failed', error instanceof Error ? error.message : 'Unable to register user.');
     }
@@ -366,6 +384,40 @@ function AppRoot() {
           <ResetPasswordPage
             onDonePress={handleResetPassword}
             onBackPress={() => setScreenState({ screen: 'verify-code' })}
+          />
+        ) : screenState.screen === 'onboarding-1' ? (
+          <OnboardingPage_1 onContinue={() => setScreenState({ screen: 'onboarding-username' })} />
+        ) : screenState.screen === 'onboarding-username' ? (
+          <OnboardingPage_Username
+            onContinue={() => setScreenState({ screen: 'onboarding-2' })}
+            onBack={() => setScreenState({ screen: 'onboarding-1' })}
+          />
+        ) : screenState.screen === 'onboarding-2' ? (
+          <OnboardingPage_2
+            onContinue={(isAnonymous) =>
+              setScreenState({ screen: isAnonymous ? 'onboarding-3' : 'onboarding-warning' })
+            }
+            onBack={() => setScreenState({ screen: 'onboarding-username' })}
+          />
+        ) : screenState.screen === 'onboarding-warning' ? (
+          <NonAnonymousWarningPage
+            onConfirm={() => setScreenState({ screen: 'onboarding-3' })}
+            onCancel={() => setScreenState({ screen: 'onboarding-2' })}
+          />
+        ) : screenState.screen === 'onboarding-3' ? (
+          <OnboardingPage_3
+            onContinue={() => setScreenState({ screen: 'onboarding-4' })}
+            onBack={() => setScreenState({ screen: 'onboarding-2' })}
+          />
+        ) : screenState.screen === 'onboarding-4' ? (
+          <OnboardingPage_4
+            onContinue={() => setScreenState({ screen: 'onboarding-5' })}
+            onBack={() => setScreenState({ screen: 'onboarding-3' })}
+          />
+        ) : screenState.screen === 'onboarding-5' ? (
+          <OnboardingPage_5
+            onContinue={handleOnboardingComplete}
+            onBack={() => setScreenState({ screen: 'onboarding-4' })}
           />
         ) : screenState.screen === 'home' ? (
           <HomePage
