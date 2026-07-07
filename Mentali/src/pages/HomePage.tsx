@@ -42,6 +42,11 @@ type HomePageProps = {
 
 const bronzeTrophy = require('../../assets/images/BronzeTrophy.png') as ImageSourcePropType;
 const thinkingMascot = require('../../assets/images/thinkingMascot.png') as ImageSourcePropType;
+const wardrobeMascot = require('../../assets/images/MascotCape.png') as ImageSourcePropType;
+const capeItem = require('../../assets/images/cape.png') as ImageSourcePropType;
+const necklaceItem = require('../../assets/images/necklace.png') as ImageSourcePropType;
+const pinItem = require('../../assets/images/pin.png') as ImageSourcePropType;
+const textSpeechItem = require('../../assets/images/textspeech.png') as ImageSourcePropType;
 const arrowIcon = require('../../assets/images/ArrowIcon.png') as ImageSourcePropType;
 const statsIcon = require('../../assets/images/StatsIcon.png') as ImageSourcePropType;
 const diamondIcon = require('../../assets/images/DiamondIcon.png') as ImageSourcePropType;
@@ -69,6 +74,13 @@ type MoodButtonProps = {
   mood: MoodItem;
   selected: boolean;
   onPress: () => void;
+};
+
+type WardrobeItem = {
+  id: string;
+  image: ImageSourcePropType;
+  selected: boolean;
+  locked?: boolean;
 };
 
 function StatPill({ icon, value, color }: StatItem) {
@@ -111,6 +123,105 @@ function QuestCard({ item }: { item: QuestItem }) {
 
 function MascotArt() {
   return <Image source={thinkingMascot} resizeMode="contain" style={styles.mascotImage} />;
+}
+
+function WardrobeMascot({ cape, necklace, pin }: { cape: boolean; necklace: boolean; pin: boolean }) {
+  return (
+    <View style={styles.wardrobeMascotStage}>
+      <View style={styles.wardrobeMascotShadow} />
+      <View style={styles.wardrobeMascotWrap}>
+        <Image source={cape ? wardrobeMascot : thinkingMascot} resizeMode="contain" style={styles.wardrobeMascotBase} />
+        {necklace ? <Image source={necklaceItem} resizeMode="contain" style={styles.wardrobeNecklaceLayer} /> : null}
+        {pin ? <Image source={pinItem} resizeMode="contain" style={styles.wardrobePinLayer} /> : null}
+      </View>
+    </View>
+  );
+}
+
+function WardrobeTile({
+  selected,
+  locked,
+  image,
+  onPress,
+}: {
+  selected: boolean;
+  locked?: boolean;
+  image: ImageSourcePropType;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      disabled={locked}
+      style={({ pressed }) => [
+        styles.wardrobeTile,
+        selected && styles.wardrobeTileSelected,
+        locked && styles.wardrobeTileLocked,
+        pressed && !locked && styles.wardrobeTilePressed,
+      ]}
+    >
+      <Image source={image} resizeMode="contain" style={[styles.wardrobeTileImage, locked && styles.wardrobeTileImageLocked]} />
+      {locked ? <View style={styles.wardrobeTileLockOverlay} /> : null}
+    </Pressable>
+  );
+}
+
+function WardrobeScreen({
+  selectedItems,
+  onToggleItem,
+  onOpenShop,
+}: {
+  selectedItems: { cape: boolean; necklace: boolean; pin: boolean; textSpeech: boolean };
+  onToggleItem: (id: 'cape' | 'necklace' | 'pin' | 'textSpeech') => void;
+  onOpenShop: () => void;
+}) {
+  const items = [
+    { id: 'cape', image: capeItem, selected: selectedItems.cape },
+    { id: 'textSpeech', image: textSpeechItem, selected: selectedItems.textSpeech },
+    { id: 'necklace', image: necklaceItem, selected: selectedItems.necklace },
+    { id: 'locked', image: pinItem, selected: false, locked: true },
+  ] as WardrobeItem[];
+
+  return (
+    <View style={styles.wardrobeScreen}>
+      <View style={styles.wardrobeTopBar}>
+        <Pressable style={styles.shopButton} onPress={onOpenShop} accessibilityRole="button" accessibilityLabel="Open shop and rewards">
+          <Text style={styles.shopButtonText}>Shop</Text>
+        </Pressable>
+      </View>
+
+      <WardrobeMascot cape={selectedItems.cape} necklace={selectedItems.necklace} pin={selectedItems.pin} />
+
+      <ScrollView
+        style={styles.wardrobeScroll}
+        contentContainerStyle={styles.wardrobeScrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.wardrobeTabsRow}>
+          {['Acc.', 'Hair', 'Hats', 'Face', 'Color'].map((label, index) => (
+            <View key={label} style={[styles.wardrobeTab, index === 0 && styles.wardrobeTabActive]}>
+              <Text style={[styles.wardrobeTabText, index === 0 && styles.wardrobeTabTextActive]}>{label}</Text>
+            </View>
+          ))}
+        </View>
+
+        <View style={styles.wardrobeInventoryRow}>
+          {items.map((item) => (
+            <WardrobeTile
+              key={item.id}
+              image={item.image}
+              selected={item.selected}
+              locked={item.locked}
+              onPress={() => {
+                if (item.locked) return;
+                onToggleItem(item.id as 'cape' | 'necklace' | 'pin' | 'textSpeech');
+              }}
+            />
+          ))}
+        </View>
+      </ScrollView>
+    </View>
+  );
 }
 
 function NavPlaceholder({ title, icon }: { title: string; icon: ComponentProps<typeof Ionicons>['name'] }) {
@@ -283,6 +394,12 @@ export default function HomePage({
   const { openSettings, requestLogout } = useSettingsOverlay();
   const { profile, setCurrentMood } = useUserProfile();
   const [selectedNav, setSelectedNav] = useState(initialSelectedNav);
+  const [wardrobeItems, setWardrobeItems] = useState({
+    cape: true,
+    necklace: false,
+    pin: false,
+    textSpeech: false,
+  });
   const [notificationsVisible, setNotificationsVisible] = useState(false);
   const [moreMenuVisible, setMoreMenuVisible] = useState(false);
   const [notifications, setNotifications] = useState<AppNotification[]>(initialNotifications);
@@ -329,60 +446,68 @@ export default function HomePage({
     setNotifications([]);
   };
 
+  const toggleWardrobeItem = (id: 'cape' | 'necklace' | 'pin' | 'textSpeech') => {
+    setWardrobeItems((current) => ({ ...current, [id]: !current[id] }));
+  };
+
   return (
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
       <StatusBar barStyle="light-content" backgroundColor="#282425" />
 
-      <View style={[styles.content, { paddingTop: insets.top - 100 }]}>
-        <View style={styles.topRow}>
-          <View style={styles.statGroup}>
-            {stats.map((item) => (
-              <StatPill key={item.value} {...item} />
-            ))}
-          </View>
+      <View style={[styles.content, { paddingTop: selectedNav === 'shirt-outline' ? 0 : insets.top - 100 }]}>
+        {selectedNav !== 'shirt-outline' ? (
+          <>
+            <View style={styles.topRow}>
+              <View style={styles.statGroup}>
+                {stats.map((item) => (
+                  <StatPill key={item.value} {...item} />
+                ))}
+              </View>
 
-          <View style={styles.actionGroup}>
-            <Pressable
-              accessibilityLabel={`Notifications, ${unreadCount} unread`}
-              onPress={() => setNotificationsVisible(true)}
-              style={styles.notificationButton}
-            >
-              <Ionicons name="notifications-outline" size={20} color="#fff" />
+              <View style={styles.actionGroup}>
+                <Pressable
+                  accessibilityLabel={`Notifications, ${unreadCount} unread`}
+                  onPress={() => setNotificationsVisible(true)}
+                  style={styles.notificationButton}
+                >
+                  <Ionicons name="notifications-outline" size={20} color="#fff" />
 
-              {unreadCount > 0 ? (
-                <View style={styles.notificationBadge}>
-                  <Text style={styles.notificationBadgeText}>{unreadCount > 9 ? '9+' : String(unreadCount)}</Text>
-                </View>
-              ) : null}
-            </Pressable>
-            <Pressable
-              accessibilityLabel="More options"
-              onPress={() => setMoreMenuVisible(true)}
-              style={styles.actionButton}
-            >
-              <Ionicons name="menu-outline" size={22} color="#fff" />
-            </Pressable>
-          </View>
-        </View>
+                  {unreadCount > 0 ? (
+                    <View style={styles.notificationBadge}>
+                      <Text style={styles.notificationBadgeText}>{unreadCount > 9 ? '9+' : String(unreadCount)}</Text>
+                    </View>
+                  ) : null}
+                </Pressable>
+                <Pressable
+                  accessibilityLabel="More options"
+                  onPress={() => setMoreMenuVisible(true)}
+                  style={styles.actionButton}
+                >
+                  <Ionicons name="menu-outline" size={22} color="#fff" />
+                </Pressable>
+              </View>
+            </View>
 
-        <NotificationPanel
-          visible={notificationsVisible}
-          notifications={notifications}
-          unreadCount={unreadCount}
-          onClose={() => setNotificationsVisible(false)}
-          onMarkNotificationRead={markNotificationRead}
-          onMarkAllNotificationsRead={markAllNotificationsRead}
-          onClearNotifications={clearNotifications}
-          topInset={insets.top}
-        />
+            <NotificationPanel
+              visible={notificationsVisible}
+              notifications={notifications}
+              unreadCount={unreadCount}
+              onClose={() => setNotificationsVisible(false)}
+              onMarkNotificationRead={markNotificationRead}
+              onMarkAllNotificationsRead={markAllNotificationsRead}
+              onClearNotifications={clearNotifications}
+              topInset={insets.top}
+            />
 
-        <MoreMenuPanel
-          visible={moreMenuVisible}
-          onClose={() => setMoreMenuVisible(false)}
-          onLogout={requestLogout}
-          onOpenSettings={openSettings}
-          topInset={insets.top}
-        />
+            <MoreMenuPanel
+              visible={moreMenuVisible}
+              onClose={() => setMoreMenuVisible(false)}
+              onLogout={requestLogout}
+              onOpenSettings={openSettings}
+              topInset={insets.top}
+            />
+          </>
+        ) : null}
 
         {isHomeSelected ? (
           <>
@@ -496,6 +621,15 @@ export default function HomePage({
             showHeader={false}
             onOpenChat={(friend) => onOpenChat?.(friend)}
             onSendMotivation={(friend) => onOpenChat?.(friend, true)}
+          />
+        ) : selectedNav === 'shirt-outline' ? (
+          <WardrobeScreen
+            selectedItems={wardrobeItems}
+            onToggleItem={toggleWardrobeItem}
+            onOpenShop={() => {
+              setSelectedNav('bag-outline');
+              onSelectedNavChange?.('bag-outline');
+            }}
           />
         ) : (
           <NavPlaceholder title={navLabels[selectedNav].title} icon={navLabels[selectedNav].icon} />
@@ -789,6 +923,161 @@ const styles = StyleSheet.create({
   },
   moreMenuList: {
     paddingBottom: 4,
+  },
+  wardrobeScreen: {
+    flex: 1,
+    backgroundColor: '#2A2929',
+    paddingTop: 10,
+  },
+  wardrobeTopBar: {
+    height: 82,
+    alignItems: 'flex-end',
+    justifyContent: 'flex-start',
+    paddingRight: 18,
+    paddingTop: 8,
+  },
+  shopButton: {
+    width: 98,
+    height: 56,
+    borderRadius: 14,
+    backgroundColor: '#F68ED4',
+    borderWidth: 3,
+    borderColor: '#FFF6FB',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOpacity: 0.15,
+    shadowRadius: 5,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 3,
+  },
+  shopButtonText: {
+    color: '#fff',
+    fontSize: 20,
+    fontWeight: '700',
+  },
+  wardrobeMascotStage: {
+    flexGrow: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 26,
+    marginBottom: 10,
+  },
+  wardrobeMascotWrap: {
+    width: 390,
+    height: 390,
+    alignItems: 'center',
+    justifyContent: 'center',
+    transform: [{ scale: 0.92 }],
+  },
+  wardrobeMascotBase: {
+    position: 'absolute',
+    width: 360,
+    height: 360,
+  },
+  wardrobeNecklaceLayer: {
+    position: 'absolute',
+    width: 245,
+    height: 245,
+    right: 14,
+    top: 126,
+  },
+  wardrobePinLayer: {
+    position: 'absolute',
+    width: 72,
+    height: 72,
+    right: 16,
+    top: 156,
+    opacity: 0.95,
+  },
+  wardrobeMascotShadow: {
+    position: 'absolute',
+    bottom: 10,
+    width: 300,
+    height: 28,
+    borderRadius: 999,
+    backgroundColor: 'rgba(215, 215, 215, 0.78)',
+  },
+  wardrobeScroll: {
+    flex: 1,
+  },
+  wardrobeScrollContent: {
+    paddingBottom: 18,
+  },
+  wardrobeTabsRow: {
+    height: 82,
+    backgroundColor: '#121212',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 10,
+  },
+  wardrobeTab: {
+    minWidth: 72,
+    height: 82,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  wardrobeTabActive: {
+    borderWidth: 3,
+    borderColor: '#CBD1E8',
+    borderRadius: 2,
+  },
+  wardrobeTabText: {
+    color: '#FFFFFF',
+    fontSize: 20,
+    fontWeight: '600',
+    letterSpacing: -0.2,
+  },
+  wardrobeTabTextActive: {
+    color: '#FFFFFF',
+  },
+  wardrobeInventoryRow: {
+    minHeight: 170,
+    backgroundColor: '#141414',
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    paddingHorizontal: 24,
+    paddingTop: 32,
+    gap: 16,
+  },
+  wardrobeTile: {
+    width: 142,
+    height: 142,
+    borderRadius: 18,
+    backgroundColor: 'transparent',
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOpacity: 0.18,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 3,
+  },
+  wardrobeTileSelected: {
+    borderWidth: 4,
+    borderColor: '#D8D9F1',
+    backgroundColor: '#252529',
+  },
+  wardrobeTileLocked: {
+    backgroundColor: '#252529',
+  },
+  wardrobeTilePressed: {
+    opacity: 0.9,
+  },
+  wardrobeTileImage: {
+    width: 100,
+    height: 100,
+    backgroundColor: 'transparent',
+  },
+  wardrobeTileImageLocked: {
+    opacity: 0.28,
+  },
+  wardrobeTileLockOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(48, 48, 54, 0.42)',
   },
   moreMenuItem: {
     flexDirection: 'row',
