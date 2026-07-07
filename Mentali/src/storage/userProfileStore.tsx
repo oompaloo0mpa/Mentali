@@ -3,7 +3,8 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 
 import { CURRENT_USER } from '@/data/mockData';
 import type { ColorThemeId } from '@/data/colorThemes';
-import { fetchUserPreferences, updateUserPreferences } from '@/services/api';
+import { fetchUserPreferences, fetchUserProfile, updateUserPreferences, updateUserProfile } from '@/services/api';
+import { clearAuthToken, saveAuthToken } from '@/storage/authStorage';
 
 const STORAGE_KEY = 'mentali.user.profile.v1';
 
@@ -12,6 +13,8 @@ export type UserProfile = {
   username: string;
   displayName: string;
   friendCode: string;
+  points: number;
+  currentTier: string;
   /** Current mood chosen on homepage; shared across profile and friends visibility. */
   currentMoodId: string;
   currentMoodEmoji: string;
@@ -27,6 +30,8 @@ const DEFAULT_PROFILE: UserProfile = {
   username: CURRENT_USER.name.toLowerCase(),
   displayName: CURRENT_USER.name,
   friendCode: CURRENT_USER.friendCode,
+  points: 0,
+  currentTier: 'Bronze',
   currentMoodId: 'okay',
   currentMoodEmoji: '😐',
   anonymousMode: false,
@@ -51,13 +56,16 @@ type UserProfileContextValue = {
   setAllowFriendRequests: (enabled: boolean) => void;
   setAllowNotifications: (enabled: boolean) => void;
   setColorTheme: (theme: ColorThemeId) => void;
+  completeOnboarding: (payload: { username?: string; anonymousMode: boolean }) => Promise<void>;
   applyAuthUser: (user: {
     _id?: string;
     id?: string;
     username?: string;
     displayName?: string;
     friendCode?: string;
-  }) => Promise<void>;
+    points?: number;
+    currentTier?: string;
+  }, token?: string | null) => Promise<void>;
   clearProfile: () => Promise<void>;
 };
 
@@ -133,26 +141,44 @@ export function UserProfileProvider({ children }: { children: React.ReactNode })
   }, [profile, hydrated]);
 
   const applyAuthUser = useCallback(
-    async (user: {
-      _id?: string;
-      id?: string;
-      username?: string;
-      displayName?: string;
-      friendCode?: string;
-    }) => {
+    async (
+      user: {
+        _id?: string;
+        id?: string;
+        username?: string;
+        displayName?: string;
+        friendCode?: string;
+        points?: number;
+        currentTier?: string;
+      },
+      token?: string | null,
+    ) => {
       const userId = user._id ?? user.id ?? null;
+      if (token) await saveAuthToken(token);
+
       let loadedPrefs = {
         anonymousMode: false,
         hideMoodFromFriends: false,
         allowFriendRequests: true,
         allowNotifications: true,
         colorTheme: 'pastel' as ColorThemeId,
+        currentMoodId: DEFAULT_PROFILE.currentMoodId,
+        currentMoodEmoji: DEFAULT_PROFILE.currentMoodEmoji,
       };
+      let points = user.points ?? 0;
+      let currentTier = user.currentTier ?? 'Bronze';
 
       if (userId) {
         try {
-          const prefs = await fetchUserPreferences(userId);
-          loadedPrefs = prefsFromApi(prefs);
+          const [prefs, remoteUser] = await Promise.all([
+            fetchUserPreferences(userId),
+            fetchUserProfile(userId),
+          ]);
+          loadedPrefs = { ...loadedPrefs, ...prefsFromApi(prefs) };
+          if (remoteUser) {
+            points = Number(remoteUser.points ?? points);
+            currentTier = String(remoteUser.currentTier ?? currentTier);
+          }
         } catch {
           // Offline or API unavailable — keep local default.
         }
@@ -164,8 +190,32 @@ export function UserProfileProvider({ children }: { children: React.ReactNode })
         username: user.username ?? prev.username,
         displayName: user.displayName ?? prev.displayName,
         friendCode: user.friendCode ?? prev.friendCode,
+        points,
+        currentTier,
         ...loadedPrefs,
       }));
+    },
+    [],
+  );
+
+  const completeOnboarding = useCallback(
+    async (payload: { username?: string; anonymousMode: boolean }) => {
+      setProfile((prev) => {
+        const next = {
+          ...prev,
+          username: payload.username?.trim().toLowerCase() || prev.username,
+          displayName: payload.username?.trim() || prev.displayName,
+          anonymousMode: payload.anonymousMode,
+        };
+        if (prev.userId) {
+          updateUserProfile(prev.userId, {
+            username: next.username,
+            displayName: next.displayName,
+          }).catch(() => {});
+          updateUserPreferences(prev.userId, { anonymousMode: payload.anonymousMode }).catch(() => {});
+        }
+        return next;
+      });
     },
     [],
   );
@@ -219,7 +269,10 @@ export function UserProfileProvider({ children }: { children: React.ReactNode })
 
   const clearProfile = useCallback(async () => {
     setProfile(DEFAULT_PROFILE);
-    await AsyncStorage.removeItem(STORAGE_KEY).catch(() => {});
+    await Promise.all([
+      AsyncStorage.removeItem(STORAGE_KEY).catch(() => {}),
+      clearAuthToken(),
+    ]);
   }, []);
 
   const value = useMemo(
@@ -232,6 +285,7 @@ export function UserProfileProvider({ children }: { children: React.ReactNode })
       setAllowFriendRequests,
       setAllowNotifications,
       setColorTheme,
+      completeOnboarding,
       applyAuthUser,
       clearProfile,
     }),
@@ -244,6 +298,7 @@ export function UserProfileProvider({ children }: { children: React.ReactNode })
       setAllowFriendRequests,
       setAllowNotifications,
       setColorTheme,
+      completeOnboarding,
       applyAuthUser,
       clearProfile,
     ],

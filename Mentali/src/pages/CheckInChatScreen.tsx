@@ -22,7 +22,7 @@ import { colors, spacing } from '@/theme/colors';
 interface Props {
   mood?: MoodOption | null;
   questions: CheckInQuestion[];
-  sessionPlan?: { opener?: string; focus?: string };
+  sessionPlan?: { opener?: string; focus?: string; displayName?: string };
   headerTitle: string;
   completeLabel: string;
   onBack: () => void;

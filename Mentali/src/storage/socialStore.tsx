@@ -5,6 +5,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { moodById } from '@/data/moods';
 import {
   acceptFriendRequest,
+  blockFriendship,
   bootstrapFriendsIfEmpty,
   fetchChatMessages,
   fetchFriendsView,
@@ -760,12 +761,16 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
   );
 
   const blockFriend = useCallback(
-    (friendId: string) =>
+    (friendId: string) => {
       update((prev) => ({
         ...prev,
         friends: prev.friends.map((f) => (f.id === friendId ? { ...f, blocked: true } : f)),
-      })),
-    [update],
+      }));
+      if (profile.userId) {
+        blockFriendship(friendId).catch(() => {});
+      }
+    },
+    [profile.userId, update],
   );
 
   const unblockFriend = useCallback(

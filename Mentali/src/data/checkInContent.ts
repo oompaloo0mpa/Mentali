@@ -96,8 +96,13 @@ export const K10_QUESTIONS: CheckInQuestion[] = [
   options: FREQUENCY_1_5,
 }));
 
+export function greetingForUser(name: string): string {
+  const first = name.trim().split(/\s+/)[0] || 'there';
+  return `Hey ${first}. I am here to listen.`;
+}
+
 export const COPY = {
-  greeting: `Hey ${USER_NAME}. I am here to listen.`,
+  greeting: greetingForUser(USER_NAME),
   intro: 'Want to talk a little about how today has been?',
   declined: 'No worries. I am here whenever you want to chat.',
   moodPrompt: 'Which face feels closest to your day?',

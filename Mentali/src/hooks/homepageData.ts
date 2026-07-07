@@ -17,10 +17,12 @@ export type MoodItem = {
 };
 
 export type QuestItem = {
+  id?: string;
   title: string;
   subtitle: string;
   points: string;
   active: boolean;
+  completed?: boolean;
 };
 
 export type NavItem = {

@@ -29,6 +29,7 @@ import { FriendsScreenContent } from '../components/social/FriendsScreenContent'
 import { BottomNav } from '@/components/nav/BottomNav';
 import { useSettingsOverlay } from '@/storage/settingsOverlayStore';
 import { moodById, moodFromHomeIndex } from '@/data/checkInContent';
+import { fetchDailyQuests } from '@/services/api';
 import type { Friend } from '@/data/mockData';
 import type { MoodOption } from '@/logic/checkin';
 import { useUserProfile } from '@/storage/userProfileStore';
@@ -36,6 +37,9 @@ import { useUserProfile } from '@/storage/userProfileStore';
 type HomePageProps = {
   initialSelectedNav?: string;
   onSelectedNavChange?: (selectedNav: string) => void;
+  checkInStreak?: number;
+  userPoints?: number;
+  userTier?: string;
   onOpenChat?: (friend: Friend, prefillMotivation?: boolean) => void;
   onOpenCheckIn?: (mood: MoodOption) => void;
   onOpenWardrobe?: () => void;
@@ -290,6 +294,9 @@ function MoreMenuPanel({ visible, onClose, onLogout, onOpenSettings, topInset }:
 export default function HomePage({
   initialSelectedNav = navItems.find((item) => item.active)?.icon ?? navItems[0].icon,
   onSelectedNavChange,
+  checkInStreak = 0,
+  userPoints = 0,
+  userTier = 'Bronze',
   onOpenChat,
   onOpenCheckIn,
   onOpenWardrobe,
@@ -300,8 +307,16 @@ export default function HomePage({
   const [notificationsVisible, setNotificationsVisible] = useState(false);
   const [moreMenuVisible, setMoreMenuVisible] = useState(false);
   const [notifications, setNotifications] = useState<AppNotification[]>(initialNotifications);
-  const completedCount = 2;
+  const [dailyQuests, setDailyQuests] = useState<QuestItem[]>(quests);
   const insets = useSafeAreaInsets();
+
+  const completedCount = dailyQuests.filter((quest) => quest.completed).length;
+
+  const headerStats: StatItem[] = [
+    { ...stats[0], value: String(checkInStreak) },
+    { ...stats[1], value: String(userPoints) },
+    stats[2],
+  ];
   const unreadCount = notifications.filter((notification) => !notification.read).length;
   const isHomeSelected = selectedNav === 'home-outline';
   const selectedMood = Math.max(
@@ -316,6 +331,36 @@ export default function HomePage({
   useEffect(() => {
     onSelectedNavChange?.(selectedNav);
   }, [selectedNav, onSelectedNavChange]);
+
+  useEffect(() => {
+    if (!profile.userId) {
+      setDailyQuests(quests);
+      return;
+    }
+
+    let active = true;
+    fetchDailyQuests(profile.userId)
+      .then((rows) => {
+        if (!active || rows.length === 0) return;
+        setDailyQuests(
+          rows.map((row) => ({
+            id: row.id,
+            title: row.title,
+            subtitle: row.description,
+            points: `+${row.rewardPoints} pts`,
+            active: !row.completed,
+            completed: row.completed,
+          })),
+        );
+      })
+      .catch(() => {
+        if (active) setDailyQuests(quests);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [profile.userId]);
 
   const navLabels: Record<string, { title: string; icon: ComponentProps<typeof Ionicons>['name'] }> = {
     'home-outline': { title: 'Home', icon: 'home-outline' },
@@ -354,8 +399,8 @@ export default function HomePage({
       >
         <View style={styles.topRow}>
           <View style={styles.statGroup}>
-            {stats.map((item) => (
-              <StatPill key={item.value} {...item} />
+            {headerStats.map((item) => (
+              <StatPill key={item.value + item.color} {...item} />
             ))}
           </View>
 
@@ -432,13 +477,13 @@ export default function HomePage({
             <View style={styles.sectionHeaderRow}>
               <Text style={styles.sectionTitle}>Daily Quest</Text>
               <Text style={styles.sectionMeta}>
-                <Text style={styles.sectionMetaHighlight}>{completedCount}/3</Text> Completed
+                <Text style={styles.sectionMetaHighlight}>{completedCount}/{dailyQuests.length}</Text> Completed
               </Text>
             </View>
 
             <View style={styles.questList}>
-              {quests.map((item) => (
-                <QuestCard key={item.title} item={item} />
+              {dailyQuests.map((item) => (
+                <QuestCard key={item.id ?? item.title} item={item} />
               ))}
             </View>
 
@@ -465,13 +510,13 @@ export default function HomePage({
                   <Image source={bronzeTrophy} resizeMode="contain" style={styles.trophyImage} />
                   <View style={styles.rankInfo}>
                     <View style={styles.rankNameRow}>
-                      <Text style={styles.rankName}>Bronze</Text>
+                      <Text style={styles.rankName}>{userTier}</Text>
                       <Text style={styles.rankPosition}>#10</Text>
                     </View>
                     <View style={styles.progressBarTrack}>
                       <View style={styles.progressBarFill} />
                     </View>
-                    <Text style={styles.rankPoints}>210 pts</Text>
+                    <Text style={styles.rankPoints}>{userPoints} pts</Text>
                   </View>
                 </View>
               </View>
@@ -492,7 +537,7 @@ export default function HomePage({
                     <Image source={diamondIcon} resizeMode="contain" style={styles.rankStatIconImage} />
                   </View>
                   <View>
-                    <Text style={[styles.rankStatValue, { color: '#C86BFF' }]}>15</Text>
+                    <Text style={[styles.rankStatValue, { color: '#C86BFF' }]}>{userPoints}</Text>
                     <Text style={styles.rankStatLabel}>Points this week</Text>
                   </View>
                 </View>

@@ -33,7 +33,7 @@ export interface UseCheckInChat {
 export function useCheckInChat(
   initialMood: MoodOption | null,
   questions: CheckInQuestion[],
-  sessionPlan?: { opener?: string; focus?: string },
+  sessionPlan?: { opener?: string; focus?: string; displayName?: string },
 ): UseCheckInChat {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [answers, setAnswers] = useState<RecordedAnswer[]>([]);

@@ -1,5 +1,6 @@
 require("dotenv").config();
 const { connectMongo } = require("./mongodb");
+const { DAILY_QUEST_CATALOG } = require("./dailyQuests");
 
 const OID = { bsonType: "objectId" };
 const DATE = { bsonType: "date" };
@@ -46,6 +47,7 @@ const collectionConfigs = [
       { key: { email: 1 }, options: { unique: true } },
       { key: { username: 1 }, options: { unique: true } },
       { key: { friendCode: 1 }, options: { unique: true } },
+      { key: { phone: 1 }, options: { unique: true, sparse: true } },
     ],
   },
   {
@@ -96,8 +98,8 @@ const collectionConfigs = [
                 value: NUM,
                 label: STR,
                 skipped: BOOL,
-                confidence: NUM,
-                source: STR,
+                confidence: { bsonType: ["double", "int", "long", "decimal", "null"] },
+                source: { bsonType: ["string", "null"] },
               },
             },
           },
@@ -168,6 +170,8 @@ const collectionConfigs = [
           createdAt: DATE,
           acceptedAt: { bsonType: ["date", "null"] },
           blockedAt: { bsonType: ["date", "null"] },
+          streak: NUM,
+          lastStreakDate: { bsonType: ["string", "null"] },
         },
       },
     },
@@ -437,18 +441,43 @@ const collectionConfigs = [
           _id: OID,
           userId: OID,
           anonymousMode: BOOL,
-          theme: { enum: ["light", "dark", "pastel"] },
+          theme: { enum: ["light", "dark", "pastel", "midnight", "blossom"] },
           dailyReminderEnabled: BOOL,
           reminderTime: STR,
           encouragementNotifications: BOOL,
           leaderboardNotifications: BOOL,
           showMoodToFriends: BOOL,
           allowFriendRequests: BOOL,
+          currentMoodId: { bsonType: ["string", "null"] },
+          currentMoodEmoji: { bsonType: ["string", "null"] },
           updatedAt: DATE,
         },
       },
     },
     indexes: [{ key: { userId: 1 }, options: { unique: true } }],
+  },
+  {
+    name: "passwordResetCodes",
+    validator: {
+      $jsonSchema: {
+        bsonType: "object",
+        required: ["mode", "value", "code", "userId", "createdAt", "expiresAt", "used"],
+        properties: {
+          _id: OID,
+          mode: { enum: ["phone", "email"] },
+          value: STR,
+          code: STR,
+          userId: OID,
+          createdAt: DATE,
+          expiresAt: DATE,
+          used: BOOL,
+        },
+      },
+    },
+    indexes: [
+      { key: { mode: 1, value: 1 }, options: { unique: true } },
+      { key: { expiresAt: 1 }, options: { expireAfterSeconds: 0 } },
+    ],
   },
 ];
 
@@ -518,28 +547,8 @@ async function seedReferenceData(db) {
     );
   }
 
-  // Starter quests
-  const questSeeds = [
-    {
-      title: "Send a supportive message",
-      description: "Send 1 encouragement message to a friend.",
-      rewardPoints: 5,
-      category: "social",
-    },
-    {
-      title: "Complete today's check-in",
-      description: "Finish your daily mood check-in once today.",
-      rewardPoints: 10,
-      category: "checkin",
-    },
-    {
-      title: "Write a short reflection",
-      description: "Add one reflection note after check-in.",
-      rewardPoints: 8,
-      category: "reflection",
-    },
-  ];
-  for (const quest of questSeeds) {
+  // Daily quest catalog
+  for (const quest of DAILY_QUEST_CATALOG) {
     await db.collection("quests").updateOne(
       { title: quest.title },
       {
@@ -548,6 +557,52 @@ async function seedReferenceData(db) {
           active: true,
           updatedAt: now,
         },
+        $setOnInsert: { createdAt: now },
+      },
+      { upsert: true }
+    );
+  }
+
+  const shopSeeds = [
+    {
+      name: "Pastel Beanie",
+      description: "A cozy beanie for your streak pet.",
+      itemType: "single",
+      category: "cosmetic",
+      price: 25,
+      rarity: "common",
+      imageUrl: "",
+      cosmeticType: "hat",
+      active: true,
+    },
+    {
+      name: "Calm Hoodie",
+      description: "Soft hoodie cosmetic.",
+      itemType: "single",
+      category: "cosmetic",
+      price: 40,
+      rarity: "rare",
+      imageUrl: "",
+      cosmeticType: "top",
+      active: true,
+    },
+    {
+      name: "Blossom Theme",
+      description: "Unlock the blossom color theme.",
+      itemType: "single",
+      category: "theme",
+      price: 60,
+      rarity: "epic",
+      imageUrl: "",
+      cosmeticType: "theme",
+      active: true,
+    },
+  ];
+  for (const item of shopSeeds) {
+    await db.collection("shopItems").updateOne(
+      { name: item.name },
+      {
+        $set: { ...item, updatedAt: now },
         $setOnInsert: { createdAt: now },
       },
       { upsert: true }

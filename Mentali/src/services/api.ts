@@ -2,6 +2,7 @@ import Constants from "expo-constants";
 import { Platform } from "react-native";
 
 import type { DailyCheckInDoc } from "@/services/wellbeingHistory";
+import { getAuthToken, loadAuthToken } from "@/storage/authStorage";
 
 function resolveApiBaseUrl(): string {
   const configured = (process.env.EXPO_PUBLIC_API_BASE_URL ?? "").trim();
@@ -36,13 +37,16 @@ type AuthMode = "phone" | "email";
 type SocialProvider = "apple" | "google";
 
 export async function apiRequest(path: string, options?: RequestInit) {
+  const token = getAuthToken() ?? (await loadAuthToken());
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    ...(options?.headers as Record<string, string> | undefined),
+  };
+  if (token) headers.Authorization = `Bearer ${token}`;
   let response: Response;
   try {
     response = await fetch(`${API_BASE_URL}${path}`, {
-      headers: {
-        "Content-Type": "application/json",
-        ...(options?.headers || {}),
-      },
+      headers,
       ...options,
     });
   } catch {
@@ -232,6 +236,64 @@ export async function bootstrapFriendsIfEmpty(userId: string) {
   return apiRequest(`/friends/bootstrap/${userId}`, { method: 'POST' });
 }
 
+export async function fetchUserProfile(userId: string) {
+  const result = await apiRequest(`/users/${userId}`);
+  return result?.user ?? null;
+}
+
+export async function updateUserProfile(
+  userId: string,
+  payload: { displayName?: string; username?: string },
+) {
+  const result = await apiRequest(`/users/${userId}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+  return result?.user ?? null;
+}
+
+export async function blockFriendship(friendshipId: string) {
+  return apiRequest(`/friends/${friendshipId}/block`, { method: "POST" });
+}
+
+export async function fetchActiveQuests() {
+  const result = await apiRequest("/quests/active");
+  return result?.data ?? [];
+}
+
+export type DailyQuestRow = {
+  id: string;
+  questId: string;
+  title: string;
+  description: string;
+  rewardPoints: number;
+  category: "social" | "checkin" | "reflection";
+  completed: boolean;
+  completedAt?: string | null;
+};
+
+export async function fetchDailyQuests(userId: string): Promise<DailyQuestRow[]> {
+  const result = await apiRequest(`/user-quests/${userId}/daily`);
+  return (result?.data ?? []) as DailyQuestRow[];
+}
+
+export async function assignDailyQuests(userId: string, count = 3) {
+  return apiRequest("/user-quests/assign-daily", {
+    method: "POST",
+    body: JSON.stringify({ userId, count }),
+  });
+}
+
+export async function fetchUserQuests(userId: string) {
+  const result = await apiRequest(`/user-quests/${userId}`);
+  return result?.data ?? [];
+}
+
+export async function fetchShopItems() {
+  const result = await apiRequest("/shop/items");
+  return result?.data ?? [];
+}
+
 export async function lookupUserByFriendCode(code: string, viewerId?: string | null) {
   const params = new URLSearchParams({ code });
   if (viewerId) params.set("viewerId", viewerId);
@@ -295,17 +357,4 @@ export async function sendChatMessage(
 
 export async function deleteAccount(userId: string) {
   return apiRequest(`/users/${userId}`, { method: 'DELETE' });
-}
-
-export async function saveChatbotSession(payload: {
-  userId: string;
-  responses: { questionId: string; value: number; scale: string }[];
-  overallWellbeingLevel: string;
-  generatedInsight: string;
-  sessionDate: string;
-}) {
-  return apiRequest("/chatbot-sessions", {
-    method: "POST",
-    body: JSON.stringify(payload),
-  });
 }

@@ -31,6 +31,8 @@ import {
   updateProfileAfterCheckIn,
 } from '@/logic/checkinPersonalization';
 import { loadCheckInProfile, saveCheckInProfile } from '@/storage/checkInProfileStorage';
+import { loadStreak, saveStreak } from '@/storage/checkInStorage';
+import { loadAuthToken } from '@/storage/authStorage';
 import type { MoodOption, RecordedAnswer, StreakState, WellbeingResult } from '@/logic/checkin';
 import {
   login,
@@ -41,6 +43,7 @@ import {
   saveDailyCheckIn,
   fetchWellbeingHistory,
   verifyResetCode,
+  fetchUserProfile,
 } from '@/services/api';
 import { mapDailyCheckInDocs } from '@/services/wellbeingHistory';
 import {
@@ -93,7 +96,7 @@ export default function App() {
 }
 
 function AppRoot() {
-  const { applyAuthUser, clearProfile } = useUserProfile();
+  const { applyAuthUser, clearProfile, completeOnboarding, profile } = useUserProfile();
   const [screenState, setScreenState] = useState<ScreenState>({ screen: 'welcome' });
   const [loginMode, setLoginMode] = useState<'phone' | 'email'>('email');
   const [recoveryMode, setRecoveryMode] = useState<'phone' | 'email'>('email');
@@ -108,9 +111,13 @@ function AppRoot() {
     lastCheckInDate: null,
   });
   const [checkInProfile, setCheckInProfile] = useState(EMPTY_PROFILE);
+  const [onboardingUsername, setOnboardingUsername] = useState('');
+  const [onboardingAnonymous, setOnboardingAnonymous] = useState(true);
 
   useEffect(() => {
     loadCheckInProfile().then(setCheckInProfile);
+    loadStreak().then(setStreak);
+    loadAuthToken().catch(() => {});
   }, []);
 
   const syncWellbeingHistory = useCallback(async (userId: string) => {
@@ -125,10 +132,32 @@ function AppRoot() {
     }
   }, []);
 
+  const syncUserFromServer = useCallback(async (userId: string) => {
+    try {
+      const user = await fetchUserProfile(userId);
+      if (!user) return;
+      const lastDate = user.lastCheckInDate
+        ? new Date(user.lastCheckInDate).toISOString().slice(0, 10)
+        : null;
+      if (user.currentStreak != null) {
+        const nextStreak = {
+          current: Number(user.currentStreak) || 0,
+          longest: Number(user.longestStreak ?? user.currentStreak) || 0,
+          lastCheckInDate: lastDate,
+        };
+        setStreak(nextStreak);
+        await saveStreak(nextStreak);
+      }
+    } catch {
+      // Keep local streak when offline.
+    }
+  }, []);
+
   useEffect(() => {
     if (!currentUserId) return;
     syncWellbeingHistory(currentUserId).catch(() => {});
-  }, [currentUserId, syncWellbeingHistory]);
+    syncUserFromServer(currentUserId).catch(() => {});
+  }, [currentUserId, syncWellbeingHistory, syncUserFromServer]);
 
   const activeCheckInPlan = useMemo(() => {
     if (screenState.screen !== 'check-in') return null;
@@ -146,10 +175,10 @@ function AppRoot() {
     phq4: WellbeingResult,
     k10: WellbeingResult | null,
   ) => {
-    if (!currentUserId) return;
+    if (!currentUserId) return null;
     const checkInDate = new Date().toISOString().slice(0, 10);
 
-    await saveDailyCheckIn({
+    return saveDailyCheckIn({
       userId: currentUserId,
       moodId: selectedMood.id,
       moodEmoji: selectedMood.emoji,
@@ -192,9 +221,21 @@ function AppRoot() {
     const k10 = answers.some((a) => a.scale === 'k10') ? scoreK10(answers) : null;
     const today = new Date().toISOString().split('T')[0];
 
-    persistCheckInData(answers, selectedMood, phq4, k10).catch(() => {
-      // Non-blocking persistence: keep check-in UX responsive even if API is unreachable.
-    });
+    persistCheckInData(answers, selectedMood, phq4, k10)
+      .then((result) => {
+        if (result?.streak) {
+          const serverStreak = {
+            current: Number(result.streak.current) || 0,
+            longest: Number(result.streak.longest) || 0,
+            lastCheckInDate: today,
+          };
+          setStreak(serverStreak);
+          saveStreak(serverStreak).catch(() => {});
+        }
+      })
+      .catch(() => {
+        // Non-blocking persistence: keep check-in UX responsive even if API is unreachable.
+      });
 
     addHistoryRecord({
       date: today,
@@ -229,6 +270,7 @@ function AppRoot() {
     }
     newStreak.lastCheckInDate = today;
     setStreak(newStreak);
+    saveStreak(newStreak).catch(() => {});
 
     const updatedProfile = updateProfileAfterCheckIn(
       checkInProfile,
@@ -254,7 +296,11 @@ function AppRoot() {
     setScreenState({ screen: 'home', selectedNav: homeNav });
   };
 
-  const handleOnboardingComplete = () => {
+  const handleOnboardingComplete = async () => {
+    await completeOnboarding({
+      username: onboardingUsername,
+      anonymousMode: onboardingAnonymous,
+    });
     handleAuthSuccess();
   };
 
@@ -269,7 +315,8 @@ function AppRoot() {
         accessToken: session.accessToken,
       });
       setCurrentUserId(result?.user?._id ?? null);
-      await applyAuthUser(result.user);
+      await applyAuthUser(result.user, result.token);
+      syncUserFromServer(result?.user?._id).catch(() => {});
       handleAuthSuccess();
     } catch (error) {
       Alert.alert(
@@ -289,7 +336,7 @@ function AppRoot() {
     try {
       const result = await registerWithEmail(payload);
       setCurrentUserId(result?.user?._id ?? null);
-      await applyAuthUser(result.user);
+      await applyAuthUser(result.user, result.token);
       setScreenState({ screen: 'onboarding-1' });
     } catch (error) {
       Alert.alert('Signup failed', error instanceof Error ? error.message : 'Unable to register user.');
@@ -304,7 +351,8 @@ function AppRoot() {
         password: payload.password,
       });
       setCurrentUserId(result?.user?._id ?? null);
-      await applyAuthUser(result.user);
+      await applyAuthUser(result.user, result.token);
+      syncUserFromServer(result?.user?._id).catch(() => {});
       handleAuthSuccess();
     } catch (error) {
       Alert.alert('Login failed', error instanceof Error ? error.message : 'Unable to login.');
@@ -427,14 +475,18 @@ function AppRoot() {
           <OnboardingPage_1 onContinue={() => setScreenState({ screen: 'onboarding-username' })} />
         ) : screenState.screen === 'onboarding-username' ? (
           <OnboardingPage_Username
-            onContinue={() => setScreenState({ screen: 'onboarding-2' })}
+            onContinue={(username) => {
+              setOnboardingUsername(username);
+              setScreenState({ screen: 'onboarding-2' });
+            }}
             onBack={() => setScreenState({ screen: 'onboarding-1' })}
           />
         ) : screenState.screen === 'onboarding-2' ? (
           <OnboardingPage_2
-            onContinue={(isAnonymous) =>
-              setScreenState({ screen: isAnonymous ? 'onboarding-3' : 'onboarding-warning' })
-            }
+            onContinue={(isAnonymous) => {
+              setOnboardingAnonymous(isAnonymous);
+              setScreenState({ screen: isAnonymous ? 'onboarding-3' : 'onboarding-warning' });
+            }}
             onBack={() => setScreenState({ screen: 'onboarding-username' })}
           />
         ) : screenState.screen === 'onboarding-warning' ? (
@@ -461,6 +513,9 @@ function AppRoot() {
           <HomePage
             initialSelectedNav={screenState.selectedNav ?? homeNav}
             onSelectedNavChange={setHomeNav}
+            checkInStreak={streak.current}
+            userPoints={profile.points}
+            userTier={profile.currentTier}
             onOpenChat={(friend, prefill) => openChat(friend.id, prefill)}
             onOpenCheckIn={(mood) => setScreenState({ screen: 'check-in', mood })}
             onOpenWardrobe={() => setScreenState({ screen: 'wardrobe', returnToNav: homeNav })}
@@ -479,7 +534,11 @@ function AppRoot() {
             questions={activeCheckInPlan?.questions ?? []}
             sessionPlan={
               activeCheckInPlan
-                ? { opener: activeCheckInPlan.opener, focus: activeCheckInPlan.focus }
+                ? {
+                    opener: activeCheckInPlan.opener,
+                    focus: activeCheckInPlan.focus,
+                    displayName: profile.displayName,
+                  }
                 : undefined
             }
             headerTitle="Wellbeing chat"

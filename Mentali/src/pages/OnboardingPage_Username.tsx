@@ -12,7 +12,7 @@ import { useRouter } from 'expo-router';
 import OnboardingProgressDots from '../components/OnboardingProgressDots';
 
 type OnboardingPageUsernameProps = {
-  onContinue?: () => void;
+  onContinue?: (username: string) => void;
   onBack?: () => void;
 };
 
@@ -30,8 +30,9 @@ export default function OnboardingPage_Username({ onContinue, onBack }: Onboardi
   };
 
   const handleContinue = (): void => {
+    const trimmed = username.trim();
     if (onContinue) {
-      onContinue();
+      onContinue(trimmed);
       return;
     }
 

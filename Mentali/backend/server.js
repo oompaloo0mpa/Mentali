@@ -5,6 +5,7 @@ const bcrypt = require("bcryptjs");
 const { Buffer } = require("node:buffer");
 const { ObjectId } = require("mongodb");
 const { connectMongo } = require("./mongodb");
+const { signToken, requireAuth, assertSelf } = require("./auth");
 
 const app = express();
 app.use(cors());
@@ -41,6 +42,33 @@ function stripSensitive(user) {
   if (!user) return user;
   const { passwordHash, ...safe } = user;
   return safe;
+}
+
+function authPayload(user) {
+  const id = user._id?.toString?.() ?? String(user._id);
+  return { user: stripSensitive(user), token: signToken(id) };
+}
+
+const PREFERENCE_FIELDS = new Set([
+  "anonymousMode",
+  "theme",
+  "dailyReminderEnabled",
+  "reminderTime",
+  "encouragementNotifications",
+  "leaderboardNotifications",
+  "showMoodToFriends",
+  "allowFriendRequests",
+  "currentMoodId",
+  "currentMoodEmoji",
+]);
+
+function pickPreferencePatch(body) {
+  const patch = {};
+  if (!body || typeof body !== "object") return patch;
+  for (const key of PREFERENCE_FIELDS) {
+    if (body[key] !== undefined) patch[key] = body[key];
+  }
+  return patch;
 }
 
 async function areFriends(db, userA, userB) {
@@ -426,7 +454,7 @@ app.post("/api/auth/register", async (req, res, next) => {
     );
 
     const created = await db.collection("users").findOne({ _id: userId });
-    res.status(201).json({ user: stripSensitive(created) });
+    res.status(201).json(authPayload(created));
   } catch (e) {
     next(e);
   }
@@ -455,6 +483,43 @@ app.post("/api/auth/login", async (req, res, next) => {
     const ok = await bcrypt.compare(String(password), user.passwordHash || "");
     if (!ok) return res.status(401).json({ error: "Invalid credentials" });
 
+    res.json(authPayload(user));
+  } catch (e) {
+    next(e);
+  }
+});
+
+app.get("/api/users/:userId", requireAuth, async (req, res, next) => {
+  try {
+    if (!assertSelf(req, res, req.params.userId)) return;
+    const { db } = await connectMongo();
+    const uid = toObjectId(req.params.userId, "userId");
+    const user = await db.collection("users").findOne({ _id: uid });
+    if (!user) return res.status(404).json({ error: "User not found" });
+    res.json({ user: stripSensitive(user) });
+  } catch (e) {
+    next(e);
+  }
+});
+
+app.patch("/api/users/:userId", requireAuth, async (req, res, next) => {
+  try {
+    if (!assertSelf(req, res, req.params.userId)) return;
+    const { db } = await connectMongo();
+    const uid = toObjectId(req.params.userId, "userId");
+    const { displayName, username } = req.body || {};
+    const patch = { updatedAt: new Date() };
+    if (displayName != null) patch.displayName = String(displayName).trim();
+    if (username != null) patch.username = String(username).trim().toLowerCase();
+    if (patch.username) {
+      const taken = await db.collection("users").findOne({
+        username: patch.username,
+        _id: { $ne: uid },
+      });
+      if (taken) return res.status(409).json({ error: "Username already taken" });
+    }
+    await db.collection("users").updateOne({ _id: uid }, { $set: patch });
+    const user = await db.collection("users").findOne({ _id: uid });
     res.json({ user: stripSensitive(user) });
   } catch (e) {
     next(e);
@@ -554,7 +619,7 @@ app.post("/api/auth/social", async (req, res, next) => {
       { upsert: true }
     );
 
-    res.json({ user: stripSensitive(user) });
+    res.json(authPayload(user));
   } catch (e) {
     next(e);
   }
@@ -589,8 +654,13 @@ app.post("/api/auth/request-reset", async (req, res, next) => {
       { upsert: true }
     );
 
-    // Demo response includes code. Replace with email/SMS provider in production.
-    res.json({ ok: true, code });
+    // Demo only: include code when not in production.
+    const payload = { ok: true };
+    if (process.env.NODE_ENV !== "production") {
+      payload.code = code;
+      payload.demoNote = "Reset code shown for local development only.";
+    }
+    res.json(payload);
   } catch (e) {
     next(e);
   }
@@ -668,21 +738,56 @@ function normalizeCheckInResponses(responses) {
     .map((item) => {
       const scale = String(item?.scale || "");
       if (!["phq4", "k10"].includes(scale)) return null;
-      return {
+      const row = {
         questionId: String(item.questionId || ""),
         scale,
         dimension: String(item.dimension || "distress"),
         value: Number(item.value ?? 0),
         label: String(item.label || ""),
         skipped: !!item.skipped,
-        confidence: item.confidence == null ? null : Number(item.confidence),
-        source: item.source ? String(item.source) : null,
       };
+      if (item.confidence != null) row.confidence = Number(item.confidence);
+      if (item.source) row.source = String(item.source);
+      return row;
     })
     .filter((item) => item && item.questionId);
 }
 
-app.post("/api/daily-checkins", async (req, res, next) => {
+async function applyUserDailyStreak(db, userId, dateValue, isFirstCheckInToday) {
+  if (!isFirstCheckInToday) return null;
+  const user = await db.collection("users").findOne({ _id: userId });
+  if (!user) return null;
+
+  const today = dateValue.toISOString().slice(0, 10);
+  const yesterday = yesterdayIso(today);
+  const last =
+    user.lastCheckInDate instanceof Date
+      ? user.lastCheckInDate.toISOString().slice(0, 10)
+      : user.lastCheckInDate
+        ? String(user.lastCheckInDate).slice(0, 10)
+        : null;
+
+  let current = Number(user.currentStreak || 0);
+  let longest = Number(user.longestStreak || 0);
+  if (last === yesterday) current += 1;
+  else if (last !== today) current = 1;
+  longest = Math.max(longest, current);
+
+  await db.collection("users").updateOne(
+    { _id: userId },
+    {
+      $set: {
+        currentStreak: current,
+        longestStreak: longest,
+        lastCheckInDate: dateValue,
+        updatedAt: new Date(),
+      },
+    }
+  );
+  return { current, longest };
+}
+
+app.post("/api/daily-checkins", requireAuth, async (req, res, next) => {
   try {
     const { db } = await connectMongo();
     const {
@@ -696,13 +801,15 @@ app.post("/api/daily-checkins", async (req, res, next) => {
       k10,
       responses,
     } = req.body || {};
+    if (!assertSelf(req, res, userId)) return;
     const now = new Date();
     const dateValue = checkInDate ? new Date(checkInDate) : new Date(now.toISOString().slice(0, 10));
-    const uid = toObjectId(userId, "userId");
+    const uid = toObjectId(req.authUserId, "userId");
     const existing = await db.collection("dailyCheckIns").findOne({
       userId: uid,
       checkInDate: dateValue,
     });
+    const isFirstCheckInToday = !existing;
 
     const doc = {
       userId: uid,
@@ -718,19 +825,22 @@ app.post("/api/daily-checkins", async (req, res, next) => {
       updatedAt: now,
     };
 
-    const result = await db.collection("dailyCheckIns").updateOne(
+    await db.collection("dailyCheckIns").updateOne(
       { userId: doc.userId, checkInDate: doc.checkInDate },
       { $set: doc },
       { upsert: true }
     );
-    res.status(201).json({ ok: true, upsertedId: result.upsertedId?.toString() || null });
+
+    const streak = await applyUserDailyStreak(db, uid, dateValue, isFirstCheckInToday);
+    res.status(201).json({ ok: true, streak });
   } catch (e) {
     next(e);
   }
 });
 
-app.get("/api/daily-checkins/:userId", async (req, res, next) => {
+app.get("/api/daily-checkins/:userId", requireAuth, async (req, res, next) => {
   try {
+    if (!assertSelf(req, res, req.params.userId)) return;
     const { db } = await connectMongo();
     const userId = toObjectId(req.params.userId, "userId");
     const data = await db.collection("dailyCheckIns").find({ userId }).sort({ createdAt: -1 }).limit(60).toArray();
@@ -741,6 +851,70 @@ app.get("/api/daily-checkins/:userId", async (req, res, next) => {
 });
 
 const { generateCheckInReply } = require("./checkinChat");
+const { DAILY_QUEST_CATALOG } = require("./dailyQuests");
+
+function todayDateOnly() {
+  return new Date(new Date().toISOString().slice(0, 10));
+}
+
+async function assignDailyQuestsForUser(db, uid, count = 3) {
+  const today = todayDateOnly();
+  const existing = await db.collection("userQuests").find({ userId: uid, assignedDate: today }).toArray();
+  if (existing.length >= count) return existing;
+
+  const alreadyIds = existing.map((row) => row.questId);
+  const needed = count - existing.length;
+
+  const pool = await db
+    .collection("quests")
+    .aggregate([
+      { $match: { active: true, _id: { $nin: alreadyIds } } },
+      { $sample: { size: needed } },
+    ])
+    .toArray();
+
+  const now = new Date();
+  for (const quest of pool) {
+    await db.collection("userQuests").updateOne(
+      { userId: uid, questId: quest._id, assignedDate: today },
+      {
+        $setOnInsert: {
+          userId: uid,
+          questId: quest._id,
+          assignedDate: today,
+          completed: false,
+          completedAt: null,
+          createdAt: now,
+          updatedAt: now,
+        },
+      },
+      { upsert: true }
+    );
+  }
+
+  return db.collection("userQuests").find({ userId: uid, assignedDate: today }).toArray();
+}
+
+async function dailyQuestsWithDetails(db, uid) {
+  const rows = await assignDailyQuestsForUser(db, uid, 3);
+  const questIds = rows.map((row) => row.questId);
+  const quests = await db.collection("quests").find({ _id: { $in: questIds } }).toArray();
+  const questMap = new Map(quests.map((q) => [String(q._id), q]));
+
+  return rows.map((row) => {
+    const quest = questMap.get(String(row.questId));
+    return {
+      id: row._id.toString(),
+      questId: row.questId.toString(),
+      title: quest?.title ?? "Daily quest",
+      description: quest?.description ?? "",
+      rewardPoints: Number(quest?.rewardPoints ?? 0),
+      category: quest?.category ?? "checkin",
+      completed: !!row.completed,
+      completedAt: row.completedAt ?? null,
+    };
+  });
+}
 
 app.post("/api/checkin/chat", async (req, res, next) => {
   try {
@@ -793,8 +967,9 @@ app.get("/api/chatbot-sessions/:userId", async (req, res, next) => {
   }
 });
 
-app.get("/api/users/lookup-by-code", async (req, res, next) => {
+app.get("/api/users/lookup-by-code", requireAuth, async (req, res, next) => {
   try {
+    if (!assertSelf(req, res, req.query.viewerId)) return;
     const { db } = await connectMongo();
     const code = String(req.query.code || "")
       .trim()
@@ -813,10 +988,11 @@ app.get("/api/users/lookup-by-code", async (req, res, next) => {
   }
 });
 
-app.post("/api/friends/request-by-code", async (req, res, next) => {
+app.post("/api/friends/request-by-code", requireAuth, async (req, res, next) => {
   try {
     const { db } = await connectMongo();
     const { fromUserId, friendCode } = req.body || {};
+    if (!assertSelf(req, res, fromUserId)) return;
     const from = toObjectId(fromUserId, "fromUserId");
     const code = String(friendCode || "")
       .trim()
@@ -907,11 +1083,20 @@ app.post("/api/friends/request", async (req, res, next) => {
   }
 });
 
-app.post("/api/friends/:id/accept", async (req, res, next) => {
+app.post("/api/friends/:id/accept", requireAuth, async (req, res, next) => {
   try {
     const { db } = await connectMongo();
+    const friendshipId = toObjectId(req.params.id);
+    const row = await db.collection("friends").findOne({ _id: friendshipId });
+    if (!row) return res.status(404).json({ error: "Friend request not found" });
+    if (String(row.requestedBy) === String(req.authUserId)) {
+      return res.status(403).json({ error: "Cannot accept your own request" });
+    }
+    if (![String(row.userAId), String(row.userBId)].includes(String(req.authUserId))) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
     await db.collection("friends").updateOne(
-      { _id: toObjectId(req.params.id) },
+      { _id: friendshipId },
       { $set: { status: "accepted", acceptedAt: new Date(), blockedAt: null } }
     );
     res.json({ ok: true });
@@ -920,21 +1105,33 @@ app.post("/api/friends/:id/accept", async (req, res, next) => {
   }
 });
 
-app.post("/api/friends/:id/reject", async (req, res, next) => {
+app.post("/api/friends/:id/reject", requireAuth, async (req, res, next) => {
   try {
     const { db } = await connectMongo();
-    await db.collection("friends").deleteOne({ _id: toObjectId(req.params.id) });
+    const friendshipId = toObjectId(req.params.id);
+    const row = await db.collection("friends").findOne({ _id: friendshipId });
+    if (!row) return res.status(404).json({ error: "Friendship not found" });
+    if (![String(row.userAId), String(row.userBId)].includes(String(req.authUserId))) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+    await db.collection("friends").deleteOne({ _id: friendshipId });
     res.json({ ok: true });
   } catch (e) {
     next(e);
   }
 });
 
-app.post("/api/friends/:id/block", async (req, res, next) => {
+app.post("/api/friends/:id/block", requireAuth, async (req, res, next) => {
   try {
     const { db } = await connectMongo();
+    const friendshipId = toObjectId(req.params.id);
+    const row = await db.collection("friends").findOne({ _id: friendshipId });
+    if (!row) return res.status(404).json({ error: "Friendship not found" });
+    if (![String(row.userAId), String(row.userBId)].includes(String(req.authUserId))) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
     await db.collection("friends").updateOne(
-      { _id: toObjectId(req.params.id) },
+      { _id: friendshipId },
       { $set: { status: "blocked", blockedAt: new Date() } }
     );
     res.json({ ok: true });
@@ -961,8 +1158,9 @@ app.get("/api/friends/raw/:userId", async (req, res, next) => {
   }
 });
 
-app.get("/api/friends/view/:userId", async (req, res, next) => {
+app.get("/api/friends/view/:userId", requireAuth, async (req, res, next) => {
   try {
+    if (!assertSelf(req, res, req.params.userId)) return;
     const { db } = await connectMongo();
     const userId = toObjectId(req.params.userId, "userId");
     const today = todayIso();
@@ -1060,8 +1258,9 @@ app.get("/api/friends/view/:userId", async (req, res, next) => {
   }
 });
 
-app.post("/api/friends/bootstrap/:userId", async (req, res, next) => {
+app.post("/api/friends/bootstrap/:userId", requireAuth, async (req, res, next) => {
   try {
+    if (!assertSelf(req, res, req.params.userId)) return;
     const { db } = await connectMongo();
     const result = await ensureFriendBootstrapData(db, req.params.userId);
     res.json({ ok: true, ...result });
@@ -1070,8 +1269,9 @@ app.post("/api/friends/bootstrap/:userId", async (req, res, next) => {
   }
 });
 
-app.get("/api/chats/:friendshipId/messages", async (req, res, next) => {
+app.get("/api/chats/:friendshipId/messages", requireAuth, async (req, res, next) => {
   try {
+    if (!assertSelf(req, res, req.query.viewerUserId)) return;
     const { db } = await connectMongo();
     const viewerUserId = String(req.query.viewerUserId || "");
     if (!viewerUserId) return res.status(400).json({ error: "viewerUserId is required" });
@@ -1106,10 +1306,11 @@ app.get("/api/chats/:friendshipId/messages", async (req, res, next) => {
   }
 });
 
-app.post("/api/chats/:friendshipId/messages", async (req, res, next) => {
+app.post("/api/chats/:friendshipId/messages", requireAuth, async (req, res, next) => {
   try {
     const { db } = await connectMongo();
     const { senderUserId, text = "", imageUri = null, fileName = null, fileUri = null } = req.body || {};
+    if (!assertSelf(req, res, senderUserId)) return;
     if (!senderUserId) return res.status(400).json({ error: "senderUserId is required" });
     if (!String(text).trim() && !imageUri && !fileName) {
       return res.status(400).json({ error: "Message content is required" });
@@ -1184,36 +1385,42 @@ app.get("/api/support-messages/random", async (_req, res, next) => {
 app.get("/api/quests/active", async (_req, res, next) => {
   try {
     const { db } = await connectMongo();
-    const data = await db.collection("quests").find({ active: true }).toArray();
+    const data = await db.collection("quests").find({ active: true }).sort({ category: 1, title: 1 }).toArray();
+    res.json({ data, catalogSize: DAILY_QUEST_CATALOG.length });
+  } catch (e) {
+    next(e);
+  }
+});
+
+app.post("/api/user-quests/assign-daily", requireAuth, async (req, res, next) => {
+  try {
+    const { db } = await connectMongo();
+    const { userId, count = 3 } = req.body || {};
+    if (!assertSelf(req, res, userId)) return;
+    const uid = toObjectId(userId, "userId");
+    const rows = await assignDailyQuestsForUser(db, uid, Number(count) || 3);
+    const data = await dailyQuestsWithDetails(db, uid);
+    res.json({ ok: true, assigned: rows.length, data });
+  } catch (e) {
+    next(e);
+  }
+});
+
+app.get("/api/user-quests/:userId/daily", requireAuth, async (req, res, next) => {
+  try {
+    if (!assertSelf(req, res, req.params.userId)) return;
+    const { db } = await connectMongo();
+    const uid = toObjectId(req.params.userId, "userId");
+    const data = await dailyQuestsWithDetails(db, uid);
     res.json({ data });
   } catch (e) {
     next(e);
   }
 });
 
-app.post("/api/user-quests/assign-daily", async (req, res, next) => {
+app.get("/api/user-quests/:userId", requireAuth, async (req, res, next) => {
   try {
-    const { db } = await connectMongo();
-    const { userId, count = 3 } = req.body || {};
-    const uid = toObjectId(userId, "userId");
-    const today = new Date(new Date().toISOString().slice(0, 10));
-    const quests = await db.collection("quests").aggregate([{ $match: { active: true } }, { $sample: { size: Number(count) } }]).toArray();
-    const now = new Date();
-    for (const q of quests) {
-      await db.collection("userQuests").updateOne(
-        { userId: uid, questId: q._id, assignedDate: today },
-        { $setOnInsert: { userId: uid, questId: q._id, assignedDate: today, completed: false, completedAt: null, createdAt: now, updatedAt: now } },
-        { upsert: true }
-      );
-    }
-    res.json({ ok: true, assigned: quests.length });
-  } catch (e) {
-    next(e);
-  }
-});
-
-app.get("/api/user-quests/:userId", async (req, res, next) => {
-  try {
+    if (!assertSelf(req, res, req.params.userId)) return;
     const { db } = await connectMongo();
     const uid = toObjectId(req.params.userId, "userId");
     const data = await db.collection("userQuests").find({ userId: uid }).sort({ assignedDate: -1 }).toArray();
@@ -1223,14 +1430,29 @@ app.get("/api/user-quests/:userId", async (req, res, next) => {
   }
 });
 
-app.post("/api/user-quests/:id/complete", async (req, res, next) => {
+app.post("/api/user-quests/:id/complete", requireAuth, async (req, res, next) => {
   try {
     const { db } = await connectMongo();
+    const questRowId = toObjectId(req.params.id);
+    const userQuest = await db.collection("userQuests").findOne({ _id: questRowId });
+    if (!userQuest) return res.status(404).json({ error: "Quest not found" });
+    if (!assertSelf(req, res, userQuest.userId)) return;
+    if (userQuest.completed) return res.json({ ok: true, pointsAwarded: 0 });
+
+    const quest = await db.collection("quests").findOne({ _id: userQuest.questId });
+    const reward = Number(quest?.rewardPoints || 0);
+
     await db.collection("userQuests").updateOne(
-      { _id: toObjectId(req.params.id) },
+      { _id: questRowId },
       { $set: { completed: true, completedAt: new Date(), updatedAt: new Date() } }
     );
-    res.json({ ok: true });
+    if (reward > 0) {
+      await db.collection("users").updateOne(
+        { _id: userQuest.userId },
+        { $inc: { points: reward }, $set: { updatedAt: new Date() } }
+      );
+    }
+    res.json({ ok: true, pointsAwarded: reward });
   } catch (e) {
     next(e);
   }
@@ -1246,25 +1468,44 @@ app.get("/api/shop/items", async (_req, res, next) => {
   }
 });
 
-app.post("/api/shop/purchase", async (req, res, next) => {
+app.post("/api/shop/purchase", requireAuth, async (req, res, next) => {
   try {
     const { db } = await connectMongo();
     const { userId, itemId, obtainedFrom = "shop" } = req.body || {};
-    const uid = toObjectId(userId, "userId");
+    if (!assertSelf(req, res, userId)) return;
+    const uid = toObjectId(req.authUserId, "userId");
     const iid = toObjectId(itemId, "itemId");
+    const item = await db.collection("shopItems").findOne({ _id: iid, active: true });
+    if (!item) return res.status(404).json({ error: "Item not found" });
+
+    const user = await db.collection("users").findOne({ _id: uid });
+    const price = Number(item.price || 0);
+    const points = Number(user?.points || 0);
+    if (price > points) return res.status(400).json({ error: "Not enough points" });
+
+    const owned = await db.collection("userInventory").findOne({ userId: uid, itemId: iid });
+    if (owned) return res.json({ ok: true, alreadyOwned: true });
+
     await db.collection("userInventory").updateOne(
       { userId: uid, itemId: iid },
       { $setOnInsert: { userId: uid, itemId: iid, obtainedFrom, acquiredAt: new Date() } },
       { upsert: true }
     );
-    res.json({ ok: true });
+    if (price > 0) {
+      await db.collection("users").updateOne(
+        { _id: uid },
+        { $inc: { points: -price }, $set: { updatedAt: new Date() } }
+      );
+    }
+    res.json({ ok: true, pointsSpent: price });
   } catch (e) {
     next(e);
   }
 });
 
-app.get("/api/shop/inventory/:userId", async (req, res, next) => {
+app.get("/api/shop/inventory/:userId", requireAuth, async (req, res, next) => {
   try {
+    if (!assertSelf(req, res, req.params.userId)) return;
     const { db } = await connectMongo();
     const uid = toObjectId(req.params.userId, "userId");
     const data = await db.collection("userInventory").find({ userId: uid }).toArray();
@@ -1341,10 +1582,18 @@ app.get("/api/leaderboard/contests/:contestId/participants", async (req, res, ne
   }
 });
 
-app.delete("/api/users/:userId", async (req, res, next) => {
+app.delete("/api/users/:userId", requireAuth, async (req, res, next) => {
   try {
+    if (!assertSelf(req, res, req.params.userId)) return;
     const { db } = await connectMongo();
     const uid = toObjectId(req.params.userId, "userId");
+
+    const friendships = await db
+      .collection("friends")
+      .find({ $or: [{ userAId: uid }, { userBId: uid }] })
+      .project({ _id: 1 })
+      .toArray();
+    const friendshipIds = friendships.map((f) => f._id);
 
     await Promise.all([
       db.collection("userPreferences").deleteMany({ userId: uid }),
@@ -1352,6 +1601,13 @@ app.delete("/api/users/:userId", async (req, res, next) => {
       db.collection("dailyCheckIns").deleteMany({ userId: uid }),
       db.collection("chatbotSessions").deleteMany({ userId: uid }),
       db.collection("passwordResetCodes").deleteMany({ userId: uid }),
+      db.collection("userQuests").deleteMany({ userId: uid }),
+      db.collection("userInventory").deleteMany({ userId: uid }),
+      db.collection("equippedItems").deleteMany({ userId: uid }),
+      db.collection("contestParticipants").deleteMany({ userId: uid }),
+      friendshipIds.length
+        ? db.collection("chatMessages").deleteMany({ friendshipId: { $in: friendshipIds } })
+        : Promise.resolve(),
       db.collection("users").deleteOne({ _id: uid }),
     ]);
 
@@ -1361,8 +1617,9 @@ app.delete("/api/users/:userId", async (req, res, next) => {
   }
 });
 
-app.get("/api/preferences/:userId", async (req, res, next) => {
+app.get("/api/preferences/:userId", requireAuth, async (req, res, next) => {
   try {
+    if (!assertSelf(req, res, req.params.userId)) return;
     const { db } = await connectMongo();
     const uid = toObjectId(req.params.userId, "userId");
     const data = await db.collection("userPreferences").findOne({ userId: uid });
@@ -1372,13 +1629,15 @@ app.get("/api/preferences/:userId", async (req, res, next) => {
   }
 });
 
-app.put("/api/preferences/:userId", async (req, res, next) => {
+app.put("/api/preferences/:userId", requireAuth, async (req, res, next) => {
   try {
+    if (!assertSelf(req, res, req.params.userId)) return;
     const { db } = await connectMongo();
     const uid = toObjectId(req.params.userId, "userId");
+    const patch = pickPreferencePatch(req.body);
     await db.collection("userPreferences").updateOne(
       { userId: uid },
-      { $set: { ...req.body, userId: uid, updatedAt: new Date() } },
+      { $set: { ...patch, userId: uid, updatedAt: new Date() } },
       { upsert: true }
     );
     const data = await db.collection("userPreferences").findOne({ userId: uid });
