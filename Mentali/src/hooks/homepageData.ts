@@ -58,26 +58,83 @@ export const moods: MoodItem[] = MOOD_OPTIONS.map((m) => ({
   homeKey: m.homeKey,
 }));
 
-export const quests: QuestItem[] = [
+export const questPool: QuestItem[] = [
   {
-    title: 'Daily Check-in',
-    subtitle: 'Complete your daily check-in with Mentali',
+    title: "Complete today's check-in",
+    subtitle: 'Finish your daily wellbeing chat once today.',
     points: '+10 pts',
     active: true,
   },
   {
-    title: 'How are you feeling today?',
-    subtitle: 'Pick your mood depending on',
+    title: 'Pick your mood',
+    subtitle: 'Choose how you feel on the homepage mood strip.',
     points: '+5 pts',
     active: true,
   },
   {
-    title: 'Talk to a friend!',
-    subtitle: 'Send a quick message to a friend of yours',
+    title: 'Read your summary',
+    subtitle: 'Open your check-in summary and see how you are doing.',
     points: '+5 pts',
-    active: false,
+    active: true,
+  },
+  {
+    title: 'Keep your streak alive',
+    subtitle: 'Check in on a day when your streak is still going.',
+    points: '+8 pts',
+    active: true,
+  },
+  {
+    title: 'Send a supportive message',
+    subtitle: 'Send one encouraging message to a friend.',
+    points: '+5 pts',
+    active: true,
+  },
+  {
+    title: 'Talk to a friend',
+    subtitle: 'Open a friend chat and say hello.',
+    points: '+5 pts',
+    active: true,
+  },
+  {
+    title: 'Grow your circle',
+    subtitle: 'Send or accept a friend request.',
+    points: '+8 pts',
+    active: true,
+  },
+  {
+    title: 'Protect your messaging streak',
+    subtitle: 'Send a message to keep a friend streak going.',
+    points: '+8 pts',
+    active: true,
+  },
+  {
+    title: 'Write a short reflection',
+    subtitle: 'Add a few words about how today felt for you.',
+    points: '+8 pts',
+    active: true,
+  },
+  {
+    title: 'Name one good thing',
+    subtitle: 'Think of one small thing that went okay today.',
+    points: '+5 pts',
+    active: true,
+  },
+  {
+    title: 'Take a mindful pause',
+    subtitle: 'Spend one minute noticing your breath or surroundings.',
+    points: '+5 pts',
+    active: true,
+  },
+  {
+    title: 'Plan a gentle next step',
+    subtitle: 'Choose one small thing that might help you tomorrow.',
+    points: '+6 pts',
+    active: true,
   },
 ];
+
+/** @deprecated Use questPool — kept for backwards compatibility */
+export const quests: QuestItem[] = questPool.slice(0, 3);
 
 export const navItems: NavItem[] = [
   { icon: 'home-outline', active: true },

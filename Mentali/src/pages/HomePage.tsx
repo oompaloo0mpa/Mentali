@@ -18,7 +18,7 @@ import {
   initialNotifications,
   moods,
   navItems,
-  quests,
+  questPool,
   stats,
   type AppNotification,
   type MoodItem,
@@ -121,8 +121,19 @@ function QuestCard({ item }: { item: QuestItem }) {
   );
 }
 
+function mapDailyQuestRows(rows: Awaited<ReturnType<typeof fetchDailyQuests>>): QuestItem[] {
+  return rows.map((row) => ({
+    id: row.id,
+    title: row.title,
+    subtitle: row.description,
+    points: `+${row.rewardPoints} pts`,
+    active: !row.completed,
+    completed: row.completed,
+  }));
+}
+
 function sampleDailyQuests(): QuestItem[] {
-  const pool = [...quests];
+  const pool = [...questPool];
   const picked: QuestItem[] = [];
 
   while (picked.length < 3 && pool.length > 0) {
@@ -320,7 +331,7 @@ export default function HomePage({
   const [notificationsVisible, setNotificationsVisible] = useState(false);
   const [moreMenuVisible, setMoreMenuVisible] = useState(false);
   const [notifications, setNotifications] = useState<AppNotification[]>(initialNotifications);
-  const [dailyQuests, setDailyQuests] = useState<QuestItem[]>(quests);
+  const [dailyQuests, setDailyQuests] = useState<QuestItem[]>(() => sampleDailyQuests());
   const [refreshingQuests, setRefreshingQuests] = useState(false);
   const insets = useSafeAreaInsets();
 
@@ -356,16 +367,7 @@ export default function HomePage({
     fetchDailyQuests(profile.userId)
       .then((rows) => {
         if (!active || rows.length === 0) return;
-        setDailyQuests(
-          rows.map((row) => ({
-            id: row.id,
-            title: row.title,
-            subtitle: row.description,
-            points: `+${row.rewardPoints} pts`,
-            active: !row.completed,
-            completed: row.completed,
-          })),
-        );
+        setDailyQuests(mapDailyQuestRows(rows));
       })
       .catch(() => {
         if (active) setDailyQuests(sampleDailyQuests());
@@ -380,20 +382,8 @@ export default function HomePage({
     setRefreshingQuests(true);
     try {
       if (profile.userId) {
-        await assignDailyQuests(profile.userId, 3, true);
-        const rows = await fetchDailyQuests(profile.userId);
-        setDailyQuests(
-          rows.length > 0
-            ? rows.map((row) => ({
-                id: row.id,
-                title: row.title,
-                subtitle: row.description,
-                points: `+${row.rewardPoints} pts`,
-                active: !row.completed,
-                completed: row.completed,
-              }))
-            : sampleDailyQuests(),
-        );
+        const rows = await assignDailyQuests(profile.userId, 3, true);
+        setDailyQuests(rows.length > 0 ? mapDailyQuestRows(rows) : sampleDailyQuests());
       } else {
         setDailyQuests(sampleDailyQuests());
       }

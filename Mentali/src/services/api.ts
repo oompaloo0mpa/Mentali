@@ -277,11 +277,16 @@ export async function fetchDailyQuests(userId: string): Promise<DailyQuestRow[]>
   return (result?.data ?? []) as DailyQuestRow[];
 }
 
-export async function assignDailyQuests(userId: string, count = 3, replace = false) {
-  return apiRequest("/user-quests/assign-daily", {
+export async function assignDailyQuests(
+  userId: string,
+  count = 3,
+  replace = false,
+): Promise<DailyQuestRow[]> {
+  const result = await apiRequest("/user-quests/assign-daily", {
     method: "POST",
     body: JSON.stringify({ userId, count, replace }),
   });
+  return (result?.data ?? []) as DailyQuestRow[];
 }
 
 export async function fetchUserQuests(userId: string) {

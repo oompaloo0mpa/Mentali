@@ -64,7 +64,7 @@ function stripSensitive(user) {
 }
 
 function authPayload(user) {
-  const id = user._id ? .toString ? .() ? ? String(user._id);
+  const id = user._id ?.toString ?.() ?? String(user._id);
   return {
     user: stripSensitive(user),
     token: signToken(id)
@@ -224,7 +224,7 @@ async function ensureFriendBootstrapData(db, userId) {
     const existing = await db.collection("users").findOne({
       username: seed.username
     });
-    let outId = existing ? ._id;
+    let outId = existing ?._id;
     if (!outId) {
       const inserted = await db.collection("users").insertOne({
         email: seed.email,
@@ -368,7 +368,7 @@ async function loadFriendshipForUser(db, friendshipId, viewerUserId) {
 function publicUserView(user, prefs, {
   isFriend
 }) {
-  const anonymousMode = !!prefs ? .anonymousMode;
+  const anonymousMode = !!prefs ?.anonymousMode;
   if (!anonymousMode || isFriend) {
     return {
       _id: user._id,
@@ -695,11 +695,11 @@ app.post("/api/auth/social", async (req, res, next) => {
 
     const claims = decodeJwtPayload(identityToken);
     const providerSub =
-      String(claims ? .sub || "").trim() ||
+      String(claims ?.sub || "").trim() ||
       String(authorizationCode || "").trim() ||
       String(accessToken || "").trim() ||
       null;
-    const providerEmail = String(claims ? .email || email || "")
+    const providerEmail = String(claims ?.email || email || "")
       .trim()
       .toLowerCase();
 
@@ -721,7 +721,7 @@ app.post("/api/auth/social", async (req, res, next) => {
 
     if (!user) {
       const displayName =
-        String(fullName || claims ? .name || "").trim() ||
+        String(fullName || claims ?.name || "").trim() ||
         (providerEmail ? providerEmail.split("@")[0] : "Mentali user");
 
       const usernameSeed = providerEmail ? providerEmail.split("@")[0] : `${provider}_user`;
@@ -957,14 +957,14 @@ function normalizeWellbeingScale(payload, scale) {
     total: Number(payload.total),
     band,
     suggestSupport: !!payload.suggestSupport,
-    answeredCount: Number(payload.answeredCount ? ? 0),
-    itemCount: Number(payload.itemCount ? ? 0),
+    answeredCount: Number(payload.answeredCount ?? 0),
+    itemCount: Number(payload.itemCount ?? 0),
   };
   if (scale === "phq4") {
     return {
       ...base,
-      anxietyScore: Number(payload.anxietyScore ? ? 0),
-      moodScore: Number(payload.moodScore ? ? 0),
+      anxietyScore: Number(payload.anxietyScore ?? 0),
+      moodScore: Number(payload.moodScore ?? 0),
     };
   }
   return base;
@@ -974,13 +974,13 @@ function normalizeCheckInResponses(responses) {
   if (!Array.isArray(responses)) return [];
   return responses
     .map((item) => {
-      const scale = String(item ? .scale || "");
+      const scale = String(item ?.scale || "");
       if (!["phq4", "k10"].includes(scale)) return null;
       const row = {
         questionId: String(item.questionId || ""),
         scale,
         dimension: String(item.dimension || "distress"),
-        value: Number(item.value ? ? 0),
+        value: Number(item.value ?? 0),
         label: String(item.label || ""),
         skipped: !!item.skipped,
       };
@@ -1065,7 +1065,7 @@ app.post("/api/daily-checkins", requireAuth, async (req, res, next) => {
       phq4: normalizeWellbeingScale(phq4, "phq4"),
       k10: normalizeWellbeingScale(k10, "k10"),
       responses: normalizeCheckInResponses(responses),
-      createdAt: existing ? .createdAt ? ? now,
+      createdAt: existing ?.createdAt ?? now,
       updatedAt: now,
     };
 
@@ -1199,12 +1199,12 @@ async function dailyQuestsWithDetails(db, uid, replaceExisting = false) {
     return {
       id: row._id.toString(),
       questId: row.questId.toString(),
-      title: quest ? .title ? ? "Daily quest",
-      description: quest ? .description ? ? "",
-      rewardPoints: Number(quest ? .rewardPoints ? ? 0),
-      category: quest ? .category ? ? "checkin",
+      title: quest ?.title ?? "Daily quest",
+      description: quest ?.description ?? "",
+      rewardPoints: Number(quest ?.rewardPoints ?? 0),
+      category: quest ?.category ?? "checkin",
       completed: !!row.completed,
-      completedAt: row.completedAt ? ? null,
+      completedAt: row.completedAt ?? null,
     };
   });
 }
@@ -1226,12 +1226,12 @@ app.post("/api/checkin/chat", async (req, res, next) => {
 
     const result = await generateCheckInReply({
       mood,
-      questions: questions ? ? [],
-      answers: answers ? ? [],
-      messages: messages ? ? [],
-      userMessage: userMessage ? ? null,
-      selectedOption: selectedOption ? ? null,
-      ackIndex: ackIndex ? ? 0,
+      questions: questions ?? [],
+      answers: answers ?? [],
+      messages: messages ?? [],
+      userMessage: userMessage ?? null,
+      selectedOption: selectedOption ?? null,
+      ackIndex: ackIndex ?? 0,
     });
 
     res.json(result);
@@ -1662,23 +1662,23 @@ app.get("/api/friends/view/:userId", requireAuth, async (req, res, next) => {
         if (!user) return null;
         const pref = prefMap.get(otherId);
         const checkin = latestCheckin.get(otherId);
-        const checkInIso = checkin ? .checkInDate ? new Date(checkin.checkInDate).toISOString().slice(0, 10) : null;
-        const showMood = pref ? .showMoodToFriends !== false;
+        const checkInIso = checkin ?.checkInDate ? new Date(checkin.checkInDate).toISOString().slice(0, 10) : null;
+        const showMood = pref ?.showMoodToFriends !== false;
 
         return {
           id: String(r._id),
           userId: otherId,
           name: user.displayName || user.username || "Friend",
           code: user.friendCode,
-          streak: Number(r.streak ? ? 0),
+          streak: Number(r.streak ?? 0),
           lastSeen: relativeLastSeen(user.updatedAt),
           streakDone: checkInIso === today,
           lastStreakDoneDate: checkInIso,
           lastStreakDate: r.lastStreakDate || null,
           addedAt: new Date(r.createdAt || new Date()).getTime(),
           blocked: r.status === "blocked",
-          moodId: showMood ? pref ? .currentMoodId || null : null,
-          moodEmoji: showMood ? pref ? .currentMoodEmoji || checkin ? .moodEmoji || null : null,
+          moodId: showMood ? pref ?.currentMoodId || null : null,
+          moodEmoji: showMood ? pref ?.currentMoodEmoji || checkin ?.moodEmoji || null : null,
         };
       })
       .filter(Boolean);
@@ -1694,7 +1694,7 @@ app.get("/api/friends/view/:userId", requireAuth, async (req, res, next) => {
           userId: otherId,
           name: user.displayName || user.username || "Friend",
           username: user.username || null,
-          anonymousMode: !!pref ? .anonymousMode,
+          anonymousMode: !!pref ?.anonymousMode,
         };
       })
       .filter(Boolean);
@@ -1914,11 +1914,10 @@ app.post("/api/user-quests/assign-daily", requireAuth, async (req, res, next) =>
     } = req.body || {};
     if (!assertSelf(req, res, userId)) return;
     const uid = toObjectId(userId, "userId");
-    const rows = await assignDailyQuestsForUser(db, uid, Number(count) || 3, !!replace);
     const data = await dailyQuestsWithDetails(db, uid, !!replace);
     res.json({
       ok: true,
-      assigned: rows.length,
+      assigned: data.length,
       data
     });
   } catch (e) {
@@ -1983,7 +1982,7 @@ app.post("/api/user-quests/:id/complete", requireAuth, async (req, res, next) =>
     const quest = await db.collection("quests").findOne({
       _id: userQuest.questId
     });
-    const reward = Number(quest ? .rewardPoints || 0);
+    const reward = Number(quest ?.rewardPoints || 0);
 
     await db.collection("userQuests").updateOne({
       _id: questRowId
@@ -2056,7 +2055,7 @@ app.post("/api/shop/purchase", requireAuth, async (req, res, next) => {
       _id: uid
     });
     const price = Number(item.price || 0);
-    const points = Number(user ? .points || 0);
+    const points = Number(user ?.points || 0);
     if (price > points) return res.status(400).json({
       error: "Not enough points"
     });
