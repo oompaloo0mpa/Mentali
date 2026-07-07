@@ -15,11 +15,34 @@ export type UserProfile = {
   /** Current mood chosen on homepage; shared across profile and friends visibility. */
   currentMoodId: string;
   currentMoodEmoji: string;
+  wardrobe: WardrobeSelection;
   anonymousMode: boolean;
   hideMoodFromFriends: boolean;
   allowFriendRequests: boolean;
   allowNotifications: boolean;
   colorTheme: ColorThemeId;
+};
+
+type PreferenceKey =
+  | 'anonymousMode'
+  | 'hideMoodFromFriends'
+  | 'allowFriendRequests'
+  | 'allowNotifications';
+
+export type WardrobeSlot = 'accessory' | 'hair' | 'hat' | 'face';
+
+export type WardrobeSelection = {
+  accessory: 'necklace' | null;
+  hair: 'ponytail' | 'wavvyhair' | null;
+  hat: 'fedora' | null;
+  face: 'cuteFace' | 'shockedFace' | null;
+};
+
+const DEFAULT_WARDROBE: WardrobeSelection = {
+  accessory: null,
+  hair: null,
+  hat: null,
+  face: null,
 };
 
 const DEFAULT_PROFILE: UserProfile = {
@@ -29,6 +52,7 @@ const DEFAULT_PROFILE: UserProfile = {
   friendCode: CURRENT_USER.friendCode,
   currentMoodId: 'okay',
   currentMoodEmoji: '😐',
+  wardrobe: DEFAULT_WARDROBE,
   anonymousMode: false,
   hideMoodFromFriends: false,
   allowFriendRequests: true,
@@ -36,16 +60,21 @@ const DEFAULT_PROFILE: UserProfile = {
   colorTheme: 'pastel',
 };
 
-type PreferenceKey =
-  | 'anonymousMode'
-  | 'hideMoodFromFriends'
-  | 'allowFriendRequests'
-  | 'allowNotifications';
+function normalizeWardrobe(value: Partial<WardrobeSelection> | null | undefined): WardrobeSelection {
+  return {
+    accessory: value?.accessory === 'necklace' ? value.accessory : null,
+    hair: value?.hair === 'ponytail' || value?.hair === 'wavvyhair' ? value.hair : null,
+    hat: value?.hat === 'fedora' ? value.hat : null,
+    face: value?.face === 'cuteFace' || value?.face === 'shockedFace' ? value.face : null,
+  };
+}
 
 type UserProfileContextValue = {
   profile: UserProfile;
   hydrated: boolean;
   setCurrentMood: (mood: { id: string; emoji: string }) => void;
+  setWardrobeItem: (slot: WardrobeSlot, itemId: WardrobeSelection[WardrobeSlot]) => void;
+  clearWardrobe: () => void;
   setAnonymousMode: (enabled: boolean) => void;
   setHideMoodFromFriends: (enabled: boolean) => void;
   setAllowFriendRequests: (enabled: boolean) => void;
@@ -114,7 +143,12 @@ export function UserProfileProvider({ children }: { children: React.ReactNode })
       try {
         const raw = await AsyncStorage.getItem(STORAGE_KEY);
         if (active && raw) {
-          setProfile({ ...DEFAULT_PROFILE, ...(JSON.parse(raw) as UserProfile) });
+          const parsed = JSON.parse(raw) as Partial<UserProfile>;
+          setProfile({
+            ...DEFAULT_PROFILE,
+            ...parsed,
+            wardrobe: normalizeWardrobe(parsed.wardrobe),
+          });
         }
       } catch {
         // Ignore corrupt storage.
@@ -191,6 +225,23 @@ export function UserProfileProvider({ children }: { children: React.ReactNode })
     });
   }, []);
 
+  const setWardrobeItem = useCallback((slot: WardrobeSlot, itemId: WardrobeSelection[WardrobeSlot]) => {
+    setProfile((prev) => ({
+      ...prev,
+      wardrobe: {
+        ...normalizeWardrobe(prev.wardrobe),
+        [slot]: itemId,
+      },
+    }));
+  }, []);
+
+  const clearWardrobe = useCallback(() => {
+    setProfile((prev) => ({
+      ...prev,
+      wardrobe: DEFAULT_WARDROBE,
+    }));
+  }, []);
+
   const setAnonymousMode = useCallback(
     (enabled: boolean) => setPreference('anonymousMode', enabled),
     [setPreference],
@@ -228,6 +279,8 @@ export function UserProfileProvider({ children }: { children: React.ReactNode })
       hydrated,
       setAnonymousMode,
       setCurrentMood,
+      setWardrobeItem,
+      clearWardrobe,
       setHideMoodFromFriends,
       setAllowFriendRequests,
       setAllowNotifications,
@@ -240,6 +293,8 @@ export function UserProfileProvider({ children }: { children: React.ReactNode })
       hydrated,
       setAnonymousMode,
       setCurrentMood,
+      setWardrobeItem,
+      clearWardrobe,
       setHideMoodFromFriends,
       setAllowFriendRequests,
       setAllowNotifications,

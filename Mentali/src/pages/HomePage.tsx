@@ -25,12 +25,13 @@ import {
   type StatItem,
 } from '../hooks/homepageData';
 import { FriendsScreenContent } from '../components/social/FriendsScreenContent';
+import { WardrobeMascotPreview, WardrobeScreenContent } from '@/components/wardrobe/WardrobeScreenContent';
 import { BottomNav } from '@/components/nav/BottomNav';
 import { useSettingsOverlay } from '@/storage/settingsOverlayStore';
 import { moodById, moodFromHomeIndex } from '@/data/checkInContent';
 import type { Friend } from '@/data/mockData';
 import type { MoodOption } from '@/logic/checkin';
-import { useUserProfile } from '@/storage/userProfileStore';
+import { useUserProfile, type WardrobeSelection } from '@/storage/userProfileStore';
 
 type HomePageProps = {
   initialSelectedNav?: string;
@@ -41,12 +42,6 @@ type HomePageProps = {
 };
 
 const bronzeTrophy = require('../../assets/images/BronzeTrophy.png') as ImageSourcePropType;
-const thinkingMascot = require('../../assets/images/thinkingMascot.png') as ImageSourcePropType;
-const wardrobeMascot = require('../../assets/images/MascotCape.png') as ImageSourcePropType;
-const capeItem = require('../../assets/images/cape.png') as ImageSourcePropType;
-const necklaceItem = require('../../assets/images/necklace.png') as ImageSourcePropType;
-const pinItem = require('../../assets/images/pin.png') as ImageSourcePropType;
-const textSpeechItem = require('../../assets/images/textspeech.png') as ImageSourcePropType;
 const arrowIcon = require('../../assets/images/ArrowIcon.png') as ImageSourcePropType;
 const statsIcon = require('../../assets/images/StatsIcon.png') as ImageSourcePropType;
 const diamondIcon = require('../../assets/images/DiamondIcon.png') as ImageSourcePropType;
@@ -74,13 +69,6 @@ type MoodButtonProps = {
   mood: MoodItem;
   selected: boolean;
   onPress: () => void;
-};
-
-type WardrobeItem = {
-  id: string;
-  image: ImageSourcePropType;
-  selected: boolean;
-  locked?: boolean;
 };
 
 function StatPill({ icon, value, color }: StatItem) {
@@ -121,107 +109,8 @@ function QuestCard({ item }: { item: QuestItem }) {
   );
 }
 
-function MascotArt() {
-  return <Image source={thinkingMascot} resizeMode="contain" style={styles.mascotImage} />;
-}
-
-function WardrobeMascot({ cape, necklace, pin }: { cape: boolean; necklace: boolean; pin: boolean }) {
-  return (
-    <View style={styles.wardrobeMascotStage}>
-      <View style={styles.wardrobeMascotShadow} />
-      <View style={styles.wardrobeMascotWrap}>
-        <Image source={cape ? wardrobeMascot : thinkingMascot} resizeMode="contain" style={styles.wardrobeMascotBase} />
-        {necklace ? <Image source={necklaceItem} resizeMode="contain" style={styles.wardrobeNecklaceLayer} /> : null}
-        {pin ? <Image source={pinItem} resizeMode="contain" style={styles.wardrobePinLayer} /> : null}
-      </View>
-    </View>
-  );
-}
-
-function WardrobeTile({
-  selected,
-  locked,
-  image,
-  onPress,
-}: {
-  selected: boolean;
-  locked?: boolean;
-  image: ImageSourcePropType;
-  onPress: () => void;
-}) {
-  return (
-    <Pressable
-      onPress={onPress}
-      disabled={locked}
-      style={({ pressed }) => [
-        styles.wardrobeTile,
-        selected && styles.wardrobeTileSelected,
-        locked && styles.wardrobeTileLocked,
-        pressed && !locked && styles.wardrobeTilePressed,
-      ]}
-    >
-      <Image source={image} resizeMode="contain" style={[styles.wardrobeTileImage, locked && styles.wardrobeTileImageLocked]} />
-      {locked ? <View style={styles.wardrobeTileLockOverlay} /> : null}
-    </Pressable>
-  );
-}
-
-function WardrobeScreen({
-  selectedItems,
-  onToggleItem,
-  onOpenShop,
-}: {
-  selectedItems: { cape: boolean; necklace: boolean; pin: boolean; textSpeech: boolean };
-  onToggleItem: (id: 'cape' | 'necklace' | 'pin' | 'textSpeech') => void;
-  onOpenShop: () => void;
-}) {
-  const items = [
-    { id: 'cape', image: capeItem, selected: selectedItems.cape },
-    { id: 'textSpeech', image: textSpeechItem, selected: selectedItems.textSpeech },
-    { id: 'necklace', image: necklaceItem, selected: selectedItems.necklace },
-    { id: 'locked', image: pinItem, selected: false, locked: true },
-  ] as WardrobeItem[];
-
-  return (
-    <View style={styles.wardrobeScreen}>
-      <View style={styles.wardrobeTopBar}>
-        <Pressable style={styles.shopButton} onPress={onOpenShop} accessibilityRole="button" accessibilityLabel="Open shop and rewards">
-          <Text style={styles.shopButtonText}>Shop</Text>
-        </Pressable>
-      </View>
-
-      <WardrobeMascot cape={selectedItems.cape} necklace={selectedItems.necklace} pin={selectedItems.pin} />
-
-      <ScrollView
-        style={styles.wardrobeScroll}
-        contentContainerStyle={styles.wardrobeScrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        <View style={styles.wardrobeTabsRow}>
-          {['Acc.', 'Hair', 'Hats', 'Face', 'Color'].map((label, index) => (
-            <View key={label} style={[styles.wardrobeTab, index === 0 && styles.wardrobeTabActive]}>
-              <Text style={[styles.wardrobeTabText, index === 0 && styles.wardrobeTabTextActive]}>{label}</Text>
-            </View>
-          ))}
-        </View>
-
-        <View style={styles.wardrobeInventoryRow}>
-          {items.map((item) => (
-            <WardrobeTile
-              key={item.id}
-              image={item.image}
-              selected={item.selected}
-              locked={item.locked}
-              onPress={() => {
-                if (item.locked) return;
-                onToggleItem(item.id as 'cape' | 'necklace' | 'pin' | 'textSpeech');
-              }}
-            />
-          ))}
-        </View>
-      </ScrollView>
-    </View>
-  );
+function MascotArt({ wardrobe }: { wardrobe: WardrobeSelection }) {
+  return <WardrobeMascotPreview wardrobe={wardrobe} size={112} />;
 }
 
 function NavPlaceholder({ title, icon }: { title: string; icon: ComponentProps<typeof Ionicons>['name'] }) {
@@ -394,12 +283,6 @@ export default function HomePage({
   const { openSettings, requestLogout } = useSettingsOverlay();
   const { profile, setCurrentMood } = useUserProfile();
   const [selectedNav, setSelectedNav] = useState(initialSelectedNav);
-  const [wardrobeItems, setWardrobeItems] = useState({
-    cape: true,
-    necklace: false,
-    pin: false,
-    textSpeech: false,
-  });
   const [notificationsVisible, setNotificationsVisible] = useState(false);
   const [moreMenuVisible, setMoreMenuVisible] = useState(false);
   const [notifications, setNotifications] = useState<AppNotification[]>(initialNotifications);
@@ -444,10 +327,6 @@ export default function HomePage({
 
   const clearNotifications = () => {
     setNotifications([]);
-  };
-
-  const toggleWardrobeItem = (id: 'cape' | 'necklace' | 'pin' | 'textSpeech') => {
-    setWardrobeItems((current) => ({ ...current, [id]: !current[id] }));
   };
 
   return (
@@ -517,7 +396,7 @@ export default function HomePage({
                 <View style={styles.quoteTail} />
               </View>
 
-              <MascotArt />
+              <MascotArt wardrobe={profile.wardrobe} />
             </View>
 
             <View style={styles.moodsRow}>
@@ -623,9 +502,7 @@ export default function HomePage({
             onSendMotivation={(friend) => onOpenChat?.(friend, true)}
           />
         ) : selectedNav === 'shirt-outline' ? (
-          <WardrobeScreen
-            selectedItems={wardrobeItems}
-            onToggleItem={toggleWardrobeItem}
+          <WardrobeScreenContent
             onOpenShop={() => {
               setSelectedNav('bag-outline');
               onSelectedNavChange?.('bag-outline');

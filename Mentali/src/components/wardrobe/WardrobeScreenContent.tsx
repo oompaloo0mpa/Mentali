@@ -10,68 +10,67 @@ import {
   View,
 } from 'react-native';
 
-const thinkingMascot = require('../../../assets/images/thinkingMascot.png') as ImageSourcePropType;
-const mascotCape = require('../../../assets/images/MascotCape.png') as ImageSourcePropType;
+import { useUserProfile, type WardrobeSelection, type WardrobeSlot } from '@/storage/userProfileStore';
 
-type CosmeticItem = {
+const nakedMascot = require('../../../assets/images/sprites/nakedMascot.png') as ImageSourcePropType;
+const facelessNakedMascot = require('../../../assets/images/sprites/facelessNakedMascot.png') as ImageSourcePropType;
+const facelessNakedMascotNecklace = require('../../../assets/images/sprites/facelessNakedMascotNecklace.png') as ImageSourcePropType;
+const necklaceSprite = require('../../../assets/images/sprites/necklace.png') as ImageSourcePropType;
+const fedoraSprite = require('../../../assets/images/sprites/fedora.png') as ImageSourcePropType;
+const cuteFaceSprite = require('../../../assets/images/sprites/cuteFace.png') as ImageSourcePropType;
+const shockedFaceSprite = require('../../../assets/images/sprites/shockedFace.png') as ImageSourcePropType;
+const ponytailSprite = require('../../../assets/images/sprites/ponytail.png') as ImageSourcePropType;
+const wavvyHairSprite = require('../../../assets/images/sprites/wavvyhair.png') as ImageSourcePropType;
+
+type WardrobeItem = {
   id: string;
-  name: string;
+  label: string;
   image: ImageSourcePropType;
-  mascotImage?: ImageSourcePropType;
+  slot: WardrobeSlot;
 };
 
 type Category = {
   label: string;
-  items: CosmeticItem[];
+  slot: WardrobeSlot | 'color';
+  items: WardrobeItem[];
 };
 
 const CATEGORIES: Category[] = [
   {
     label: 'Acc.',
+    slot: 'accessory',
     items: [
-      {
-        id: 'cape',
-        name: 'Cape',
-        image: require('../../../assets/images/Cape.png') as ImageSourcePropType,
-        mascotImage: mascotCape,
-      },
-      {
-        id: 'necklace',
-        name: 'Necklace',
-        image: require('../../../assets/images/Necklace.png') as ImageSourcePropType,
-      },
-      {
-        id: 'badge',
-        name: 'Badge',
-        image: require('../../../assets/images/Badge.png') as ImageSourcePropType,
-      },
-      {
-        id: 'textspeech',
-        name: 'Speech',
-        image: require('../../../assets/images/TextSpeech.png') as ImageSourcePropType,
-      },
+      { id: 'necklace', label: 'Necklace', image: necklaceSprite, slot: 'accessory' },
     ],
   },
-  { label: 'Hair', items: [] },
-  { label: 'Hats', items: [] },
-  { label: 'Face', items: [] },
-  { label: 'Color', items: [] },
+  {
+    label: 'Hair',
+    slot: 'hair',
+    items: [
+      { id: 'ponytail', label: 'Ponytail', image: ponytailSprite, slot: 'hair' },
+      { id: 'wavvyhair', label: 'Wavy Hair', image: wavvyHairSprite, slot: 'hair' },
+    ],
+  },
+  {
+    label: 'Hats',
+    slot: 'hat',
+    items: [{ id: 'fedora', label: 'Fedora', image: fedoraSprite, slot: 'hat' }],
+  },
+  {
+    label: 'Face',
+    slot: 'face',
+    items: [
+      { id: 'cuteFace', label: 'Cute Face', image: cuteFaceSprite, slot: 'face' },
+      { id: 'shockedFace', label: 'Shocked Face', image: shockedFaceSprite, slot: 'face' },
+    ],
+  },
+  { label: 'Color', slot: 'color', items: [] },
 ];
 
-function getMascotImage(equippedId: string | null): ImageSourcePropType {
-  if (!equippedId) return thinkingMascot;
-  for (const cat of CATEGORIES) {
-    for (const item of cat.items) {
-      if (item.id === equippedId && item.mascotImage) {
-        return item.mascotImage;
-      }
-    }
-  }
-  return thinkingMascot;
-}
+const CATEGORY_ORDER: WardrobeSlot[] = ['accessory', 'hair', 'hat', 'face'];
 
 type ItemCellProps = {
-  item: CosmeticItem;
+  item: WardrobeItem;
   equipped: boolean;
   size: number;
   onPress: () => void;
@@ -87,24 +86,80 @@ function ItemCell({ item, equipped, size, onPress }: ItemCellProps) {
         equipped && styles.itemCellEquipped,
       ]}
     >
-      <Image
-        source={item.image}
-        resizeMode="contain"
-        style={{ width: size * 0.7, height: size * 0.7 }}
-      />
+      <Image source={item.image} resizeMode="contain" style={{ width: size * 0.74, height: size * 0.74 }} />
     </Pressable>
   );
 }
 
-type EmptyCategory = {
-  label: string;
-};
-
-function EmptyCategoryView({ label }: EmptyCategory) {
+function EmptyCategoryView({ label }: { label: string }) {
   return (
     <View style={styles.emptyState}>
       <Text style={styles.emptyStateText}>No {label} items yet</Text>
       <Text style={styles.emptyStateSubtext}>Visit the Shop to unlock cosmetics</Text>
+    </View>
+  );
+}
+
+type MascotPreviewProps = {
+  wardrobe: WardrobeSelection;
+  size: number;
+};
+
+export function WardrobeMascotPreview({ wardrobe, size }: MascotPreviewProps) {
+  const shadowWidth = size * 0.56;
+  const mascotBox = { width: size, height: size };
+  const baseMascot = wardrobe.accessory === 'necklace'
+    ? facelessNakedMascotNecklace
+    : wardrobe.face
+      ? facelessNakedMascot
+      : nakedMascot;
+
+  const faceStyle = {
+    width: size * 0.54,
+    height: size * 0.42,
+    left: size * 0.23,
+    top: size * 0.27,
+  };
+
+  const hairStyle = {
+    width: size * 0.78,
+    height: size * 0.7,
+    left: size * 0.21,
+    top: size * 0.02,
+    transform: [{ scaleX: 2.5 }],
+  };
+
+  const necklaceStyle = {
+    width: size * 0.80,
+    height: size * 1.2,
+    left: size * 0.10,
+    top: size * 0,
+  };
+
+  const hatStyle = {
+    width: size * 0.60,
+    height: size * 0.36,
+    left: size * 0.20,
+    top: size * 0.1,
+  };
+
+  return (
+    <View style={[styles.mascotStage, { width: size, height: size + 28 }]}> 
+      <Image source={baseMascot} resizeMode="contain" style={[styles.mascotLayer, mascotBox]} />
+      {wardrobe.face === 'cuteFace' ? (
+        <Image source={cuteFaceSprite} resizeMode="contain" style={[styles.mascotLayer, faceStyle]} />
+      ) : wardrobe.face === 'shockedFace' ? (
+        <Image source={shockedFaceSprite} resizeMode="contain" style={[styles.mascotLayer, faceStyle]} />
+      ) : null}
+      {wardrobe.hair === 'ponytail' ? (
+        <Image source={ponytailSprite} resizeMode="contain" style={[styles.mascotLayer, hairStyle]} />
+      ) : wardrobe.hair === 'wavvyhair' ? (
+        <Image source={wavvyHairSprite} resizeMode="contain" style={[styles.mascotLayer, hairStyle]} />
+      ) : null}
+      {wardrobe.hat === 'fedora' ? (
+        <Image source={fedoraSprite} resizeMode="contain" style={[styles.mascotLayer, hatStyle]} />
+      ) : null}
+      <View style={[styles.mascotShadow, { width: shadowWidth }]} />
     </View>
   );
 }
@@ -115,6 +170,9 @@ type Props = {
 
 export function WardrobeScreenContent({ onOpenShop }: Props) {
   const { width } = useWindowDimensions();
+  const { profile, setWardrobeItem } = useUserProfile();
+  const [selectedCategory, setSelectedCategory] = useState(0);
+
   const NUM_COLUMNS = 3;
   const CELL_MARGIN = 8;
   const GRID_PADDING = 16;
@@ -122,38 +180,24 @@ export function WardrobeScreenContent({ onOpenShop }: Props) {
   const itemSize = Math.floor(rawItemSize);
   const mascotSize = Math.min(width * 0.72, 320);
 
-  const [selectedCategory, setSelectedCategory] = useState(0);
-  const [equippedId, setEquippedId] = useState<string | null>(null);
-
   const category = CATEGORIES[selectedCategory];
-  const mascotImage = getMascotImage(equippedId);
+  const equippedValue = category.slot !== 'color' ? profile.wardrobe[category.slot] : null;
 
-  const handleItemPress = (id: string) => {
-    setEquippedId((prev) => (prev === id ? null : id));
+  const handleItemPress = (item: WardrobeItem) => {
+    const currentValue = profile.wardrobe[item.slot];
+    setWardrobeItem(item.slot, currentValue === item.id ? null : (item.id as WardrobeSelection[typeof item.slot]));
   };
 
   return (
     <View style={styles.container}>
-      {/* Mascot preview + Shop button — takes up the majority of the screen */}
       <View style={styles.previewArea}>
-        <Pressable
-          onPress={onOpenShop}
-          style={({ pressed }) => [styles.shopBtn, pressed && styles.shopBtnPressed]}
-        >
+        <Pressable onPress={onOpenShop} style={({ pressed }) => [styles.shopBtn, pressed && styles.shopBtnPressed]}>
           <Text style={styles.shopBtnText}>Shop</Text>
         </Pressable>
 
-        <View style={styles.mascotWrap}>
-          <Image
-            source={mascotImage}
-            resizeMode="contain"
-            style={{ width: mascotSize, height: mascotSize }}
-          />
-          <View style={[styles.mascotShadow, { width: mascotSize * 0.55 }]} />
-        </View>
+        <WardrobeMascotPreview wardrobe={profile.wardrobe} size={mascotSize} />
       </View>
 
-      {/* Cosmetics section — fixed tabs + smaller scrollable grid */}
       <View style={styles.cosmeticsSection}>
         <View style={styles.categoryBar}>
           {CATEGORIES.map((cat, index) => (
@@ -162,12 +206,7 @@ export function WardrobeScreenContent({ onOpenShop }: Props) {
               onPress={() => setSelectedCategory(index)}
               style={[styles.categoryTab, selectedCategory === index && styles.categoryTabActive]}
             >
-              <Text
-                style={[
-                  styles.categoryLabel,
-                  selectedCategory === index && styles.categoryLabelActive,
-                ]}
-              >
+              <Text style={[styles.categoryLabel, selectedCategory === index && styles.categoryLabelActive]}>
                 {cat.label}
               </Text>
             </Pressable>
@@ -187,9 +226,9 @@ export function WardrobeScreenContent({ onOpenShop }: Props) {
             renderItem={({ item }) => (
               <ItemCell
                 item={item}
-                equipped={equippedId === item.id}
+                equipped={equippedValue === item.id}
                 size={itemSize}
-                onPress={() => handleItemPress(item.id)}
+                onPress={() => handleItemPress(item)}
               />
             )}
           />
@@ -204,18 +243,22 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#282425',
   },
-  // Dominant top section — the mascot preview takes up most of the screen.
   previewArea: {
     flex: 1.6,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  mascotWrap: {
+  mascotStage: {
     alignItems: 'center',
     justifyContent: 'center',
   },
+  mascotLayer: {
+    position: 'absolute',
+    resizeMode: 'contain',
+  },
   mascotShadow: {
-    marginTop: -14,
+    position: 'absolute',
+    bottom: 14,
     height: 18,
     borderRadius: 999,
     backgroundColor: '#000',
@@ -248,7 +291,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '800',
   },
-  // Smaller bottom section for cosmetics — fixed tabs + compact grid.
   cosmeticsSection: {
     flex: 1,
   },
