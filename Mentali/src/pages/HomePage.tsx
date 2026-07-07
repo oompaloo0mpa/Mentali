@@ -25,16 +25,19 @@ import {
   type StatItem,
 } from '../hooks/homepageData';
 import { FriendsScreenContent } from '../components/social/FriendsScreenContent';
+import { BottomNav } from '@/components/nav/BottomNav';
 import { useSettingsOverlay } from '@/storage/settingsOverlayStore';
-import { moodFromHomeIndex } from '@/data/checkInContent';
+import { moodById, moodFromHomeIndex } from '@/data/checkInContent';
 import type { Friend } from '@/data/mockData';
 import type { MoodOption } from '@/logic/checkin';
+import { useUserProfile } from '@/storage/userProfileStore';
 
 type HomePageProps = {
   initialSelectedNav?: string;
   onSelectedNavChange?: (selectedNav: string) => void;
   onOpenChat?: (friend: Friend, prefillMotivation?: boolean) => void;
   onOpenCheckIn?: (mood: MoodOption) => void;
+  onOpenWardrobe?: () => void;
 };
 
 const bronzeTrophy = require('../../assets/images/BronzeTrophy.png') as ImageSourcePropType;
@@ -47,9 +50,6 @@ const textSpeechItem = require('../../assets/images/textspeech.png') as ImageSou
 const arrowIcon = require('../../assets/images/ArrowIcon.png') as ImageSourcePropType;
 const statsIcon = require('../../assets/images/StatsIcon.png') as ImageSourcePropType;
 const diamondIcon = require('../../assets/images/DiamondIcon.png') as ImageSourcePropType;
-
-const moodStripWidth = 364;
-const moodFaceWidth = moodStripWidth / moods.length;
 
 type NotificationPanelProps = {
   visible: boolean;
@@ -118,16 +118,6 @@ function QuestCard({ item }: { item: QuestItem }) {
         <Text style={styles.pointsText}>{item.points}</Text>
       </View>
     </View>
-  );
-}
-
-function BottomNavItem({ icon, active, onPress }: { icon: string; active?: boolean; onPress: () => void }) {
-  const iconName = active ? icon.replace('-outline', '') : icon;
-
-  return (
-    <Pressable onPress={onPress} style={[styles.navItem, active && styles.navItemActive]}>
-      <Ionicons name={iconName as ComponentProps<typeof Ionicons>['name']} size={24} color={active ? '#111' : '#F4D5F2'} />
-    </Pressable>
   );
 }
 
@@ -286,7 +276,7 @@ function NotificationPanel({
 
           {notifications.length === 0 ? (
             <View style={styles.notificationsEmptyState}>
-              <Text style={styles.notificationsEmptyText}>You're all caught up!</Text>
+              <Text style={styles.notificationsEmptyText}>You are all caught up!</Text>
             </View>
           ) : (
             <>
@@ -399,9 +389,10 @@ export default function HomePage({
   onSelectedNavChange,
   onOpenChat,
   onOpenCheckIn,
+  onOpenWardrobe,
 }: HomePageProps) {
   const { openSettings, requestLogout } = useSettingsOverlay();
-  const [selectedMood, setSelectedMood] = useState(0);
+  const { profile, setCurrentMood } = useUserProfile();
   const [selectedNav, setSelectedNav] = useState(initialSelectedNav);
   const [wardrobeItems, setWardrobeItems] = useState({
     cape: true,
@@ -416,6 +407,10 @@ export default function HomePage({
   const insets = useSafeAreaInsets();
   const unreadCount = notifications.filter((notification) => !notification.read).length;
   const isHomeSelected = selectedNav === 'home-outline';
+  const selectedMood = Math.max(
+    0,
+    moods.findIndex((m) => m.id === profile.currentMoodId),
+  );
 
   useEffect(() => {
     setSelectedNav(initialSelectedNav);
@@ -459,7 +454,7 @@ export default function HomePage({
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
       <StatusBar barStyle="light-content" backgroundColor="#282425" />
 
-      <View style={[styles.content, { paddingTop: selectedNav === 'shirt-outline' ? 0 : insets.top - 100}]}> 
+      <View style={[styles.content, { paddingTop: selectedNav === 'shirt-outline' ? 0 : insets.top - 100 }]}>
         {selectedNav !== 'shirt-outline' ? (
           <>
             <View style={styles.topRow}>
@@ -531,7 +526,10 @@ export default function HomePage({
                   key={mood.label}
                   mood={mood}
                   selected={selectedMood === index}
-                  onPress={() => setSelectedMood(index)}
+                  onPress={() => {
+                    const picked = moodById(mood.id) ?? moodFromHomeIndex(index);
+                    setCurrentMood({ id: picked.id, emoji: picked.emoji });
+                  }}
                 />
               ))}
             </View>
@@ -638,16 +636,16 @@ export default function HomePage({
         )}
       </View>
 
-      <View style={styles.bottomNav}>
-        {navItems.map((item) => (
-          <BottomNavItem
-            key={item.icon}
-            icon={item.icon}
-            active={selectedNav === item.icon}
-            onPress={() => setSelectedNav(item.icon)}
-          />
-        ))}
-      </View>
+      <BottomNav
+        activeIcon={selectedNav}
+        onSelect={(icon) => {
+          if (icon === 'shirt-outline') {
+            onOpenWardrobe?.();
+          } else {
+            setSelectedNav(icon);
+          }
+        }}
+      />
     </SafeAreaView>
   );
 }
@@ -1460,26 +1458,5 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     textAlign: 'center',
     lineHeight: 18,
-  },
-  bottomNav: {
-    height: 72,
-    backgroundColor: '#B02AB3',
-    borderTopWidth: 1,
-    borderTopColor: '#CC5FD0',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-around',
-    paddingHorizontal: 10,
-    paddingBottom: 4,
-  },
-  navItem: {
-    width: 54,
-    height: 42,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 18,
-  },
-  navItemActive: {
-    backgroundColor: '#F3C1F4',
   },
 });

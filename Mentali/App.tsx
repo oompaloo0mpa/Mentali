@@ -8,6 +8,7 @@ import VerifyCodePage from '@/pages/VerifyCodePage';
 import ResetPasswordPage from '@/pages/ResetPasswordPage';
 import Welcome from '@/pages/Welcome';
 import HomePage from '@/pages/HomePage';
+import WardrobePage from '@/pages/WardrobePage';
 import { SocialProvider } from '@/storage/socialStore';
 import { SettingsOverlayProvider } from '@/storage/settingsOverlayStore';
 import { UserProfileProvider, useUserProfile } from '@/storage/userProfileStore';
@@ -26,6 +27,7 @@ import { loadCheckInProfile, saveCheckInProfile } from '@/storage/checkInProfile
 import type { MoodOption, RecordedAnswer, StreakState, WellbeingResult } from '@/logic/checkin';
 import {
   login,
+  loginWithSocial,
   registerWithEmail,
   requestResetCode,
   resetPassword,
@@ -33,6 +35,7 @@ import {
   saveDailyCheckIn,
   verifyResetCode,
 } from '@/services/api';
+import type { SocialAuthResult } from '@/hooks/useSocialAuth';
 
 type ScreenState =
   | { screen: 'welcome' }
@@ -57,7 +60,8 @@ type ScreenState =
       phq4: WellbeingResult;
       k10: WellbeingResult | null;
       streak: StreakState;
-    };
+    }
+  | { screen: 'wardrobe'; returnToNav: string };
 
 export default function App() {
   return (
@@ -208,6 +212,27 @@ function AppRoot() {
     setScreenState({ screen: 'home', selectedNav: homeNav });
   };
 
+  const handleSocialAuthSuccess = async (session: SocialAuthResult) => {
+    try {
+      const result = await loginWithSocial({
+        provider: session.provider,
+        email: session.email,
+        fullName: session.fullName,
+        identityToken: session.identityToken,
+        authorizationCode: session.authorizationCode,
+        accessToken: session.accessToken,
+      });
+      setCurrentUserId(result?.user?._id ?? null);
+      await applyAuthUser(result.user);
+      handleAuthSuccess();
+    } catch (error) {
+      Alert.alert(
+        `${session.provider === 'apple' ? 'Apple' : 'Google'} sign-in failed`,
+        error instanceof Error ? error.message : 'Unable to complete social sign-in.',
+      );
+    }
+  };
+
   const handleRegister = async (payload: {
     email: string;
     username: string;
@@ -292,9 +317,9 @@ function AppRoot() {
     () => ({
       onLogout: handleLogout,
       onChangePassword: () => setScreenState({ screen: 'forgot-password' }),
-      onOpenWardrobe: () => setScreenState({ screen: 'home', selectedNav: 'shirt-outline' }),
+      onOpenWardrobe: () => setScreenState({ screen: 'wardrobe', returnToNav: homeNav }),
     }),
-    [handleLogout],
+    [handleLogout, homeNav],
   );
 
   return (
@@ -315,14 +340,14 @@ function AppRoot() {
               setScreenState({ screen: 'forgot-password' });
             }}
             onLoginPress={handleLogin}
-            onSocialAuthSuccess={handleAuthSuccess}
+            onSocialAuthSuccess={handleSocialAuthSuccess}
           />
         ) : screenState.screen === 'signup' ? (
           <SignupPage
             onBackPress={() => setScreenState({ screen: 'welcome' })}
             onSignInPress={() => setScreenState({ screen: 'login' })}
             onRegisterPress={handleRegister}
-            onSocialAuthSuccess={handleAuthSuccess}
+            onSocialAuthSuccess={handleSocialAuthSuccess}
           />
         ) : screenState.screen === 'forgot-password' ? (
           <ForgetPasswordPage
@@ -348,6 +373,14 @@ function AppRoot() {
             onSelectedNavChange={setHomeNav}
             onOpenChat={(friend, prefill) => openChat(friend.id, prefill)}
             onOpenCheckIn={(mood) => setScreenState({ screen: 'check-in', scale: 'phq4', mood })}
+            onOpenWardrobe={() => setScreenState({ screen: 'wardrobe', returnToNav: homeNav })}
+          />
+        ) : screenState.screen === 'wardrobe' ? (
+          <WardrobePage
+            onNavigate={(navItem) => {
+              if (navItem === 'shirt-outline') return;
+              setScreenState({ screen: 'home', selectedNav: navItem });
+            }}
           />
         ) : screenState.screen === 'check-in' ? (
           <CheckInChatScreen
