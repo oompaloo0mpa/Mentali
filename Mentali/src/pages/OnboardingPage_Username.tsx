@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import {
+  Alert,
   SafeAreaView,
   ScrollView,
   StyleSheet,
@@ -12,13 +13,14 @@ import { useRouter } from 'expo-router';
 import OnboardingProgressDots from '../components/OnboardingProgressDots';
 
 type OnboardingPageUsernameProps = {
-  onContinue?: (username: string) => void;
+  onContinue?: (username: string) => void | Promise<void>;
   onBack?: () => void;
 };
 
 export default function OnboardingPage_Username({ onContinue, onBack }: OnboardingPageUsernameProps): React.ReactElement {
   const router = useRouter();
   const [username, setUsername] = useState('');
+  const [saving, setSaving] = useState(false);
 
   const handleGoBack = (): void => {
     if (onBack) {
@@ -29,10 +31,20 @@ export default function OnboardingPage_Username({ onContinue, onBack }: Onboardi
     router.push('/');
   };
 
-  const handleContinue = (): void => {
+  const handleContinue = async (): Promise<void> => {
     const trimmed = username.trim();
+    if (!trimmed) {
+      Alert.alert('Username required', 'Please enter a username to continue.');
+      return;
+    }
+
     if (onContinue) {
-      onContinue(trimmed);
+      setSaving(true);
+      try {
+        await onContinue(trimmed);
+      } finally {
+        setSaving(false);
+      }
       return;
     }
 
@@ -78,8 +90,13 @@ export default function OnboardingPage_Username({ onContinue, onBack }: Onboardi
           <View style={styles.bottomArea}>
             <OnboardingProgressDots activeIndex={0} />
 
-            <TouchableOpacity style={styles.continueButton} onPress={handleContinue} activeOpacity={0.8}>
-              <Text style={styles.continueButtonText}>CONTINUE</Text>
+            <TouchableOpacity
+              style={[styles.continueButton, saving && styles.continueButtonDisabled]}
+              onPress={() => void handleContinue()}
+              disabled={saving}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.continueButtonText}>{saving ? 'SAVING...' : 'CONTINUE'}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -190,6 +207,9 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.55,
     shadowRadius: 0,
     elevation: 4,
+  },
+  continueButtonDisabled: {
+    opacity: 0.7,
   },
   continueButtonText: {
     fontSize: 14,

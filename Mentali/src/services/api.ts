@@ -185,6 +185,7 @@ export async function updateUserPreferences(
     allowFriendRequests?: boolean;
     leaderboardNotifications?: boolean;
     encouragementNotifications?: boolean;
+    dailyReminderEnabled?: boolean;
     theme?: string;
     currentMoodId?: string;
     currentMoodEmoji?: string;

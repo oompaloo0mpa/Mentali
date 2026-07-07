@@ -114,6 +114,21 @@ export function SettingsScreen({ visible, onClose, onResetPassword, onDeleteAcco
     setCurrentMood,
   } = useUserProfile();
 
+  const persistSetting = async (
+    label: string,
+    setter: (value: boolean) => Promise<void>,
+    value: boolean,
+  ) => {
+    try {
+      await setter(value);
+    } catch (error) {
+      Alert.alert(
+        'Could not save setting',
+        error instanceof Error ? error.message : `Unable to update ${label}.`,
+      );
+    }
+  };
+
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
       <View style={[styles.screen, { paddingTop: insets.top + Spacing.two }]}>
@@ -132,19 +147,23 @@ export function SettingsScreen({ visible, onClose, onResetPassword, onDeleteAcco
             <ToggleRow
               label="Anonymous mode"
               value={profile.anonymousMode}
-              onValueChange={setAnonymousMode}
+              onValueChange={(value) => void persistSetting('Anonymous mode', setAnonymousMode, value)}
               helpText="People who are not your friends will not see your username. They can still add you with your friend code."
             />
             <ToggleRow
               label="Hide mood from friends"
               value={profile.hideMoodFromFriends}
-              onValueChange={setHideMoodFromFriends}
+              onValueChange={(value) =>
+                void persistSetting('Hide mood from friends', setHideMoodFromFriends, value)
+              }
               helpText="When enabled, friends will not see your daily mood on their friends list."
             />
             <ToggleRow
               label="Allow friend requests"
               value={profile.allowFriendRequests}
-              onValueChange={setAllowFriendRequests}
+              onValueChange={(value) =>
+                void persistSetting('Allow friend requests', setAllowFriendRequests, value)
+              }
               helpText="When disabled, other users cannot send you new friend requests."
             />
           </SettingsSection>
@@ -153,7 +172,9 @@ export function SettingsScreen({ visible, onClose, onResetPassword, onDeleteAcco
             <ToggleRow
               label="Allow notifications"
               value={profile.allowNotifications}
-              onValueChange={setAllowNotifications}
+              onValueChange={(value) =>
+                void persistSetting('Allow notifications', setAllowNotifications, value)
+              }
               helpText="Receive reminders, encouragement, and leaderboard updates from Mentali."
             />
           </SettingsSection>

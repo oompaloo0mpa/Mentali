@@ -93,6 +93,19 @@ function pickPreferencePatch(body) {
   return patch;
 }
 
+const DEFAULT_USER_PREFERENCES = {
+  anonymousMode: false,
+  theme: "pastel",
+  dailyReminderEnabled: true,
+  reminderTime: "20:00",
+  encouragementNotifications: true,
+  leaderboardNotifications: true,
+  showMoodToFriends: true,
+  allowFriendRequests: true,
+  currentMoodId: "okay",
+  currentMoodEmoji: "😐",
+};
+
 async function areFriends(db, userA, userB) {
   const a = toObjectId(userA, "userId");
   const b = toObjectId(userB, "userId");
@@ -2322,17 +2335,29 @@ app.put("/api/preferences/:userId", requireAuth, async (req, res, next) => {
     } = await connectMongo();
     const uid = toObjectId(req.params.userId, "userId");
     const patch = pickPreferencePatch(req.body);
-    await db.collection("userPreferences").updateOne({
+    const now = new Date();
+    const existing = await db.collection("userPreferences").findOne({
       userId: uid
-    }, {
-      $set: {
-        ...patch,
-        userId: uid,
-        updatedAt: new Date()
-      }
-    }, {
-      upsert: true
     });
+
+    if (existing) {
+      await db.collection("userPreferences").updateOne({
+        userId: uid
+      }, {
+        $set: {
+          ...patch,
+          updatedAt: now
+        }
+      });
+    } else {
+      await db.collection("userPreferences").insertOne({
+        userId: uid,
+        ...DEFAULT_USER_PREFERENCES,
+        ...patch,
+        updatedAt: now,
+      });
+    }
+
     const data = await db.collection("userPreferences").findOne({
       userId: uid
     });

@@ -96,7 +96,8 @@ export default function App() {
 }
 
 function AppRoot() {
-  const { applyAuthUser, clearProfile, completeOnboarding, profile } = useUserProfile();
+  const { applyAuthUser, clearProfile, completeOnboarding, profile, saveUsername, setAnonymousMode } =
+    useUserProfile();
   const [screenState, setScreenState] = useState<ScreenState>({ screen: 'welcome' });
   const [loginMode, setLoginMode] = useState<'phone' | 'email'>('email');
   const [recoveryMode, setRecoveryMode] = useState<'phone' | 'email'>('email');
@@ -297,11 +298,18 @@ function AppRoot() {
   };
 
   const handleOnboardingComplete = async () => {
-    await completeOnboarding({
-      username: onboardingUsername,
-      anonymousMode: onboardingAnonymous,
-    });
-    handleAuthSuccess();
+    try {
+      await completeOnboarding({
+        username: onboardingUsername,
+        anonymousMode: onboardingAnonymous,
+      });
+      handleAuthSuccess();
+    } catch (error) {
+      Alert.alert(
+        'Could not finish setup',
+        error instanceof Error ? error.message : 'Please try again.',
+      );
+    }
   };
 
   const handleSocialAuthSuccess = async (session: SocialAuthResult) => {
@@ -475,17 +483,33 @@ function AppRoot() {
           <OnboardingPage_1 onContinue={() => setScreenState({ screen: 'onboarding-username' })} />
         ) : screenState.screen === 'onboarding-username' ? (
           <OnboardingPage_Username
-            onContinue={(username) => {
+            onContinue={async (username) => {
               setOnboardingUsername(username);
-              setScreenState({ screen: 'onboarding-2' });
+              try {
+                await saveUsername(username);
+                setScreenState({ screen: 'onboarding-2' });
+              } catch (error) {
+                Alert.alert(
+                  'Could not save username',
+                  error instanceof Error ? error.message : 'Please try again.',
+                );
+              }
             }}
             onBack={() => setScreenState({ screen: 'onboarding-1' })}
           />
         ) : screenState.screen === 'onboarding-2' ? (
           <OnboardingPage_2
-            onContinue={(isAnonymous) => {
+            onContinue={async (isAnonymous) => {
               setOnboardingAnonymous(isAnonymous);
-              setScreenState({ screen: isAnonymous ? 'onboarding-3' : 'onboarding-warning' });
+              try {
+                await setAnonymousMode(isAnonymous);
+                setScreenState({ screen: isAnonymous ? 'onboarding-3' : 'onboarding-warning' });
+              } catch (error) {
+                Alert.alert(
+                  'Could not save preference',
+                  error instanceof Error ? error.message : 'Please try again.',
+                );
+              }
             }}
             onBack={() => setScreenState({ screen: 'onboarding-username' })}
           />

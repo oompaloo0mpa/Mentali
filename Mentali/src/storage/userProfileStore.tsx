@@ -50,11 +50,12 @@ type PreferenceKey =
 type UserProfileContextValue = {
   profile: UserProfile;
   hydrated: boolean;
+  saveUsername: (username: string) => Promise<void>;
   setCurrentMood: (mood: { id: string; emoji: string }) => void;
-  setAnonymousMode: (enabled: boolean) => void;
-  setHideMoodFromFriends: (enabled: boolean) => void;
-  setAllowFriendRequests: (enabled: boolean) => void;
-  setAllowNotifications: (enabled: boolean) => void;
+  setAnonymousMode: (enabled: boolean) => Promise<void>;
+  setHideMoodFromFriends: (enabled: boolean) => Promise<void>;
+  setAllowFriendRequests: (enabled: boolean) => Promise<void>;
+  setAllowNotifications: (enabled: boolean) => Promise<void>;
   setColorTheme: (theme: ColorThemeId) => void;
   completeOnboarding: (payload: { username?: string; anonymousMode: boolean }) => Promise<void>;
   applyAuthUser: (user: {
@@ -89,7 +90,10 @@ function prefsFromApi(prefs: Record<string, unknown> | null | undefined): Pick<
     anonymousMode: !!prefs?.anonymousMode,
     hideMoodFromFriends: prefs?.showMoodToFriends === undefined ? false : !prefs.showMoodToFriends,
     allowFriendRequests: prefs?.allowFriendRequests !== false,
-    allowNotifications: prefs?.leaderboardNotifications !== false,
+    allowNotifications:
+      prefs?.leaderboardNotifications !== false &&
+      prefs?.encouragementNotifications !== false &&
+      prefs?.dailyReminderEnabled !== false,
     colorTheme,
     currentMoodId: typeof prefs?.currentMoodId === 'string' ? prefs.currentMoodId : DEFAULT_PROFILE.currentMoodId,
     currentMoodEmoji:
@@ -106,7 +110,11 @@ function prefsToApi(key: PreferenceKey, value: boolean): Record<string, boolean>
     case 'allowFriendRequests':
       return { allowFriendRequests: value };
     case 'allowNotifications':
-      return { leaderboardNotifications: value, encouragementNotifications: value };
+      return {
+        leaderboardNotifications: value,
+        encouragementNotifications: value,
+        dailyReminderEnabled: value,
+      };
     default:
       return {};
   }
@@ -198,47 +206,65 @@ export function UserProfileProvider({ children }: { children: React.ReactNode })
     [],
   );
 
-  const completeOnboarding = useCallback(
-    async (payload: { username?: string; anonymousMode: boolean }) => {
-      setProfile((prev) => {
-        const next = {
-          ...prev,
-          username: payload.username?.trim().toLowerCase() || prev.username,
-          displayName: payload.username?.trim() || prev.displayName,
-          anonymousMode: payload.anonymousMode,
-        };
-        if (prev.userId) {
-          updateUserProfile(prev.userId, {
-            username: next.username,
-            displayName: next.displayName,
-          }).catch(() => {});
-          updateUserPreferences(prev.userId, { anonymousMode: payload.anonymousMode }).catch(() => {});
-        }
-        return next;
-      });
-    },
-    [],
-  );
+  const saveUsername = useCallback(async (username: string) => {
+    const trimmed = username.trim();
+    if (!trimmed) {
+      throw new Error('Username is required');
+    }
+    const normalized = trimmed.toLowerCase();
 
-  const setPreference = useCallback((key: PreferenceKey, enabled: boolean) => {
+    let userId: string | null = null;
     setProfile((prev) => {
-      if (prev.userId) {
-        updateUserPreferences(prev.userId, prefsToApi(key, enabled)).catch(() => {});
-      }
-      return { ...prev, [key]: enabled };
+      userId = prev.userId;
+      return { ...prev, username: normalized, displayName: trimmed };
     });
+
+    if (userId) {
+      await updateUserProfile(userId, { username: normalized, displayName: trimmed });
+    }
   }, []);
 
-  const setCurrentMood = useCallback((mood: { id: string; emoji: string }) => {
+  const setPreference = useCallback(async (key: PreferenceKey, enabled: boolean) => {
+    let userId: string | null = null;
+    let previousValue = !enabled;
     setProfile((prev) => {
-      if (prev.userId) {
-        updateUserPreferences(prev.userId, {
-          currentMoodId: mood.id,
-          currentMoodEmoji: mood.emoji,
-        }).catch(() => {});
+      userId = prev.userId;
+      previousValue = prev[key] as boolean;
+      return { ...prev, [key]: enabled };
+    });
+
+    if (!userId) return;
+
+    try {
+      await updateUserPreferences(userId, prefsToApi(key, enabled));
+    } catch (error) {
+      setProfile((prev) => ({ ...prev, [key]: previousValue }));
+      throw error;
+    }
+  }, []);
+
+  const completeOnboarding = useCallback(
+    async (payload: { username?: string; anonymousMode: boolean }) => {
+      if (payload.username?.trim()) {
+        await saveUsername(payload.username);
       }
+      await setPreference('anonymousMode', payload.anonymousMode);
+    },
+    [saveUsername, setPreference],
+  );
+
+  const setCurrentMood = useCallback((mood: { id: string; emoji: string }) => {
+    let userId: string | null = null;
+    setProfile((prev) => {
+      userId = prev.userId;
       return { ...prev, currentMoodId: mood.id, currentMoodEmoji: mood.emoji };
     });
+    if (userId) {
+      updateUserPreferences(userId, {
+        currentMoodId: mood.id,
+        currentMoodEmoji: mood.emoji,
+      }).catch(() => {});
+    }
   }, []);
 
   const setAnonymousMode = useCallback(
@@ -259,12 +285,14 @@ export function UserProfileProvider({ children }: { children: React.ReactNode })
   );
 
   const setColorTheme = useCallback((theme: ColorThemeId) => {
+    let userId: string | null = null;
     setProfile((prev) => {
-      if (prev.userId) {
-        updateUserPreferences(prev.userId, { theme }).catch(() => {});
-      }
+      userId = prev.userId;
       return { ...prev, colorTheme: theme };
     });
+    if (userId) {
+      updateUserPreferences(userId, { theme }).catch(() => {});
+    }
   }, []);
 
   const clearProfile = useCallback(async () => {
@@ -279,6 +307,7 @@ export function UserProfileProvider({ children }: { children: React.ReactNode })
     () => ({
       profile,
       hydrated,
+      saveUsername,
       setAnonymousMode,
       setCurrentMood,
       setHideMoodFromFriends,
@@ -292,6 +321,7 @@ export function UserProfileProvider({ children }: { children: React.ReactNode })
     [
       profile,
       hydrated,
+      saveUsername,
       setAnonymousMode,
       setCurrentMood,
       setHideMoodFromFriends,
