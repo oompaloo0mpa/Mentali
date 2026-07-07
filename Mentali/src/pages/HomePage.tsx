@@ -29,7 +29,7 @@ import { FriendsScreenContent } from '../components/social/FriendsScreenContent'
 import { BottomNav } from '@/components/nav/BottomNav';
 import { useSettingsOverlay } from '@/storage/settingsOverlayStore';
 import { moodById, moodFromHomeIndex } from '@/data/checkInContent';
-import { fetchDailyQuests } from '@/services/api';
+import { assignDailyQuests, fetchDailyQuests } from '@/services/api';
 import type { Friend } from '@/data/mockData';
 import type { MoodOption } from '@/logic/checkin';
 import { useUserProfile } from '@/storage/userProfileStore';
@@ -119,6 +119,19 @@ function QuestCard({ item }: { item: QuestItem }) {
       </View>
     </View>
   );
+}
+
+function sampleDailyQuests(): QuestItem[] {
+  const pool = [...quests];
+  const picked: QuestItem[] = [];
+
+  while (picked.length < 3 && pool.length > 0) {
+    const index = Math.floor(Math.random() * pool.length);
+    const [quest] = pool.splice(index, 1);
+    picked.push({ ...quest, active: true, completed: false });
+  }
+
+  return picked;
 }
 
 function confirmMoodSelection(mood: MoodItem, onConfirm: () => void) {
@@ -308,6 +321,7 @@ export default function HomePage({
   const [moreMenuVisible, setMoreMenuVisible] = useState(false);
   const [notifications, setNotifications] = useState<AppNotification[]>(initialNotifications);
   const [dailyQuests, setDailyQuests] = useState<QuestItem[]>(quests);
+  const [refreshingQuests, setRefreshingQuests] = useState(false);
   const insets = useSafeAreaInsets();
 
   const completedCount = dailyQuests.filter((quest) => quest.completed).length;
@@ -334,7 +348,7 @@ export default function HomePage({
 
   useEffect(() => {
     if (!profile.userId) {
-      setDailyQuests(quests);
+      setDailyQuests(sampleDailyQuests());
       return;
     }
 
@@ -354,13 +368,41 @@ export default function HomePage({
         );
       })
       .catch(() => {
-        if (active) setDailyQuests(quests);
+        if (active) setDailyQuests(sampleDailyQuests());
       });
 
     return () => {
       active = false;
     };
   }, [profile.userId]);
+
+  const refreshDailyQuests = async () => {
+    setRefreshingQuests(true);
+    try {
+      if (profile.userId) {
+        await assignDailyQuests(profile.userId, 3, true);
+        const rows = await fetchDailyQuests(profile.userId);
+        setDailyQuests(
+          rows.length > 0
+            ? rows.map((row) => ({
+                id: row.id,
+                title: row.title,
+                subtitle: row.description,
+                points: `+${row.rewardPoints} pts`,
+                active: !row.completed,
+                completed: row.completed,
+              }))
+            : sampleDailyQuests(),
+        );
+      } else {
+        setDailyQuests(sampleDailyQuests());
+      }
+    } catch {
+      setDailyQuests(sampleDailyQuests());
+    } finally {
+      setRefreshingQuests(false);
+    }
+  };
 
   const navLabels: Record<string, { title: string; icon: ComponentProps<typeof Ionicons>['name'] }> = {
     'home-outline': { title: 'Home', icon: 'home-outline' },
@@ -475,10 +517,27 @@ export default function HomePage({
             </View>
 
             <View style={styles.sectionHeaderRow}>
-              <Text style={styles.sectionTitle}>Daily Quest</Text>
-              <Text style={styles.sectionMeta}>
-                <Text style={styles.sectionMetaHighlight}>{completedCount}/{dailyQuests.length}</Text> Completed
-              </Text>
+              <View style={styles.sectionHeaderTitleWrap}>
+                <Text style={styles.sectionTitle}>Daily Quest</Text>
+                <Text style={styles.sectionMeta}>
+                  <Text style={styles.sectionMetaHighlight}>{completedCount}/{dailyQuests.length}</Text> Completed
+                </Text>
+              </View>
+
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Refresh quests"
+                onPress={() => void refreshDailyQuests()}
+                disabled={refreshingQuests}
+                style={({ pressed }) => [
+                  styles.refreshQuestsButton,
+                  pressed && styles.refreshQuestsButtonPressed,
+                  refreshingQuests && styles.refreshQuestsButtonDisabled,
+                ]}
+              >
+                <Ionicons name="refresh" size={16} color="#fff" />
+                <Text style={styles.refreshQuestsText}>{refreshingQuests ? 'Refreshing' : 'Refresh quests'}</Text>
+              </Pressable>
             </View>
 
             <View style={styles.questList}>
@@ -963,6 +1022,10 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: 8,
   },
+  sectionHeaderTitleWrap: {
+    flex: 1,
+    paddingRight: 10,
+  },
   sectionTitle: {
     color: '#fff',
     fontSize: 20,
@@ -975,6 +1038,29 @@ const styles = StyleSheet.create({
   },
   sectionMetaHighlight: {
     color: '#E56AE5',
+    fontWeight: '800',
+  },
+  refreshQuestsButton: {
+    minHeight: 34,
+    paddingHorizontal: 12,
+    borderRadius: 17,
+    backgroundColor: '#B03AB4',
+    borderWidth: 1,
+    borderColor: '#FF6DEB',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  refreshQuestsButtonPressed: {
+    opacity: 0.88,
+  },
+  refreshQuestsButtonDisabled: {
+    opacity: 0.72,
+  },
+  refreshQuestsText: {
+    color: '#fff',
+    fontSize: 12,
     fontWeight: '800',
   },
   questList: {
