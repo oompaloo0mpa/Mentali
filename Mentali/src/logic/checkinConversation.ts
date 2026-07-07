@@ -6,6 +6,7 @@ import type {
   RecordedAnswer,
   ScaleKind,
 } from '@/logic/checkin';
+import { COPY } from '@/data/checkInContent';
 
 export type ConversationPhase = 'mood' | 'opening' | 'exploring' | 'clarifying' | 'closing';
 
@@ -29,6 +30,8 @@ export interface CheckInConversationState {
   turnCount: number;
   signals: Record<string, DimensionSignal>;
   clarifyingId: string | null;
+  /** Last topic question the bot asked — used to interpret short replies like "yes". */
+  lastAskedQuestionId: string | null;
   deeper: boolean;
   maxTurns: number;
   sessionOpener?: string | null;
@@ -46,24 +49,41 @@ export type ConversationReply = {
 };
 
 const PHQ4_SUBTLE: Record<string, string> = {
-  phq4_anx_1: 'Have you felt more keyed up or on edge than usual?',
-  phq4_anx_2: 'When worries show up, do they tend to stick around for a while?',
-  phq4_mood_1: 'Have there been moments where things felt a bit heavy or low?',
-  phq4_mood_2: 'Have the things you usually enjoy felt less exciting lately?',
+  phq4_anx_1: 'Has anything been leaving you feeling wound up lately?',
+  phq4_anx_2: 'When something is on your mind, does it tend to stick around?',
+  phq4_mood_1: 'Have there been moments where things just felt heavy?',
+  phq4_mood_2: 'Have the things you usually enjoy felt a bit flat lately?',
 };
 
 const K10_SUBTLE: Record<string, string> = {
-  k10_1: 'Has tiredness been showing up even when you have not been doing much?',
-  k10_2: 'Have you felt nervous or on edge more than usual?',
-  k10_3: 'Have there been times when anxiety felt hard to calm down?',
-  k10_4: 'Have moments of hopelessness come up at all?',
-  k10_5: 'Have you felt restless, like it is hard to settle?',
-  k10_6: 'Has restlessness ever made it tough to sit still?',
+  k10_1: 'Have you been running on empty lately?',
+  k10_2: 'Has your body felt tense or on edge more than usual?',
+  k10_3: 'Have there been times when it was hard to calm down?',
+  k10_4: 'Have hopeless moments come up at all?',
+  k10_5: 'Has it been hard to settle or relax?',
+  k10_6: 'Have you felt physically restless, like you cannot sit still?',
   k10_7: 'Have low or down moments been part of the picture?',
-  k10_8: 'Has everything felt like more of an effort than usual?',
+  k10_8: 'Has everything felt like more effort than it should?',
   k10_9: 'Have sad feelings been hard to shake?',
-  k10_10: 'Have you had thoughts about not feeling good enough or worthless?',
+  k10_10: 'Have you been hard on yourself lately?',
 };
+
+const SHORT_ACKS = ['Got it.', 'Yeah.', 'Okay.', 'Thanks for sharing that.', 'Mm, I get that.'];
+
+const OPEN_CURIOSITY = [
+  "What's been taking up most of your headspace lately?",
+  'Tell me a bit more about what that has been like for you.',
+  'What part of that has felt hardest?',
+  'Is there more you want to get off your chest?',
+  'How has that been affecting the rest of your day?',
+];
+
+const ORGANIC_FOLLOWUPS = [
+  'What else has been sitting with you?',
+  'Has anything helped, even a little?',
+  'How have the people around you been through all this?',
+  'What would a slightly better day look like for you?',
+];
 
 const THEME_KEYWORDS: Record<string, RegExp> = {
   phq4_anx_1: /\b(anxious|anxiety|nervous|on edge|keyed up|tense|stress|stressed|panic|worried|worry|restless)\b/i,
@@ -96,15 +116,17 @@ export function createConversationState(
   sessionOpener?: string | null,
   focus?: string | null,
 ): CheckInConversationState {
-  const deeper = questions[0]?.scale === 'k10';
+  const hasK10 = questions.some((q) => q.scale === 'k10');
+  const deeper = hasK10 && !questions.some((q) => q.scale === 'phq4');
   return {
     mood,
     phase: mood ? 'opening' : 'mood',
     turnCount: 0,
     signals: {},
     clarifyingId: null,
+    lastAskedQuestionId: null,
     deeper,
-    maxTurns: maxTurnsForMood(mood, deeper),
+    maxTurns: maxTurnsForMood(mood, questions),
     sessionOpener: sessionOpener ?? null,
     focus: focus ?? null,
   };
@@ -114,59 +136,85 @@ function promptFromQuestions(questions: CheckInQuestion[], questionId: string): 
   return questions.find((q) => q.id === questionId)?.prompt ?? null;
 }
 
-function maxTurnsForMood(mood: MoodOption | null, deeper: boolean): number {
-  if (deeper) {
+function maxTurnsForMood(mood: MoodOption | null, questions: CheckInQuestion[]): number {
+  const hasK10 = questions.some((q) => q.scale === 'k10');
+  const hasPhq4 = questions.some((q) => q.scale === 'phq4');
+  const unified = hasK10 && hasPhq4;
+
+  if (unified) {
+    if (!mood || mood.value <= 1) return Math.max(10, questions.length);
+    if (mood.value === 2) return Math.max(9, questions.length);
+    return Math.max(8, questions.length);
+  }
+
+  if (hasK10) {
     if (!mood || mood.value <= 1) return 7;
     if (mood.value === 2) return 6;
     return 5;
   }
+
   if (!mood || mood.value >= 3) return 3;
   if (mood.value === 2) return 4;
   return 5;
 }
 
-function gentleClarifyPrompt(questionId: string, deeper: boolean, questions: CheckInQuestion[]): string {
-  const fromPool = promptFromQuestions(questions, questionId);
-  if (fromPool) return fromPool;
+function questionCovered(signals: Record<string, DimensionSignal>, questionId: string): boolean {
+  const s = signals[questionId];
+  return !!s && (s.confidence >= 0.55 || !!s.skipped);
+}
 
+function isFirstK10Target(
+  questions: CheckInQuestion[],
+  signals: Record<string, DimensionSignal>,
+  target: CheckInQuestion,
+): boolean {
+  if (target.scale !== 'k10') return false;
+  const phq4Qs = questions.filter((q) => q.scale === 'phq4');
+  const phq4Complete = phq4Qs.length === 0 || phq4Qs.every((q) => questionCovered(signals, q.id));
+  if (!phq4Complete) return false;
+  const firstK10 = questions.find((q) => q.scale === 'k10' && !questionCovered(signals, q.id));
+  return firstK10?.id === target.id;
+}
+
+function gentleClarifyPrompt(questionId: string, deeper: boolean, questions: CheckInQuestion[]): string {
   const phq4: Record<string, string> = {
-    phq4_anx_1:
-      "When you think about feeling on edge — has that been around much lately, or more of a today thing?",
-    phq4_anx_2:
-      "Does your mind tend to stay on things, even when you'd rather switch off?",
-    phq4_mood_1:
-      'Have the heavier moments been weighing on you much, or do they come and go?',
-    phq4_mood_2:
-      'Have the things you usually enjoy felt less satisfying than normal?',
+    phq4_anx_1: 'Has that wound-up feeling been around much, or more of a today thing?',
+    phq4_anx_2: 'Does your mind tend to stay on things even when you want a break from them?',
+    phq4_mood_1: 'Have the heavier moments been weighing on you, or do they come and go?',
+    phq4_mood_2: 'Have the things you usually enjoy felt less satisfying than normal?',
   };
   if (!deeper) return phq4[questionId] ?? subtlePrompt(questionId, false, questions);
 
   return (
     K10_SUBTLE[questionId] ??
     promptFromQuestions(questions, questionId) ??
-    'How much has that been showing up for you over the past couple of weeks?'
+    'How has that been for you over the past couple of weeks?'
   );
 }
 
-function subtlePrompt(questionId: string, deeper: boolean, questions: CheckInQuestion[]): string {
+function subtlePrompt(questionId: string, _deeper: boolean, questions: CheckInQuestion[]): string {
   const custom = promptFromQuestions(questions, questionId);
   if (custom) return custom;
-  return (deeper ? K10_SUBTLE : PHQ4_SUBTLE)[questionId] ?? 'How has that been for you lately?';
+  const scale = questions.find((q) => q.id === questionId)?.scale;
+  if (scale === 'k10' || questionId.startsWith('k10_')) {
+    return K10_SUBTLE[questionId] ?? 'How has that been for you over the past couple of weeks?';
+  }
+  return PHQ4_SUBTLE[questionId] ?? 'How has that been for you lately?';
 }
 
 function moodOpener(mood: MoodOption, deeper: boolean, sessionOpener?: string | null): string {
   if (sessionOpener) return sessionOpener;
   const label = mood.label.toLowerCase();
   if (deeper) {
-    return `Thanks for being open to going a little deeper ${mood.emoji} We can take this slowly — tell me how the past couple of weeks have felt.`;
+    return `We can take this slowly. Tell me how the past couple of weeks have felt.`;
   }
   if (mood.value >= 3) {
-    return `Hey ${mood.emoji} Sounds like today's been on the ${label} side. What's been going on for you?`;
+    return `Sounds like today has been on the ${label} side. What has been going on for you?`;
   }
   if (mood.value <= 1) {
-    return `Hey ${mood.emoji} I can hear today's felt pretty ${label}. I'm here with you — what's been on your mind?`;
+    return `I can hear today has felt pretty ${label}. I am here with you. What has been on your mind?`;
   }
-  return `Hey ${mood.emoji} Thanks for checking in. Today sounds ${label} — how has your day been?`;
+  return `Thanks for sharing. Today sounds ${label}. How has your day been?`;
 }
 
 function reflectUserText(text: string): string {
@@ -178,10 +226,115 @@ function reflectUserText(text: string): string {
   if (/\b(good|great|fine|okay|ok|alright|better|happy)\b/.test(t)) return 'Good to hear some of that.';
   if (/\b(sad|down|low|depress|hopeless)\b/.test(t)) return 'Thank you for trusting me with that.';
   if (text.length > 80) return 'Thanks for putting that into words.';
-  return 'I hear you.';
+  if (text.trim().length < 8) return '';
+  return SHORT_ACKS[text.length % SHORT_ACKS.length];
+}
+
+function conversationalMessage(parts: Array<string | null | undefined>): string {
+  return parts
+    .map((p) => p?.trim())
+    .filter(Boolean)
+    .join(' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function promptForTurn(
+  state: CheckInConversationState,
+  questions: CheckInQuestion[],
+  target: CheckInQuestion,
+  userMessage: string,
+  extracted: DimensionSignal[],
+  embedded: string | null,
+): string {
+  if (embedded) return embedded;
+
+  const trimmed = userMessage.trim();
+  const richReply = trimmed.length > 60;
+  const strongSignals = extracted.filter((s) => s.confidence >= 0.65).length;
+
+  if (state.turnCount <= 3 && trimmed.length < 28 && strongSignals === 0) {
+    return OPEN_CURIOSITY[state.turnCount % OPEN_CURIOSITY.length];
+  }
+
+  if ((richReply || strongSignals >= 2) && state.turnCount < state.maxTurns - 1) {
+    return ORGANIC_FOLLOWUPS[state.turnCount % ORGANIC_FOLLOWUPS.length];
+  }
+
+  if (state.turnCount <= 2 && strongSignals === 0) {
+    return OPEN_CURIOSITY[state.turnCount % OPEN_CURIOSITY.length];
+  }
+
+  return softenPrompt(subtlePrompt(target.id, state.deeper, questions), state.turnCount);
+}
+
+const SOFT_PREFIXES = ['', '', 'I have been wondering, ', 'If it is okay to ask, '];
+
+function softenPrompt(prompt: string, turnCount = 0): string {
+  const prefix = SOFT_PREFIXES[turnCount % SOFT_PREFIXES.length];
+  if (!prefix) return prompt;
+  return `${prefix}${prompt.charAt(0).toLowerCase()}${prompt.slice(1)}`;
+}
+
+function pickOrganicFollowUp(
+  state: CheckInConversationState,
+  userMessage: string,
+  target: CheckInQuestion | null,
+  questions: CheckInQuestion[],
+): string {
+  const embedded = target ? embeddedFollowUp(userMessage, target) : null;
+  if (embedded) return embedded;
+
+  if (state.turnCount <= 4) {
+    return ORGANIC_FOLLOWUPS[state.turnCount % ORGANIC_FOLLOWUPS.length];
+  }
+
+  if (target) {
+    return softenPrompt(subtlePrompt(target.id, state.deeper, questions), state.turnCount);
+  }
+
+  return ORGANIC_FOLLOWUPS[state.turnCount % ORGANIC_FOLLOWUPS.length];
+}
+
+const AFFIRMATIVE_REPLY = /^\s*(yes|yeah|yep|yup|sure|definitely|absolutely|true|correct|i have|i do)\s*[.!]?$/i;
+const NEGATIVE_REPLY = /^\s*(no|nah|nope|not really|not much|none|never)\s*[.!]?$/i;
+
+function isShortDirectReply(text: string): boolean {
+  const trimmed = text.trim();
+  if (trimmed.length > 32) return false;
+  return AFFIRMATIVE_REPLY.test(trimmed) || NEGATIVE_REPLY.test(trimmed);
+}
+
+function recordAnswerForQuestion(
+  question: CheckInQuestion,
+  text: string,
+  source: SignalSource = 'free_text',
+): DimensionSignal {
+  const intensity = inferIntensity(text, question.scale);
+  return {
+    questionId: question.id,
+    scale: question.scale,
+    dimension: question.dimension,
+    value: intensity.value,
+    label: intensity.label,
+    confidence: Math.max(intensity.confidence, 0.85),
+    evidence: text.slice(0, 120),
+    source,
+  };
 }
 
 function inferIntensity(text: string, scale: ScaleKind): { value: number; label: string; confidence: number } {
+  const trimmed = text.trim();
+  if (AFFIRMATIVE_REPLY.test(trimmed)) {
+    return scale === 'k10'
+      ? { value: 4, label: 'Most of the time', confidence: 0.9 }
+      : { value: 2, label: 'Quite a bit', confidence: 0.9 };
+  }
+  if (NEGATIVE_REPLY.test(trimmed)) {
+    return scale === 'k10'
+      ? { value: 1, label: 'None of the time', confidence: 0.9 }
+      : { value: 0, label: 'Not really', confidence: 0.9 };
+  }
   if (INTENSITY_NONE.test(text)) {
     return scale === 'k10'
       ? { value: 1, label: 'None of the time', confidence: 0.75 }
@@ -264,9 +417,23 @@ function coverageRatio(questions: CheckInQuestion[], signals: Record<string, Dim
 }
 
 function pickClarifyTarget(questions: CheckInQuestion[], signals: Record<string, DimensionSignal>): CheckInQuestion | null {
-  const uncovered = uncoveredQuestions(questions, signals);
-  if (uncovered.length === 0) return null;
-  return uncovered.sort((a, b) => (signals[a.id]?.confidence ?? 0) - (signals[b.id]?.confidence ?? 0))[0];
+  const phq4Qs = questions.filter((q) => q.scale === 'phq4');
+  const phq4Uncovered = uncoveredQuestions(phq4Qs, signals);
+  if (phq4Uncovered.length > 0) {
+    return phq4Uncovered.sort(
+      (a, b) => (signals[a.id]?.confidence ?? 0) - (signals[b.id]?.confidence ?? 0),
+    )[0];
+  }
+
+  const k10Qs = questions.filter((q) => q.scale === 'k10');
+  const k10Uncovered = uncoveredQuestions(k10Qs, signals);
+  if (k10Uncovered.length > 0) {
+    return k10Uncovered.sort(
+      (a, b) => (signals[a.id]?.confidence ?? 0) - (signals[b.id]?.confidence ?? 0),
+    )[0];
+  }
+
+  return null;
 }
 
 function embeddedFollowUp(
@@ -275,25 +442,25 @@ function embeddedFollowUp(
 ): string | null {
   const t = lastUserText.toLowerCase();
   if (target.id === 'phq4_anx_2' && /\b(worry|stress|work|mind)\b/.test(t)) {
-    return 'You mentioned that — has it been hard to switch off after?';
+    return 'You mentioned that. Is it hard to switch off after?';
   }
   if (target.id === 'phq4_mood_2' && /\b(tired|flat|blah|meh)\b/.test(t)) {
     return 'Has stuff you normally enjoy felt less appealing lately?';
   }
   if (target.id === 'phq4_anx_1' && /\b(stress|nervous|tense)\b/.test(t)) {
-    return 'Has that left you feeling keyed up at all?';
+    return 'Sounds like that has left you pretty wound up.';
   }
   if (target.id === 'phq4_mood_1' && /\b(sad|down|rough|hard)\b/.test(t)) {
-    return 'Have there been moments where things felt heavy or low?';
+    return 'Those heavier moments can really linger.';
   }
   return null;
 }
 
 function closingMessage(mood: MoodOption | null): string {
   if (mood && mood.value <= 1) {
-    return "Thank you for sharing all of that — it takes courage. I've put together a gentle summary whenever you're ready.";
+    return 'Thank you for sharing all of that. It takes courage. Whenever you are ready, I can show you a summary with a few support ideas.';
   }
-  return "Thanks for chatting with me. I've put together a gentle summary for you — tap below when you'd like to see it.";
+  return 'Thanks for chatting with me. Whenever you are ready, tap below and I will share a summary with some next steps.';
 }
 
 export function signalsToRecordedAnswers(
@@ -344,7 +511,7 @@ export function advanceConversation(payload: {
       ...state,
       mood: selectedMood,
       phase: 'exploring',
-      maxTurns: maxTurnsForMood(selectedMood, state.deeper),
+      maxTurns: maxTurnsForMood(selectedMood, questions),
     };
     return {
       message: moodOpener(selectedMood, state.deeper, state.sessionOpener),
@@ -359,7 +526,7 @@ export function advanceConversation(payload: {
 
   if (state.phase === 'mood') {
     return {
-      message: "Hey — before we chat, which emoji feels closest to your day?",
+      message: COPY.moodPrompt,
       helper: null,
       finished: false,
       showChips: false,
@@ -398,7 +565,9 @@ export function advanceConversation(payload: {
     state.turnCount += 1;
     const activeClarify = state.clarifyingId
       ? questions.find((q) => q.id === state.clarifyingId)
-      : null;
+      : state.lastAskedQuestionId
+        ? questions.find((q) => q.id === state.lastAskedQuestionId)
+        : null;
 
     if (SKIP_PHRASES.test(userMessage) && activeClarify) {
       const skipSignal: DimensionSignal = {
@@ -413,61 +582,47 @@ export function advanceConversation(payload: {
       };
       state.signals = mergeSignal(state.signals, skipSignal);
       state.clarifyingId = null;
+      state.lastAskedQuestionId = null;
       state.phase = 'exploring';
 
       if (shouldFinish(state, questions)) return finishReply(state);
 
       const next = pickClarifyTarget(questions, state.signals);
-      return {
-        message: next
-          ? `No worries. ${subtlePrompt(next.id, state.deeper, questions)}`
-          : closingMessage(state.mood),
-        helper: null,
-        finished: !next,
-        showChips: false,
-        chipOptions: [],
-        showMoodPicker: false,
-        state: next ? state : { ...state, phase: 'closing' },
-      };
+      return askNextQuestion(state, questions, 'No worries.', next);
     }
 
-    if (state.clarifyingId) {
-      const clarifyQ = questions.find((q) => q.id === state.clarifyingId);
-      if (clarifyQ) {
-        const targeted = extractSignalsFromText(userMessage, [clarifyQ]);
+    const pendingId =
+      state.clarifyingId ?? (isShortDirectReply(userMessage) ? state.lastAskedQuestionId : null);
+    if (pendingId) {
+      const pendingQ = questions.find((q) => q.id === pendingId);
+      if (pendingQ) {
+        const targeted = extractSignalsFromText(userMessage, [pendingQ]);
         if (targeted.length > 0) {
           state.signals = mergeSignals(state.signals, targeted);
         } else {
-          const intensity = inferIntensity(userMessage, clarifyQ.scale);
-          state.signals = mergeSignal(state.signals, {
-            questionId: clarifyQ.id,
-            scale: clarifyQ.scale,
-            dimension: clarifyQ.dimension,
-            value: intensity.value,
-            label: intensity.label,
-            confidence: intensity.confidence,
-            evidence: userMessage.slice(0, 120),
-            source: 'free_text',
-          });
+          state.signals = mergeSignal(state.signals, recordAnswerForQuestion(pendingQ, userMessage));
         }
       }
       state.clarifyingId = null;
+      state.lastAskedQuestionId = null;
       state.phase = 'exploring';
     }
 
     const extracted = extractSignalsFromText(userMessage, questions);
     state.signals = mergeSignals(state.signals, extracted);
     const reflection = reflectUserText(userMessage);
+    const richReply = userMessage.trim().length > 60;
+    const strongExtraction = extracted.some((s) => s.confidence >= 0.65) || extracted.length >= 2;
 
     if (shouldFinish(state, questions)) {
       return {
-        message: `${reflection} ${closingMessage(state.mood)}`,
+        message: conversationalMessage([reflection, closingMessage(state.mood)]),
         helper: null,
         finished: true,
         showChips: false,
         chipOptions: [],
         showMoodPicker: false,
-        state: { ...state, phase: 'closing' },
+        state: { ...state, phase: 'closing', lastAskedQuestionId: null },
       };
     }
 
@@ -478,11 +633,31 @@ export function advanceConversation(payload: {
     const weakSignal = state.signals[target.id];
     const needsFollowUp = !embedded && (!weakSignal || weakSignal.confidence < 0.55);
 
-    if (needsFollowUp && state.turnCount >= 2) {
-      state.clarifyingId = target.id;
+    if ((richReply || strongExtraction) && state.turnCount < state.maxTurns - 1 && !needsFollowUp) {
       state.phase = 'exploring';
       return {
-        message: `${reflection} ${gentleClarifyPrompt(target.id, state.deeper, questions)}`,
+        message: conversationalMessage([
+          reflection,
+          pickOrganicFollowUp(state, userMessage, pickClarifyTarget(questions, state.signals), questions),
+        ]),
+        helper: null,
+        finished: false,
+        showChips: false,
+        chipOptions: [],
+        showMoodPicker: false,
+        state: { ...state, lastAskedQuestionId: null },
+      };
+    }
+
+    if (needsFollowUp && state.turnCount >= 5) {
+      state.clarifyingId = target.id;
+      state.lastAskedQuestionId = target.id;
+      state.phase = 'exploring';
+      return {
+        message: conversationalMessage([
+          reflection,
+          gentleClarifyPrompt(target.id, state.deeper, questions),
+        ]),
         helper: null,
         finished: false,
         showChips: false,
@@ -493,19 +668,12 @@ export function advanceConversation(payload: {
     }
 
     state.phase = 'exploring';
-    return {
-      message: `${reflection} ${embedded ?? subtlePrompt(target.id, state.deeper, questions)}`,
-      helper: null,
-      finished: false,
-      showChips: false,
-      chipOptions: [],
-      showMoodPicker: false,
-      state,
-    };
+    const prompt = promptForTurn(state, questions, target, userMessage, extracted, embedded);
+    return askNextQuestion(state, questions, reflection, target, prompt);
   }
 
   return {
-    message: "I'm still here — share whatever comes to mind.",
+    message: 'I am still here. Share whatever comes to mind.',
     helper: null,
     finished: false,
     showChips: false,
@@ -515,10 +683,45 @@ export function advanceConversation(payload: {
   };
 }
 
+function askNextQuestion(
+  state: CheckInConversationState,
+  questions: CheckInQuestion[],
+  reflection: string,
+  target: CheckInQuestion | null,
+  promptOverride?: string,
+): ConversationReply {
+  if (!target) {
+    return finishReply(state);
+  }
+  const prompt = promptOverride ?? subtlePrompt(target.id, state.deeper, questions);
+  const bridge = isFirstK10Target(questions, state.signals, target) ? COPY.k10Bridge : null;
+  const outgoing = conversationalMessage([reflection, bridge, softenPrompt(prompt, state.turnCount)]);
+
+  return {
+    message: outgoing,
+    helper: null,
+    finished: false,
+    showChips: false,
+    chipOptions: [],
+    showMoodPicker: false,
+    state: { ...state, lastAskedQuestionId: target.id, clarifyingId: null },
+  };
+}
+
 function shouldFinish(state: CheckInConversationState, questions: CheckInQuestion[]): boolean {
   if (state.turnCount >= state.maxTurns) return true;
+
+  const phq4Qs = questions.filter((q) => q.scale === 'phq4');
+  const k10Qs = questions.filter((q) => q.scale === 'k10');
+
+  if (phq4Qs.length > 0 && k10Qs.length > 0) {
+    const phq4Done = coverageRatio(phq4Qs, state.signals) >= 0.75;
+    const k10Done = coverageRatio(k10Qs, state.signals) >= 0.6;
+    return phq4Done && k10Done && state.turnCount >= phq4Qs.length + 2;
+  }
+
   const ratio = coverageRatio(questions, state.signals);
-  if (state.deeper) return ratio >= 0.6 && state.turnCount >= 4;
+  if (state.deeper || k10Qs.length > 0) return ratio >= 0.6 && state.turnCount >= 4;
   return ratio >= 0.75 || (ratio >= 0.5 && state.turnCount >= 3);
 }
 
@@ -530,7 +733,7 @@ function finishReply(state: CheckInConversationState): ConversationReply {
     showChips: false,
     chipOptions: [],
     showMoodPicker: false,
-    state: { ...state, phase: 'closing' },
+    state: { ...state, phase: 'closing', lastAskedQuestionId: null, clarifyingId: null },
   };
 }
 

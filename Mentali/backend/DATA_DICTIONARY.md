@@ -27,22 +27,27 @@ Fields:
 - `updatedAt: Date`
 
 ## 2) `dailyCheckIns`
-Daily mood check-in records.
+Daily mood and wellbeing chat records (one per user per day).
 
 Fields:
 - `_id: ObjectId`
 - `userId: ObjectId`
 - `checkInDate: Date` (date key for one-per-day uniqueness)
+- `moodId?: string | null`
 - `moodEmoji: string`
 - `moodScore: number`
 - `reflectionText?: string | null`
+- `phq4?: { total, anxietyScore, moodScore, band, suggestSupport, answeredCount, itemCount } | null`
+- `k10?: { total, band, suggestSupport, answeredCount, itemCount } | null`
+- `responses?: [{ questionId, scale, dimension, value, label, skipped?, confidence?, source? }]`
 - `createdAt: Date`
+- `updatedAt?: Date`
 
 Indexes:
 - Unique `{ userId, checkInDate }`
 
 ## 3) `chatbotSessions`
-PHQ-4 / K-10 chatbot evaluation sessions.
+Legacy chat session records. New check-ins store scores in `dailyCheckIns`.
 
 Fields:
 - `_id: ObjectId`

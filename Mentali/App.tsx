@@ -38,10 +38,16 @@ import {
   registerWithEmail,
   requestResetCode,
   resetPassword,
-  saveChatbotSession,
   saveDailyCheckIn,
+  fetchWellbeingHistory,
   verifyResetCode,
 } from '@/services/api';
+import { mapDailyCheckInDocs } from '@/services/wellbeingHistory';
+import {
+  addHistoryRecord,
+  saveHistoryRecords,
+  saveTodaySnapshot,
+} from '@/storage/checkInStorage';
 import type { SocialAuthResult } from '@/hooks/useSocialAuth';
 
 type ScreenState =
@@ -64,9 +70,6 @@ type ScreenState =
   | {
       screen: 'check-in';
       mood?: MoodOption;
-      scale: 'phq4' | 'k10';
-      returnPhq4?: WellbeingResult;
-      returnStreak?: StreakState;
     }
   | {
       screen: 'summary';
@@ -110,52 +113,106 @@ function AppRoot() {
     loadCheckInProfile().then(setCheckInProfile);
   }, []);
 
+  const syncWellbeingHistory = useCallback(async (userId: string) => {
+    try {
+      const docs = await fetchWellbeingHistory(userId);
+      const records = mapDailyCheckInDocs(docs);
+      if (records.length > 0) {
+        await saveHistoryRecords(records);
+      }
+    } catch {
+      // Non-blocking: local history remains available offline.
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!currentUserId) return;
+    syncWellbeingHistory(currentUserId).catch(() => {});
+  }, [currentUserId, syncWellbeingHistory]);
+
   const activeCheckInPlan = useMemo(() => {
     if (screenState.screen !== 'check-in') return null;
     const mood = screenState.mood ?? MOOD_OPTIONS[2];
-    return buildPersonalizedCheckInPlan(mood, screenState.scale, checkInProfile);
+    return buildPersonalizedCheckInPlan(mood, 'unified', checkInProfile);
   }, [screenState, checkInProfile]);
 
   const openChat = (friendId: string, prefill?: boolean) => {
     setScreenState({ screen: 'chat', friendId, prefill, returnToNav: homeNav });
   };
 
-  const persistCheckInData = async (answers: RecordedAnswer[], selectedMood: typeof MOODS[0]) => {
+  const persistCheckInData = async (
+    answers: RecordedAnswer[],
+    selectedMood: MoodOption,
+    phq4: WellbeingResult,
+    k10: WellbeingResult | null,
+  ) => {
     if (!currentUserId) return;
-    const phq4 = scorePhq4(answers);
-    const overall = phq4.band.level === 'calm' ? 'high' : phq4.band.level === 'mild' ? 'moderate' : 'low';
+    const checkInDate = new Date().toISOString().slice(0, 10);
 
-    await Promise.all([
-      saveDailyCheckIn({
-        userId: currentUserId,
-        moodEmoji: selectedMood.emoji,
-        moodScore: selectedMood.value,
-        checkInDate: new Date().toISOString().slice(0, 10),
-        reflectionText: null,
-      }),
-      saveChatbotSession({
-        userId: currentUserId,
-        sessionDate: new Date().toISOString(),
-        responses: answers.map((a) => ({
-          questionId: a.questionId,
-          value: a.value,
-          scale: a.scale,
-        })),
-        overallWellbeingLevel: overall,
-        generatedInsight: `Mood ${selectedMood.label}, PHQ4 level ${phq4.band.level}`,
-      }),
-    ]);
+    await saveDailyCheckIn({
+      userId: currentUserId,
+      moodId: selectedMood.id,
+      moodEmoji: selectedMood.emoji,
+      moodScore: selectedMood.value,
+      checkInDate,
+      reflectionText: null,
+      phq4: {
+        total: phq4.total,
+        anxietyScore: phq4.anxietyScore ?? 0,
+        moodScore: phq4.moodScore ?? 0,
+        band: phq4.band.level,
+        suggestSupport: phq4.suggestSupport,
+        answeredCount: phq4.answeredCount,
+        itemCount: phq4.itemCount,
+      },
+      k10: k10
+        ? {
+            total: k10.total,
+            band: k10.band.level,
+            suggestSupport: k10.suggestSupport,
+            answeredCount: k10.answeredCount,
+            itemCount: k10.itemCount,
+          }
+        : null,
+      responses: answers.map((answer) => ({
+        questionId: answer.questionId,
+        scale: answer.scale,
+        dimension: answer.dimension,
+        value: answer.value,
+        label: answer.label,
+        skipped: answer.skipped,
+        confidence: answer.confidence,
+        source: answer.source,
+      })),
+    });
   };
 
   const handleCheckInComplete = (answers: RecordedAnswer[], selectedMood: MoodOption) => {
     const phq4 = scorePhq4(answers);
     const k10 = answers.some((a) => a.scale === 'k10') ? scoreK10(answers) : null;
-    persistCheckInData(answers, selectedMood).catch(() => {
+    const today = new Date().toISOString().split('T')[0];
+
+    persistCheckInData(answers, selectedMood, phq4, k10).catch(() => {
       // Non-blocking persistence: keep check-in UX responsive even if API is unreachable.
     });
 
+    addHistoryRecord({
+      date: today,
+      moodId: selectedMood.id,
+      moodValue: selectedMood.value,
+      phq4Total: phq4.total,
+      band: phq4.band.level,
+      k10Total: k10?.total,
+    }).catch(() => {});
+
+    saveTodaySnapshot({
+      date: today,
+      mood: selectedMood,
+      phq4,
+      k10,
+    }).catch(() => {});
+
     // Update streak
-    const today = new Date().toISOString().split('T')[0];
     const newStreak = { ...streak };
     if (streak.lastCheckInDate !== today) {
       const yesterday = new Date();
@@ -190,36 +247,6 @@ function AppRoot() {
       phq4,
       k10,
       streak: newStreak,
-    });
-  };
-
-  const handleK10Complete = (
-    answers: RecordedAnswer[],
-    mood: MoodOption,
-    phq4: WellbeingResult,
-    streakState: StreakState,
-  ) => {
-    const k10 = scoreK10(answers);
-    if (currentUserId) {
-      saveChatbotSession({
-        userId: currentUserId,
-        sessionDate: new Date().toISOString(),
-        responses: answers.map((a) => ({
-          questionId: a.questionId,
-          value: a.value,
-          scale: a.scale,
-        })),
-        overallWellbeingLevel: k10.band.level === 'calm' ? 'high' : k10.band.level === 'mild' ? 'moderate' : 'low',
-        generatedInsight: `K10 level ${k10.band.level} after deeper check-in`,
-      }).catch(() => {});
-    }
-
-    setScreenState({
-      screen: 'summary',
-      mood,
-      phq4,
-      k10,
-      streak: streakState,
     });
   };
 
@@ -435,7 +462,7 @@ function AppRoot() {
             initialSelectedNav={screenState.selectedNav ?? homeNav}
             onSelectedNavChange={setHomeNav}
             onOpenChat={(friend, prefill) => openChat(friend.id, prefill)}
-            onOpenCheckIn={(mood) => setScreenState({ screen: 'check-in', scale: 'phq4', mood })}
+            onOpenCheckIn={(mood) => setScreenState({ screen: 'check-in', mood })}
             onOpenWardrobe={() => setScreenState({ screen: 'wardrobe', returnToNav: homeNav })}
           />
         ) : screenState.screen === 'wardrobe' ? (
@@ -447,7 +474,7 @@ function AppRoot() {
           />
         ) : screenState.screen === 'check-in' ? (
           <CheckInChatScreen
-            key={`check-in-${screenState.scale}-${checkInProfile.checkInCount}-${activeCheckInPlan?.focus ?? 'balanced'}`}
+            key={`check-in-${checkInProfile.checkInCount}-${activeCheckInPlan?.focus ?? 'balanced'}`}
             mood={screenState.mood}
             questions={activeCheckInPlan?.questions ?? []}
             sessionPlan={
@@ -455,28 +482,10 @@ function AppRoot() {
                 ? { opener: activeCheckInPlan.opener, focus: activeCheckInPlan.focus }
                 : undefined
             }
-            headerTitle={screenState.scale === 'k10' ? 'A little longer' : 'Chat'}
+            headerTitle="Wellbeing chat"
             completeLabel="See my summary"
-            onBack={() => {
-              if (screenState.scale === 'k10' && screenState.returnPhq4 && screenState.returnStreak) {
-                setScreenState({
-                  screen: 'summary',
-                  mood: screenState.mood ?? MOODS[2],
-                  phq4: screenState.returnPhq4,
-                  k10: null,
-                  streak: screenState.returnStreak,
-                });
-              } else {
-                setScreenState({ screen: 'home', selectedNav: homeNav });
-              }
-            }}
-            onComplete={(answers, mood) => {
-              if (screenState.scale === 'k10' && screenState.returnPhq4 && screenState.returnStreak) {
-                handleK10Complete(answers, mood, screenState.returnPhq4, screenState.returnStreak);
-              } else {
-                handleCheckInComplete(answers, mood);
-              }
-            }}
+            onBack={() => setScreenState({ screen: 'home', selectedNav: homeNav })}
+            onComplete={(answers, mood) => handleCheckInComplete(answers, mood)}
           />
         ) : screenState.screen === 'summary' ? (
           <SummaryScreen
@@ -484,16 +493,8 @@ function AppRoot() {
             streak={screenState.streak}
             phq4={screenState.phq4}
             k10={screenState.k10}
-            onDeeper={() =>
-              setScreenState({
-                screen: 'check-in',
-                mood: screenState.mood,
-                scale: 'k10',
-                returnPhq4: screenState.phq4,
-                returnStreak: screenState.streak,
-              })
-            }
             onDone={() => setScreenState({ screen: 'home', selectedNav: homeNav })}
+            onOpenFriends={() => setScreenState({ screen: 'home', selectedNav: 'people-outline' })}
           />
         ) : screenState.screen === 'chat' ? (
           <FriendChatScreenContent

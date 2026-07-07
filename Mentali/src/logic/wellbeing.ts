@@ -14,52 +14,52 @@ import type {
 const PHQ4_BANDS: Record<BandLevel, WellbeingBand> = {
   calm: {
     level: 'calm',
-    title: "You're in a steady place",
+    title: 'A fairly steady day',
     message:
-      'Your answers point to a calm day overall. Nice — small daily check-ins help keep it that way.',
+      'From what you shared, today sounds manageable overall. Small habits and staying connected can help keep it that way.',
   },
   mild: {
     level: 'mild',
-    title: 'A few things on your mind',
+    title: 'A few bumps today',
     message:
-      'Sounds like some mild ups and downs lately. That is completely normal. Be kind to yourself today.',
+      'Some stress or low moments came through. That happens. A walk, a rest, or a chat with someone you trust can help.',
   },
   moderate: {
     level: 'moderate',
-    title: "You're carrying a fair bit",
+    title: 'Today felt heavier than usual',
     message:
-      'It looks like things have felt heavier recently. It can really help to share how you feel with someone you trust.',
+      'It sounds like you have been carrying a fair bit. Reaching out to someone you trust, or a support service in Singapore, could help.',
   },
   high: {
     level: 'high',
-    title: "You're carrying a lot right now",
+    title: 'Please take yourself seriously today',
     message:
-      'Your answers suggest you have been going through a tough stretch. You do not have to handle it alone.',
+      'You shared that things have been really hard. You deserve support. Consider talking to someone you trust or a helpline soon.',
   },
 };
 
 const K10_BANDS: Record<BandLevel, WellbeingBand> = {
   calm: {
     level: 'calm',
-    title: 'Low distress',
-    message: 'This longer check-in points to a generally settled couple of weeks.',
+    title: 'The past few weeks sound steadier',
+    message: 'From our chat, the past few weeks seem generally settled. Keep noticing what helps you feel okay.',
   },
   mild: {
     level: 'mild',
-    title: 'Mild distress',
-    message: 'Some stress has been around, but it looks manageable. Keep checking in.',
+    title: 'Some tough patches lately',
+    message: 'Stress has shown up here and there, but it may feel manageable. Stay connected with people who care about you.',
   },
   moderate: {
     level: 'moderate',
-    title: 'Moderate distress',
+    title: 'The past few weeks have been a lot',
     message:
-      'These past weeks seem to have taken a toll. Reaching out to someone could lighten the load.',
+      'It sounds like recent weeks have taken a toll. Talking to a trusted person or a Singapore support service could lighten the load.',
   },
   high: {
     level: 'high',
-    title: 'High distress',
+    title: 'You have been going through a lot',
     message:
-      'This points to a lot of distress lately. Please consider talking to a professional or someone you trust soon.',
+      'From what you shared, the past while has been really heavy. Please consider speaking with someone you trust or a helpline soon.',
   },
 };
 
@@ -143,17 +143,17 @@ export function reflectionLine(
   const low = phq4.moodScore ?? 0;
 
   let focus = '';
-  if (anxiety > low && anxiety >= 3) focus = ', and worry seems to be the louder part today';
-  else if (low > anxiety && low >= 3) focus = ', and low mood seems to be weighing on you';
+  if (anxiety > low && anxiety >= 3) focus = ', and stress seemed to be a big part of that';
+  else if (low > anxiety && low >= 3) focus = ', and things feeling low seemed to weigh on you';
 
   const suggestion: Record<BandLevel, string> = {
-    calm: 'Keep doing what works — a quick check-in tomorrow keeps the momentum.',
-    mild: 'A small reset, like a short walk or a chat, can help.',
-    moderate: 'Sharing how you feel with someone you trust could lighten the load.',
-    high: 'Please consider reaching out to someone you trust or a professional soon.',
+    calm: 'Small moments like this help you notice how you are doing. Come back tomorrow if you can.',
+    mild: 'If anything lingers, a message to a friend or a short reset can help.',
+    moderate: 'This might be a good moment to reach out to someone you trust or explore support options below.',
+    high: 'Please look at the support options below. You do not have to go through this alone.',
   };
 
-  return `You checked in feeling ${mood.label.toLowerCase()}${focus}. ${suggestion[level]}`;
+  return `You came in feeling ${mood.label.toLowerCase()}${focus}. ${suggestion[level]}`;
 }
 
 /** Plain-language label for a 0-6 sub-score. */

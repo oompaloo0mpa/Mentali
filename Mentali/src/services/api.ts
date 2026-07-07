@@ -1,6 +1,8 @@
 import Constants from "expo-constants";
 import { Platform } from "react-native";
 
+import type { DailyCheckInDoc } from "@/services/wellbeingHistory";
+
 function resolveApiBaseUrl(): string {
   const configured = (process.env.EXPO_PUBLIC_API_BASE_URL ?? "").trim();
 
@@ -123,15 +125,47 @@ export async function resetPassword(payload: {
 
 export async function saveDailyCheckIn(payload: {
   userId: string;
+  moodId?: string;
   moodEmoji: string;
   moodScore: number;
   reflectionText?: string | null;
   checkInDate: string;
+  phq4?: {
+    total: number;
+    anxietyScore: number;
+    moodScore: number;
+    band: string;
+    suggestSupport: boolean;
+    answeredCount: number;
+    itemCount: number;
+  } | null;
+  k10?: {
+    total: number;
+    band: string;
+    suggestSupport: boolean;
+    answeredCount: number;
+    itemCount: number;
+  } | null;
+  responses?: {
+    questionId: string;
+    scale: string;
+    dimension: string;
+    value: number;
+    label: string;
+    skipped?: boolean;
+    confidence?: number;
+    source?: string;
+  }[];
 }) {
   return apiRequest("/daily-checkins", {
     method: "POST",
     body: JSON.stringify(payload),
   });
+}
+
+export async function fetchWellbeingHistory(userId: string): Promise<DailyCheckInDoc[]> {
+  const result = await apiRequest(`/daily-checkins/${userId}`);
+  return (result?.data ?? []) as DailyCheckInDoc[];
 }
 
 export async function fetchUserPreferences(userId: string) {

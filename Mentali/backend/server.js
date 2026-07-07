@@ -641,18 +641,83 @@ app.post("/api/auth/reset-password", async (req, res, next) => {
   }
 });
 
+function normalizeWellbeingScale(payload, scale) {
+  if (!payload || typeof payload !== "object") return null;
+  const band = String(payload.band || "");
+  if (!["calm", "mild", "moderate", "high"].includes(band)) return null;
+  const base = {
+    total: Number(payload.total),
+    band,
+    suggestSupport: !!payload.suggestSupport,
+    answeredCount: Number(payload.answeredCount ?? 0),
+    itemCount: Number(payload.itemCount ?? 0),
+  };
+  if (scale === "phq4") {
+    return {
+      ...base,
+      anxietyScore: Number(payload.anxietyScore ?? 0),
+      moodScore: Number(payload.moodScore ?? 0),
+    };
+  }
+  return base;
+}
+
+function normalizeCheckInResponses(responses) {
+  if (!Array.isArray(responses)) return [];
+  return responses
+    .map((item) => {
+      const scale = String(item?.scale || "");
+      if (!["phq4", "k10"].includes(scale)) return null;
+      return {
+        questionId: String(item.questionId || ""),
+        scale,
+        dimension: String(item.dimension || "distress"),
+        value: Number(item.value ?? 0),
+        label: String(item.label || ""),
+        skipped: !!item.skipped,
+        confidence: item.confidence == null ? null : Number(item.confidence),
+        source: item.source ? String(item.source) : null,
+      };
+    })
+    .filter((item) => item && item.questionId);
+}
+
 app.post("/api/daily-checkins", async (req, res, next) => {
   try {
     const { db } = await connectMongo();
-    const { userId, moodEmoji, moodScore, reflectionText, checkInDate } = req.body || {};
+    const {
+      userId,
+      moodId,
+      moodEmoji,
+      moodScore,
+      reflectionText,
+      checkInDate,
+      phq4,
+      k10,
+      responses,
+    } = req.body || {};
+    const now = new Date();
+    const dateValue = checkInDate ? new Date(checkInDate) : new Date(now.toISOString().slice(0, 10));
+    const uid = toObjectId(userId, "userId");
+    const existing = await db.collection("dailyCheckIns").findOne({
+      userId: uid,
+      checkInDate: dateValue,
+    });
+
     const doc = {
-      userId: toObjectId(userId, "userId"),
+      userId: uid,
+      moodId: moodId ? String(moodId) : null,
       moodEmoji,
       moodScore,
       reflectionText: reflectionText || null,
-      checkInDate: checkInDate ? new Date(checkInDate) : new Date(new Date().toISOString().slice(0, 10)),
-      createdAt: new Date(),
+      checkInDate: dateValue,
+      phq4: normalizeWellbeingScale(phq4, "phq4"),
+      k10: normalizeWellbeingScale(k10, "k10"),
+      responses: normalizeCheckInResponses(responses),
+      createdAt: existing?.createdAt ?? now,
+      updatedAt: now,
     };
+
     const result = await db.collection("dailyCheckIns").updateOne(
       { userId: doc.userId, checkInDate: doc.checkInDate },
       { $set: doc },
@@ -1284,7 +1349,7 @@ app.delete("/api/users/:userId", async (req, res, next) => {
     await Promise.all([
       db.collection("userPreferences").deleteMany({ userId: uid }),
       db.collection("friends").deleteMany({ $or: [{ userAId: uid }, { userBId: uid }] }),
-      db.collection("dailyCheckins").deleteMany({ userId: uid }),
+      db.collection("dailyCheckIns").deleteMany({ userId: uid }),
       db.collection("chatbotSessions").deleteMany({ userId: uid }),
       db.collection("passwordResetCodes").deleteMany({ userId: uid }),
       db.collection("users").deleteOne({ _id: uid }),

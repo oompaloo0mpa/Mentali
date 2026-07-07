@@ -67,8 +67,31 @@ export async function clearCheckInData(): Promise<void> {
 
 export async function addHistoryRecord(record: CheckInRecord): Promise<CheckInRecord[]> {
   const history = await loadHistory();
-  // Keep one record per day and limit history size.
-  const next = [record, ...history.filter((r) => r.date !== record.date)].slice(0, 60);
+  const next = mergeHistoryRecords(history, [record]);
+  try {
+    await AsyncStorage.setItem(HISTORY_KEY, JSON.stringify(next));
+  } catch {
+    // Non-fatal.
+  }
+  return next;
+}
+
+/** Merges records by date; incoming entries replace existing dates. */
+export function mergeHistoryRecords(
+  existing: CheckInRecord[],
+  incoming: CheckInRecord[],
+): CheckInRecord[] {
+  const byDate = new Map<string, CheckInRecord>();
+  for (const record of existing) byDate.set(record.date, record);
+  for (const record of incoming) byDate.set(record.date, record);
+  return [...byDate.values()]
+    .sort((a, b) => b.date.localeCompare(a.date))
+    .slice(0, 60);
+}
+
+export async function saveHistoryRecords(records: CheckInRecord[]): Promise<CheckInRecord[]> {
+  const history = await loadHistory();
+  const next = mergeHistoryRecords(history, records);
   try {
     await AsyncStorage.setItem(HISTORY_KEY, JSON.stringify(next));
   } catch {

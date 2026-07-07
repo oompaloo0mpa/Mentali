@@ -140,46 +140,51 @@ export function personalizedOpener(mood: MoodOption, focus: CheckInFocus, profil
   const label = mood.label.toLowerCase();
 
   if (profile.checkInCount === 0) {
-    return `Hey ${mood.emoji} Welcome to your first chat check-in — I'm glad you're here. Today sounds ${label}; what's been on your mind?`;
+    return `Hey, I am glad you are here. Today sounds ${label}. What has been on your mind?`;
   }
 
   const returning =
     profile.checkInCount >= 3
-      ? "Good to see you again. "
+      ? 'Good to see you again. '
       : '';
 
   switch (focus) {
     case 'anxiety':
-      return `${returning}${mood.emoji} Worry and stress have come up before — no need to go over all of that again. How has today felt?`;
+      return `${returning}Worry and stress have come up before. How has today felt?`;
     case 'mood':
-      return `${returning}${mood.emoji} I've noticed some heavier days lately. I'm here — what's today been like for you?`;
+      return `${returning}I have noticed some heavier days lately. I am here. What has today been like for you?`;
     case 'energy':
-      return `${returning}${mood.emoji} Energy can really shape a day. How are you feeling right now?`;
+      return `${returning}Energy can really shape a day. How are you feeling right now?`;
     case 'stress':
-      return `${returning}${mood.emoji} Sounds like today's been ${label}. What's been taking up space in your head?`;
+      return `${returning}Sounds like today has been ${label}. What has been taking up space in your head?`;
     case 'social':
-      return `${returning}${mood.emoji} Connection matters. How have people and relationships felt lately?`;
+      return `${returning}Connection matters. How have people and relationships felt lately?`;
     case 'positive':
-      return `${returning}${mood.emoji} Nice — today sounds ${label}. What's been going well, and is anything still on your mind?`;
+      return `${returning}Today sounds ${label}. What has been going well, and is anything still on your mind?`;
     default:
       if (mood.value >= 3) {
-        return `${returning}${mood.emoji} Today sounds ${label}. What's been going on for you?`;
+        return `${returning}Today sounds ${label}. What has been going on for you?`;
       }
       if (mood.value <= 1) {
-        return `${returning}${mood.emoji} I hear today's felt ${label}. I'm here with you — what's been on your mind?`;
+        return `${returning}I hear today has felt ${label}. I am here with you. What has been on your mind?`;
       }
-      return `${returning}${mood.emoji} Thanks for checking in. How has your day been?`;
+      return `${returning}Thanks for sharing. How has your day been?`;
   }
 }
 
 export function buildPersonalizedCheckInPlan(
   mood: MoodOption,
-  scale: 'phq4' | 'k10',
+  scale: 'phq4' | 'k10' | 'unified',
   profile: UserCheckInProfile,
 ): PersonalizedCheckInPlan {
   const sessionIndex = profile.checkInCount;
   const focus = resolveFocus(mood, profile);
-  const questions = scale === 'k10' ? buildK10Set(focus, sessionIndex) : buildPhq4Set(focus, sessionIndex);
+  const questions =
+    scale === 'k10'
+      ? buildK10Set(focus, sessionIndex)
+      : scale === 'unified'
+        ? [...buildPhq4Set(focus, sessionIndex), ...buildK10Set(focus, sessionIndex)]
+        : buildPhq4Set(focus, sessionIndex);
   const opener = personalizedOpener(mood, focus, profile);
 
   return { questions, focus, opener, sessionIndex };

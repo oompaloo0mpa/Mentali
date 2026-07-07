@@ -101,6 +101,8 @@ export interface TodaySnapshot {
   k10: WellbeingResult | null;
 }
 
+export type SupportTier = 'helpline' | 'community' | 'crisis';
+
 /** A support contact shown on the escalation card. */
 export interface SupportResource {
   label: string;
@@ -109,4 +111,7 @@ export interface SupportResource {
   phone?: string;
   /** Web address to open in the browser. */
   url?: string;
+  /** WhatsApp deep link (wa.me). */
+  whatsapp?: string;
+  tier?: SupportTier;
 }

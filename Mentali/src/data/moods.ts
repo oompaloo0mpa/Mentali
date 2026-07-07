@@ -24,7 +24,7 @@ export const MOOD_OPTIONS: MoodOptionWithImage[] = [
     value: 4,
     homeKey: 'great',
     image: happyFeeling,
-    color: '#7CD957',
+    color: '#8BCF4E',
   },
   {
     id: 'good',
@@ -42,7 +42,7 @@ export const MOOD_OPTIONS: MoodOptionWithImage[] = [
     value: 2,
     homeKey: 'meh',
     image: averageFeeling,
-    color: '#FF8C42',
+    color: '#FF9A4A',
   },
   {
     id: 'low',
@@ -51,7 +51,7 @@ export const MOOD_OPTIONS: MoodOptionWithImage[] = [
     value: 1,
     homeKey: 'sad',
     image: sadFeeling,
-    color: '#B8DCF5',
+    color: '#9EC9E8',
   },
   {
     id: 'rough',
@@ -60,7 +60,7 @@ export const MOOD_OPTIONS: MoodOptionWithImage[] = [
     value: 0,
     homeKey: 'cry',
     image: depressedFeeling,
-    color: '#B6C9B7',
+    color: '#A8B5A0',
   },
 ];
 
