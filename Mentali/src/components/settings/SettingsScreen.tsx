@@ -2,7 +2,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { type ReactNode } from 'react';
 import {
   Alert,
-  Image,
   Modal,
   Pressable,
   ScrollView,
@@ -13,8 +12,8 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { MoodFacePicker } from '@/components/mood/MoodFacePicker';
 import { COLOR_THEME_OPTIONS } from '@/data/colorThemes';
-import { moodById } from '@/data/moods';
 import { useUserProfile } from '@/storage/userProfileStore';
 import { Spacing } from '@/theme/theme';
 
@@ -27,14 +26,14 @@ const Screen = {
   toggleOff: '#C9A8B8',
   helpIcon: '#D81B9C',
   themeSelected: '#D81B9C',
+  hint: 'rgba(92, 42, 56, 0.7)',
 } as const;
 
 type Props = {
   visible: boolean;
   onClose: () => void;
-  onChangePassword: () => void;
+  onResetPassword: () => void;
   onDeleteAccount: () => void;
-  onOpenWardrobe: () => void;
 };
 
 type ToggleRowProps = {
@@ -72,15 +71,19 @@ function ToggleRow({ label, value, onValueChange, helpText }: ToggleRowProps) {
 
 type LinkRowProps = {
   label: string;
+  subtitle?: string;
   onPress?: () => void;
 };
 
-function LinkRow({ label, onPress }: LinkRowProps) {
+function LinkRow({ label, subtitle, onPress }: LinkRowProps) {
   return (
     <Pressable
       style={({ pressed }) => [styles.linkRow, pressed && styles.pressed]}
       onPress={onPress}>
-      <Text style={styles.cardText}>{label}</Text>
+      <View style={styles.linkTextWrap}>
+        <Text style={styles.cardText}>{label}</Text>
+        {subtitle ? <Text style={styles.linkSubtitle}>{subtitle}</Text> : null}
+      </View>
       <Ionicons name="chevron-forward" size={20} color={Screen.cardText} />
     </Pressable>
   );
@@ -100,13 +103,7 @@ function SettingsSection({ title, children }: SectionProps) {
   );
 }
 
-export function SettingsScreen({
-  visible,
-  onClose,
-  onChangePassword,
-  onDeleteAccount,
-  onOpenWardrobe,
-}: Props) {
+export function SettingsScreen({ visible, onClose, onResetPassword, onDeleteAccount }: Props) {
   const insets = useSafeAreaInsets();
   const {
     profile,
@@ -114,9 +111,8 @@ export function SettingsScreen({
     setHideMoodFromFriends,
     setAllowFriendRequests,
     setAllowNotifications,
-    setColorTheme,
+    setCurrentMood,
   } = useUserProfile();
-  const activeMood = moodById(profile.currentMoodId);
 
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
@@ -163,43 +159,49 @@ export function SettingsScreen({
           </SettingsSection>
 
           <SettingsSection title="Appearance">
-            <LinkRow label="Edit your mentality" onPress={onOpenWardrobe} />
-            <View style={styles.linkRow}>
-              <Text style={styles.cardText}>Current mood</Text>
-              <View style={styles.moodValue}>
-                {activeMood ? <Image source={activeMood.image} resizeMode="contain" style={styles.moodImage} /> : null}
-                <Text style={styles.cardText}>{profile.currentMoodEmoji}</Text>
-              </View>
+            <View style={styles.mentalitySection}>
+              <Text style={styles.mentalityTitle}>Edit your mentality</Text>
+              <Text style={styles.mentalityHint}>
+                Pick the mood face that matches how you feel. This is the same set shown on your homepage.
+              </Text>
+              <MoodFacePicker
+                selectedId={profile.currentMoodId}
+                onSelect={(mood) => setCurrentMood({ id: mood.id, emoji: mood.emoji })}
+                variant="light"
+                compact
+              />
             </View>
           </SettingsSection>
 
           <SettingsSection title="Account Management">
-            <LinkRow label="Change password" onPress={onChangePassword} />
+            <LinkRow
+              label="Reset password"
+              subtitle="We'll send a verification code to your email or phone"
+              onPress={onResetPassword}
+            />
             <LinkRow label="Delete account" onPress={onDeleteAccount} />
           </SettingsSection>
 
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Colour Themes</Text>
-            <View style={styles.card}>
+            <View style={styles.comingSoonHeader}>
+              <Text style={styles.sectionTitle}>Colour Themes</Text>
+              <Text style={styles.comingSoonBadge}>Coming soon</Text>
+            </View>
+            <View style={[styles.card, styles.disabledCard]} pointerEvents="none">
               {COLOR_THEME_OPTIONS.map((theme) => {
                 const selected = profile.colorTheme === theme.id;
                 return (
-                  <Pressable
+                  <View
                     key={theme.id}
-                    style={({ pressed }) => [
-                      styles.themeRow,
-                      pressed && styles.pressed,
-                      selected && styles.themeRowSelected,
-                    ]}
-                    onPress={() => setColorTheme(theme.id)}>
+                    style={[styles.themeRow, selected && styles.themeRowSelected]}>
                     <View style={[styles.themeSwatch, { backgroundColor: theme.swatch }]} />
-                    <Text style={styles.cardText}>{theme.label}</Text>
+                    <Text style={[styles.cardText, styles.disabledText]}>{theme.label}</Text>
                     {selected ? (
                       <Ionicons name="checkmark-circle" size={22} color={Screen.themeSelected} />
                     ) : (
                       <View style={styles.themeRadioEmpty} />
                     )}
-                  </Pressable>
+                  </View>
                 );
               })}
             </View>
@@ -246,6 +248,19 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     marginBottom: Spacing.two,
   },
+  comingSoonHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: Spacing.two,
+  },
+  comingSoonBadge: {
+    color: 'rgba(255, 255, 255, 0.55)',
+    fontSize: 12,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
   card: {
     backgroundColor: Screen.card,
     borderRadius: 16,
@@ -253,12 +268,18 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.one,
     gap: 2,
   },
+  disabledCard: {
+    opacity: 0.45,
+  },
   cardText: {
     color: Screen.cardText,
     fontSize: 16,
     fontWeight: '600',
     flexShrink: 1,
     flex: 1,
+  },
+  disabledText: {
+    opacity: 0.9,
   },
   toggleRow: {
     flexDirection: 'row',
@@ -292,6 +313,32 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingVertical: Spacing.two,
+    gap: Spacing.two,
+  },
+  linkTextWrap: {
+    flex: 1,
+    gap: 4,
+  },
+  linkSubtitle: {
+    color: Screen.hint,
+    fontSize: 13,
+    fontWeight: '500',
+    lineHeight: 18,
+  },
+  mentalitySection: {
+    paddingVertical: Spacing.two,
+    gap: Spacing.two,
+  },
+  mentalityTitle: {
+    color: Screen.cardText,
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  mentalityHint: {
+    color: Screen.hint,
+    fontSize: 13,
+    fontWeight: '500',
+    lineHeight: 18,
   },
   themeRow: {
     flexDirection: 'row',
@@ -319,8 +366,6 @@ const styles = StyleSheet.create({
     borderColor: Screen.cardText,
     opacity: 0.35,
   },
-  moodValue: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  moodImage: { width: 20, height: 20 },
   pressed: {
     opacity: 0.8,
   },

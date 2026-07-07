@@ -8,8 +8,7 @@ import { useUserProfile } from '@/storage/userProfileStore';
 
 export type SettingsHostActions = {
   onLogout: () => void;
-  onChangePassword: () => void;
-  onOpenWardrobe: () => void;
+  onResetPassword: () => void;
 };
 
 type SettingsOverlayContextValue = {
@@ -41,14 +40,9 @@ export function SettingsOverlayProvider({ children, actions }: ProviderProps) {
     ]);
   }, [actions]);
 
-  const handleChangePassword = useCallback(() => {
+  const handleResetPassword = useCallback(() => {
     closeSettings();
-    actions.onChangePassword();
-  }, [actions, closeSettings]);
-
-  const handleOpenWardrobe = useCallback(() => {
-    closeSettings();
-    actions.onOpenWardrobe();
+    actions.onResetPassword();
   }, [actions, closeSettings]);
 
   const handleDeleteRequest = useCallback(() => {
@@ -86,9 +80,8 @@ export function SettingsOverlayProvider({ children, actions }: ProviderProps) {
       <SettingsScreen
         visible={settingsVisible}
         onClose={closeSettings}
-        onChangePassword={handleChangePassword}
+        onResetPassword={handleResetPassword}
         onDeleteAccount={handleDeleteRequest}
-        onOpenWardrobe={handleOpenWardrobe}
       />
       <DeleteAccountModal
         visible={deleteVisible}

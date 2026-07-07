@@ -96,6 +96,7 @@ function AppRoot() {
   const [recoveryMode, setRecoveryMode] = useState<'phone' | 'email'>('email');
   const [recoveryValue, setRecoveryValue] = useState('');
   const [verifiedResetCode, setVerifiedResetCode] = useState('');
+  const [passwordResetReturn, setPasswordResetReturn] = useState<'login' | 'home'>('login');
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [homeNav, setHomeNav] = useState('home-outline');
   const [streak, setStreak] = useState<StreakState>({
@@ -334,10 +335,13 @@ function AppRoot() {
   const settingsActions = useMemo(
     () => ({
       onLogout: handleLogout,
-      onChangePassword: () => setScreenState({ screen: 'forgot-password' }),
-      onOpenWardrobe: () => setScreenState({ screen: 'wardrobe', returnToNav: homeNav }),
+      onResetPassword: () => {
+        setPasswordResetReturn('home');
+        setRecoveryMode('email');
+        setScreenState({ screen: 'forgot-password' });
+      },
     }),
-    [handleLogout, homeNav],
+    [handleLogout],
   );
 
   return (
@@ -354,6 +358,7 @@ function AppRoot() {
             onToggleMode={() => setLoginMode((current) => (current === 'phone' ? 'email' : 'phone'))}
             onSignupPress={() => setScreenState({ screen: 'signup' })}
             onForgotPasswordPress={() => {
+              setPasswordResetReturn('login');
               setRecoveryMode(loginMode);
               setScreenState({ screen: 'forgot-password' });
             }}
@@ -372,7 +377,13 @@ function AppRoot() {
             mode={recoveryMode}
             onToggleMode={() => setRecoveryMode((current) => (current === 'phone' ? 'email' : 'phone'))}
             onNextPress={handleRequestReset}
-            onBackPress={() => setScreenState({ screen: 'login' })}
+            onBackPress={() =>
+              setScreenState(
+                passwordResetReturn === 'home'
+                  ? { screen: 'home', selectedNav: homeNav }
+                  : { screen: 'login' },
+              )
+            }
           />
         ) : screenState.screen === 'verify-code' ? (
           <VerifyCodePage

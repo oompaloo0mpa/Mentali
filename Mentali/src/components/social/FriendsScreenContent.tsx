@@ -13,9 +13,10 @@ import { RequestRow } from '@/components/social/RequestRow';
 import { SearchBar } from '@/components/social/SearchBar';
 import { SortFilterBar, type FriendFilter, type FriendSort } from '@/components/social/SortFilterBar';
 import { StatBar } from '@/components/social/StatBar';
+import { StreakReminderBanner } from '@/components/social/StreakReminderBanner';
 import { Brand, MaxContentWidth, Spacing } from '@/theme/theme';
 import { type Friend } from '@/data/mockData';
-import { friendBadges, friendNeedsSupport, isFriendAtRisk, isNewFriend, useSocial } from '@/storage/socialStore';
+import { friendBadges, friendNeedsSupport, isFriendAtRisk, isMessagingStreakAtRisk, isNewFriend, useSocial } from '@/storage/socialStore';
 import { useUserProfile } from '@/storage/userProfileStore';
 import { useSettingsOverlay } from '@/storage/settingsOverlayStore';
 
@@ -82,6 +83,12 @@ export function FriendsScreenContent({ showHeader = true, onOpenChat, onSendMoti
   }, [refreshFriendsView]);
 
   const questActive = quests.some((q) => q.id === 'q-motivate' && q.progress < q.goal);
+
+  const atRiskFriends = useMemo(() => friends.filter(isMessagingStreakAtRisk), [friends]);
+  const topAtRiskStreak = useMemo(
+    () => atRiskFriends.reduce((max, f) => Math.max(max, f.streak), 0),
+    [atRiskFriends],
+  );
 
   const visibleFriends = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -157,6 +164,13 @@ export function FriendsScreenContent({ showHeader = true, onOpenChat, onSendMoti
         ) : null}
 
         <FriendCodeInput onSubmit={handleAddFriend} />
+
+        {atRiskFriends.length > 0 ? (
+          <StreakReminderBanner
+            streak={topAtRiskStreak}
+            friendName={atRiskFriends.length === 1 ? atRiskFriends[0].name : undefined}
+          />
+        ) : null}
 
         <Text style={styles.friendCode}>
           Your Friend Code: <Text style={styles.friendCodeValue}>{profile.friendCode}</Text>

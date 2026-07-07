@@ -41,9 +41,6 @@ const LEGACY_STORAGE_KEYS = ['mentali.social.v5', 'mentali.social.v4'];
 /** Friends added within this many days show under the "New" filter. */
 export const NEW_FRIEND_DAYS = 7;
 
-/** Minimum streak length before a missed day is considered "at risk". */
-export const AT_RISK_MIN_STREAK = 7;
-
 export type AddFriendResult = { ok: boolean; message: string };
 
 export type MuteDuration = '8h' | '24h' | '1w';
@@ -280,15 +277,25 @@ export function isStreakDoneToday(friend: Friend): boolean {
   return friend.streakDone;
 }
 
+/** Whether someone messaged in this friendship today (messaging streak is safe). */
+export function isMessagingStreakSafeToday(friend: Friend): boolean {
+  return friend.lastStreakDate === todayKey();
+}
+
+/** Active messaging streak that will reset if no one texts today. */
+export function isMessagingStreakAtRisk(friend: Friend): boolean {
+  return friend.streak >= 1 && !isMessagingStreakSafeToday(friend);
+}
+
 /** Added within the last NEW_FRIEND_DAYS days. */
 export function isNewFriend(friend: Friend): boolean {
   const addedAt = friend.addedAt ?? 0;
   return Date.now() - addedAt < NEW_FRIEND_DAYS * 24 * 60 * 60 * 1000;
 }
 
-/** Long streak (7+ days) but hasn't checked in today — streak may break. */
+/** Messaging streak at risk — no message sent in this friendship today. */
 export function isFriendAtRisk(friend: Friend): boolean {
-  return friend.streak >= AT_RISK_MIN_STREAK && !isStreakDoneToday(friend);
+  return isMessagingStreakAtRisk(friend);
 }
 
 /** Hasn't checked in today and you haven't messaged them yet — worth reaching out. */
@@ -320,7 +327,7 @@ export type FriendBadge = { label: string; tone: BadgeTone };
 export function friendBadges(friend: Friend, questActive: boolean): FriendBadge[] {
   const badges: FriendBadge[] = [];
   if (friend.hasUnread) badges.push({ label: 'New message', tone: 'info' });
-  if (isFriendAtRisk(friend)) badges.push({ label: 'Streak at risk', tone: 'warning' });
+  if (isMessagingStreakAtRisk(friend)) badges.push({ label: 'Streak at risk', tone: 'warning' });
   if (friendNeedsSupport(friend) && !isFriendAtRisk(friend)) {
     badges.push({ label: 'Reach out', tone: 'warning' });
   }

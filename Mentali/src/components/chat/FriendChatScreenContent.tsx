@@ -15,17 +15,19 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { AppIcon } from '@/components/AppIcon';
 import { AttachmentSheet } from '@/components/chat/AttachmentSheet';
 import { ChatBubble } from '@/components/chat/ChatBubble';
 import { ChatInput } from '@/components/chat/ChatInput';
 import { FlameIcon } from '@/components/chat/FlameIcon';
 import { StreakPet } from '@/components/chat/StreakPet';
 import { SuggestionBar } from '@/components/chat/SuggestionBar';
+import { StreakReminderBanner } from '@/components/social/StreakReminderBanner';
 import { FriendOptionsModal } from '@/components/social/FriendOptionsModal';
 import { SettingsAccessButton } from '@/components/settings/SettingsAccessButton';
 import { Brand, MaxContentWidth, Radius, Spacing, getStreakVisuals } from '@/theme/theme';
 import { MOTIVATIONAL_SUGGESTIONS } from '@/data/mockData';
-import { friendMoodImage, useSocial } from '@/storage/socialStore';
+import { friendMoodImage, isMessagingStreakAtRisk, useSocial } from '@/storage/socialStore';
 
 type Props = {
   friendId: string;
@@ -54,6 +56,7 @@ export function FriendChatScreenContent({ friendId, prefill, onBack, onOpenStrea
   const messages = friendId ? chatFor(friendId) : [];
   const isBlocked = !!friend?.blocked;
   const streakVisuals = getStreakVisuals(friend?.streak ?? 0);
+  const streakAtRisk = friend ? isMessagingStreakAtRisk(friend) : false;
 
   const scrollRef = useRef<ScrollView>(null);
   const [draft, setDraft] = useState('');
@@ -183,13 +186,18 @@ export function FriendChatScreenContent({ friendId, prefill, onBack, onOpenStrea
 
         <View style={styles.headerTitle}>
           <Text style={styles.headerName}>{friend?.name ?? 'Friend'}</Text>
-          {friend && (
-            <>
-              <FlameIcon streak={friend.streak} size={18} />
+          {friend && friend.streak >= 1 && (
+            <Pressable
+              onPress={onOpenStreakGuide}
+              hitSlop={6}
+              style={({ pressed }) => [styles.streakBadge, pressed && styles.pressed]}
+              accessibilityRole="button"
+              accessibilityLabel={`${friend.streak} day streak. Tap for streak guide.`}>
+              <AppIcon name="fire" size={20} />
               <Text style={[styles.headerStreak, { color: streakVisuals.color }]}>{friend.streak}</Text>
-              <Image source={friendMoodImage(friend)} resizeMode="contain" style={styles.headerMoodImage} />
-            </>
+            </Pressable>
           )}
+          {friend && <Image source={friendMoodImage(friend)} resizeMode="contain" style={styles.headerMoodImage} />}
         </View>
 
         <View style={styles.headerActions}>
@@ -210,6 +218,12 @@ export function FriendChatScreenContent({ friendId, prefill, onBack, onOpenStrea
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 8 : 0}>
         <View style={styles.chatArea}>
+          {streakAtRisk && friend && !isBlocked ? (
+            <View style={styles.reminderWrap}>
+              <StreakReminderBanner streak={friend.streak} friendName={friend.name} />
+            </View>
+          ) : null}
+
           <ScrollView
             ref={scrollRef}
             style={styles.flex}
@@ -288,6 +302,14 @@ const styles = StyleSheet.create({
   flex: { flex: 1 },
   chatArea: { flex: 1, position: 'relative' },
   petWrap: { position: 'absolute', right: Spacing.three, bottom: Spacing.three },
+  reminderWrap: {
+    paddingHorizontal: Spacing.three,
+    paddingTop: Spacing.two,
+    paddingBottom: Spacing.one,
+    width: '100%',
+    maxWidth: MaxContentWidth,
+    alignSelf: 'center',
+  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -305,8 +327,9 @@ const styles = StyleSheet.create({
   },
   backText: { color: '#FFFFFF', fontSize: 14, fontWeight: '700' },
   headerTitle: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6 },
-  headerName: { color: Brand.text, fontSize: 17, fontWeight: '700' },
-  headerStreak: { color: Brand.fire, fontSize: 14, fontWeight: '700' },
+  headerName: { color: Brand.text, fontSize: 17, fontWeight: '700', flexShrink: 1 },
+  streakBadge: { flexDirection: 'row', alignItems: 'center', gap: 3 },
+  headerStreak: { fontSize: 14, fontWeight: '700' },
   headerMoodImage: { width: 22, height: 22 },
   headerActions: { flexDirection: 'row', alignItems: 'center', gap: Spacing.one },
   menuBtn: { padding: 4 },
