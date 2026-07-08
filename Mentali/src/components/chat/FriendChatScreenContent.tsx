@@ -113,10 +113,14 @@ export function FriendChatScreenContent({ friendId, prefill, onBack, onOpenStrea
 
   const scrollToEnd = () => requestAnimationFrame(() => scrollRef.current?.scrollToEnd({ animated: true }));
 
-  const send = (text: string) => {
+  const send = async (text: string) => {
     if (!friendId || isBlocked) return;
-    sendMessage(friendId, { text });
-    scrollToEnd();
+    try {
+      await sendMessage(friendId, { text });
+      scrollToEnd();
+    } catch {
+      Alert.alert('Send failed', 'Could not send your message. Please try again.');
+    }
   };
 
   const runAttachmentAction = (action: () => Promise<void>) => {
@@ -141,8 +145,13 @@ export function FriendChatScreenContent({ friendId, prefill, onBack, onOpenStrea
       });
 
       if (!result.canceled && result.assets.length > 0) {
-        sendMessage(friendId, { text: '', imageUri: result.assets[0].uri });
-        scrollToEnd();
+        const asset = result.assets[0];
+        try {
+          await sendMessage(friendId, { text: '', imageUri: asset.uri });
+          scrollToEnd();
+        } catch {
+          Alert.alert('Upload failed', 'Could not send your photo. Please try again.');
+        }
       }
     } catch (error) {
       Alert.alert('Unable to open photos', String(error ?? 'Please try again.'));
@@ -160,8 +169,12 @@ export function FriendChatScreenContent({ friendId, prefill, onBack, onOpenStrea
 
       if (!result.canceled && result.assets.length > 0) {
         const asset = result.assets[0];
-        sendMessage(friendId, { text: '', fileName: asset.name, fileUri: asset.uri });
-        scrollToEnd();
+        try {
+          await sendMessage(friendId, { text: '', fileName: asset.name, fileUri: asset.uri });
+          scrollToEnd();
+        } catch {
+          Alert.alert('Upload failed', 'Could not send your file. Please try again.');
+        }
       }
     } catch (error) {
       Alert.alert('Unable to open files', String(error ?? 'Please try again.'));

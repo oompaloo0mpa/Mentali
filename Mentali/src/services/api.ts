@@ -33,6 +33,65 @@ function resolveApiBaseUrl(): string {
 
 const API_BASE_URL = resolveApiBaseUrl();
 
+function guessMimeType(fileName: string): string {
+  const ext = fileName.split('.').pop()?.toLowerCase() ?? '';
+  const map: Record<string, string> = {
+    jpg: 'image/jpeg',
+    jpeg: 'image/jpeg',
+    png: 'image/png',
+    gif: 'image/gif',
+    webp: 'image/webp',
+    pdf: 'application/pdf',
+    txt: 'text/plain',
+  };
+  return map[ext] ?? 'application/octet-stream';
+}
+
+export function isRemoteMediaUri(uri?: string | null): boolean {
+  return !!uri && /^https?:\/\//i.test(uri);
+}
+
+/** Rewrites localhost upload URLs to match the device-reachable API host. */
+export function resolveMediaUrl(uri?: string | null): string | undefined {
+  if (!uri) return undefined;
+  if (!/^https?:\/\//i.test(uri)) return uri;
+  try {
+    const api = new URL(API_BASE_URL);
+    const parsed = new URL(uri);
+    const loopback = parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1' || parsed.hostname === '10.0.2.2';
+    if (loopback && api.hostname !== parsed.hostname) {
+      parsed.hostname = api.hostname;
+      if (api.port) parsed.port = api.port;
+      return parsed.toString();
+    }
+  } catch {
+    // Keep original URL when parsing fails.
+  }
+  return uri;
+}
+
+export async function uploadChatAttachment(
+  localUri: string,
+  fileName: string,
+  mimeType?: string,
+): Promise<string> {
+  const FileSystem = await import('expo-file-system');
+  const base64 = await FileSystem.readAsStringAsync(localUri, {
+    encoding: 'base64',
+  });
+  const result = await apiRequest('/chats/uploads', {
+    method: 'POST',
+    body: JSON.stringify({
+      fileName,
+      mimeType: mimeType || guessMimeType(fileName),
+      data: base64,
+    }),
+  });
+  const url = String(result?.url ?? '');
+  if (!url) throw new Error('Upload failed');
+  return resolveMediaUrl(url) ?? url;
+}
+
 type AuthMode = "phone" | "email";
 type SocialProvider = "apple" | "google";
 
