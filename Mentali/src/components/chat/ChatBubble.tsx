@@ -16,9 +16,10 @@ type Props = { message: ChatMessage } | CheckInBubbleProps;
 export function ChatBubble(props: Props) {
   const isSocialMessage = 'message' in props;
   const isMe = isSocialMessage ? props.message.sender === 'me' : props.role === 'user';
-  const imageUri = isSocialMessage ? resolveMediaUrl(props.message.imageUri) : undefined;
+  const rawImageUri = isSocialMessage ? props.message.imageUri : undefined;
+  const imageUri = resolveMediaUrl(rawImageUri);
   const fileUri = isSocialMessage ? resolveMediaUrl(props.message.fileUri) : undefined;
-  const hasImage = isSocialMessage ? !!imageUri : false;
+  const hasImage = !!rawImageUri;
   const hasFile = isSocialMessage ? !!props.message.fileName : false;
   const text = isSocialMessage ? props.message.text : props.text;
   const helper = isSocialMessage ? undefined : props.helper;

@@ -47,14 +47,27 @@ function sanitizeUploadName(name) {
   return String(name || "attachment").replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 120);
 }
 
-function uploadPublicUrl(req, filename) {
-  const proto = req.headers["x-forwarded-proto"] || req.protocol || "http";
-  const host = req.headers["x-forwarded-host"] || req.get("host");
-  return `${proto}://${host}/api/uploads/${encodeURIComponent(filename)}`;
+function uploadPublicUrl(_req, filename) {
+  return `/api/uploads/${filename}`;
 }
 
 function isPublicMediaUri(uri) {
-  return typeof uri === "string" && /^https?:\/\//i.test(uri);
+  if (typeof uri !== "string" || !uri) return false;
+  if (uri.startsWith("/api/uploads/")) return true;
+  return /^https?:\/\//i.test(uri);
+}
+
+function normalizeStoredMediaUri(uri) {
+  if (!uri || typeof uri !== "string") return null;
+  if (uri.startsWith("/api/uploads/")) return uri;
+  try {
+    const parsed = new URL(uri);
+    if (parsed.pathname.startsWith("/api/uploads/")) return parsed.pathname;
+  } catch {
+    // Ignore invalid URLs.
+  }
+  if (/^https?:\/\//i.test(uri)) return uri;
+  return null;
 }
 
 function toObjectId(value, field = "id") {
@@ -1977,6 +1990,19 @@ app.post("/api/chats/:friendshipId/messages", requireAuth, async (req, res, next
       });
     }
 
+    const storedImageUri = imageUri ? normalizeStoredMediaUri(imageUri) : null;
+    const storedFileUri = fileUri ? normalizeStoredMediaUri(fileUri) : null;
+    if (imageUri && !storedImageUri) {
+      return res.status(400).json({
+        error: "imageUri must be an uploaded public URL"
+      });
+    }
+    if (fileUri && !storedFileUri) {
+      return res.status(400).json({
+        error: "fileUri must be an uploaded public URL"
+      });
+    }
+
     const {
       friendship,
       viewerId
@@ -1996,9 +2022,9 @@ app.post("/api/chats/:friendshipId/messages", requireAuth, async (req, res, next
       senderUserId: viewerId,
       recipientUserId,
       text: String(text || ""),
-      imageUri: imageUri || null,
+      imageUri: storedImageUri,
       fileName: fileName || null,
-      fileUri: fileUri || null,
+      fileUri: storedFileUri,
       createdAt: now,
     });
 
@@ -2029,9 +2055,9 @@ app.post("/api/chats/:friendshipId/messages", requireAuth, async (req, res, next
         senderUserId: String(viewerId),
         recipientUserId: String(recipientUserId),
         text: String(text || ""),
-        imageUri: imageUri || null,
+        imageUri: storedImageUri,
         fileName: fileName || null,
-        fileUri: fileUri || null,
+        fileUri: storedFileUri,
         createdAt: now,
       },
       streak: streakUpdate.streak,
@@ -2652,6 +2678,6 @@ app.use((error, _req, res, _next) => {
   });
 });
 
-app.listen(PORT, () => {
+app.listen(PORT, "0.0.0.0", () => {
   console.log(`Mentali API listening on http://localhost:${PORT}`);
 });

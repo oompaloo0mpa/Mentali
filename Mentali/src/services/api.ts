@@ -1,5 +1,6 @@
 import Constants from "expo-constants";
 import { Platform } from "react-native";
+import { EncodingType, readAsStringAsync } from "expo-file-system/legacy";
 
 import type { DailyCheckInDoc } from "@/services/wellbeingHistory";
 import { getAuthToken, loadAuthToken } from "@/storage/authStorage";
@@ -33,6 +34,10 @@ function resolveApiBaseUrl(): string {
 
 const API_BASE_URL = resolveApiBaseUrl();
 
+function getApiOrigin(): string {
+  return new URL(API_BASE_URL).origin;
+}
+
 function guessMimeType(fileName: string): string {
   const ext = fileName.split('.').pop()?.toLowerCase() ?? '';
   const map: Record<string, string> = {
@@ -48,25 +53,42 @@ function guessMimeType(fileName: string): string {
 }
 
 export function isRemoteMediaUri(uri?: string | null): boolean {
-  return !!uri && /^https?:\/\//i.test(uri);
+  return !!uri && (/^https?:\/\//i.test(uri) || uri.startsWith('/api/uploads/'));
 }
 
-/** Rewrites localhost upload URLs to match the device-reachable API host. */
+/** Build a device-reachable URL for chat attachments stored on the API server. */
 export function resolveMediaUrl(uri?: string | null): string | undefined {
   if (!uri) return undefined;
-  if (!/^https?:\/\//i.test(uri)) return uri;
-  try {
-    const api = new URL(API_BASE_URL);
-    const parsed = new URL(uri);
-    const loopback = parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1' || parsed.hostname === '10.0.2.2';
-    if (loopback && api.hostname !== parsed.hostname) {
-      parsed.hostname = api.hostname;
-      if (api.port) parsed.port = api.port;
-      return parsed.toString();
-    }
-  } catch {
-    // Keep original URL when parsing fails.
+
+  // Local file preview while a message is sending optimistically.
+  if (!uri.startsWith('/') && !/^https?:\/\//i.test(uri)) {
+    return uri;
   }
+
+  const apiOrigin = getApiOrigin();
+
+  if (uri.startsWith('/api/')) {
+    return `${apiOrigin}${uri}`;
+  }
+
+  if (/^https?:\/\//i.test(uri)) {
+    try {
+      const parsed = new URL(uri);
+      if (parsed.pathname.startsWith('/api/uploads/')) {
+        return `${apiOrigin}${parsed.pathname}`;
+      }
+      const loopback =
+        parsed.hostname === 'localhost' ||
+        parsed.hostname === '127.0.0.1' ||
+        parsed.hostname === '10.0.2.2';
+      if (loopback) {
+        return `${apiOrigin}${parsed.pathname}${parsed.search}`;
+      }
+    } catch {
+      return uri;
+    }
+  }
+
   return uri;
 }
 
@@ -75,10 +97,11 @@ export async function uploadChatAttachment(
   fileName: string,
   mimeType?: string,
 ): Promise<string> {
-  const FileSystem = await import('expo-file-system');
-  const base64 = await FileSystem.readAsStringAsync(localUri, {
-    encoding: 'base64',
+  const base64 = await readAsStringAsync(localUri, {
+    encoding: EncodingType.Base64,
   });
+  if (!base64) throw new Error('Could not read attachment');
+
   const result = await apiRequest('/chats/uploads', {
     method: 'POST',
     body: JSON.stringify({
@@ -89,7 +112,7 @@ export async function uploadChatAttachment(
   });
   const url = String(result?.url ?? '');
   if (!url) throw new Error('Upload failed');
-  return resolveMediaUrl(url) ?? url;
+  return url;
 }
 
 type AuthMode = "phone" | "email";

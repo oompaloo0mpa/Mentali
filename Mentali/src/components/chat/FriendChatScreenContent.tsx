@@ -150,8 +150,11 @@ export function FriendChatScreenContent({ friendId, prefill, onBack, onOpenStrea
         try {
           await sendMessage(friendId, { text: '', imageUri: asset.uri });
           scrollToEnd();
-        } catch {
-          Alert.alert('Upload failed', 'Could not send your photo. Please try again.');
+        } catch (error) {
+          Alert.alert(
+            'Upload failed',
+            error instanceof Error ? error.message : 'Could not send your photo. Please try again.',
+          );
         }
       }
     } catch (error) {
@@ -173,8 +176,11 @@ export function FriendChatScreenContent({ friendId, prefill, onBack, onOpenStrea
         try {
           await sendMessage(friendId, { text: '', fileName: asset.name, fileUri: asset.uri });
           scrollToEnd();
-        } catch {
-          Alert.alert('Upload failed', 'Could not send your file. Please try again.');
+        } catch (error) {
+          Alert.alert(
+            'Upload failed',
+            error instanceof Error ? error.message : 'Could not send your file. Please try again.',
+          );
         }
       }
     } catch (error) {
