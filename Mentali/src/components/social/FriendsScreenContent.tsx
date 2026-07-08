@@ -34,7 +34,6 @@ type Props = {
   userPoints?: number;
   longestStreak?: number;
   onOpenChat?: (friend: Friend) => void;
-  onSendMotivation?: (friend: Friend) => void;
 };
 
 export function FriendsScreenContent({
@@ -43,7 +42,6 @@ export function FriendsScreenContent({
   userPoints = 0,
   longestStreak = 0,
   onOpenChat,
-  onSendMotivation,
 }: Props) {
   const {
     friends,
@@ -133,10 +131,6 @@ export function FriendsScreenContent({
     onOpenChat?.(friend);
   };
 
-  const sendMotivation = (friend: Friend) => {
-    onSendMotivation?.(friend);
-  };
-
   const openProfile = (friend: Friend) => setProfileFriend(friend);
   const hasNoFriends = friends.length === 0;
 
@@ -216,7 +210,6 @@ export function FriendsScreenContent({
                   onPress={openChat}
                   onLongPress={setOptionsFriend}
                   onPressProfile={openProfile}
-                  onSendMotivation={sendMotivation}
                 />
               ))}
               {visibleFriends.length === 0 && <Text style={styles.empty}>No friends match this view.</Text>}

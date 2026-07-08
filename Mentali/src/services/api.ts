@@ -212,6 +212,8 @@ export type FriendListRow = {
   blocked?: boolean;
   moodId?: string;
   moodEmoji?: string;
+  currentTier?: string;
+  leaderboardRank?: number | null;
 };
 
 export type FriendRequestRow = {

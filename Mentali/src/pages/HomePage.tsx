@@ -660,7 +660,6 @@ export default function HomePage({
             userPoints={userPoints}
             longestStreak={profile.longestStreak}
             onOpenChat={(friend) => onOpenChat?.(friend)}
-            onSendMotivation={(friend) => onOpenChat?.(friend, true)}
           />
         ) : (
           <NavPlaceholder title={navLabels[selectedNav].title} icon={navLabels[selectedNav].icon} />

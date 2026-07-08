@@ -28,6 +28,10 @@ export type Friend = {
   /** Current daily mood selected on the friend's homepage. */
   moodId?: string;
   moodEmoji?: string;
+  /** Leaderboard tier from MongoDB (Bronze, Silver, Gold, Platinum). */
+  currentTier?: string;
+  /** Rank within the user's active tier contest, when enrolled. */
+  leaderboardRank?: number | null;
 };
 
 export type FriendRequest = {
