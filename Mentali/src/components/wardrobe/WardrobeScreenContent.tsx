@@ -107,7 +107,19 @@ type MascotPreviewProps = {
 };
 
 export function WardrobeMascotPreview({ wardrobe, size, preset = 'wardrobe' }: MascotPreviewProps) {
-  const shadowWidth = size * 0.56;
+  const shadowStyle =
+    preset === 'home'
+      ? {
+          width: size * 0.68,
+          height: size * 0.3,
+          bottom: 8,
+        }
+      : {
+          width: size * 0.56,
+          height: size * 0.25,
+          bottom: 5,
+          opacity: 0.3,
+        };
   const mascotBox = { width: size, height: size };
   const baseMascot = wardrobe.accessory === 'necklace'
     ? facelessNakedMascotNecklace
@@ -210,7 +222,7 @@ export function WardrobeMascotPreview({ wardrobe, size, preset = 'wardrobe' }: M
       {wardrobe.hat === 'fedora' ? (
         <Image source={fedoraSprite} resizeMode="contain" style={[styles.mascotLayer, hatStyle]} />
       ) : null}
-      <View style={[styles.mascotShadow, { width: shadowWidth }]} />
+      <View style={[styles.mascotShadow, shadowStyle]} />
     </View>
   );
 }
