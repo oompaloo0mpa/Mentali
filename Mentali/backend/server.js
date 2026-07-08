@@ -2548,3 +2548,4 @@ app.use((error, _req, res, _next) => {
 app.listen(PORT, () => {
   console.log(`Mentali API listening on http://localhost:${PORT}`);
 });
+

@@ -111,7 +111,7 @@ function QuestCard({ item }: { item: QuestItem }) {
   const rewardText = item.points.replace(/\s*pts$/i, '');
 
   return (
-    <View style={[styles.questCard, item.active ? styles.questCardActive : styles.questCardInactive]}>
+    <View style={[styles.questCard, item.completed ? styles.questCardActive : styles.questCardInactive]}>
       <View style={styles.questTextWrap}>
         <Text numberOfLines={1} style={styles.questTitle}>
           {item.title}

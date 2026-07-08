@@ -1,14 +1,13 @@
 /** Daily quest catalog seeded into MongoDB and sampled for each user per day. */
 
-const DAILY_QUEST_CATALOG = [
-  {
+const DAILY_QUEST_CATALOG = [{
     title: "Complete today's check-in",
     description: "Finish your daily wellbeing chat once today.",
     rewardPoints: 10,
     category: "checkin",
   },
   {
-    title: "Pick your mood",
+    description: 'Open your check-in summary and review the result.',
     description: "Choose how you feel on the homepage mood strip.",
     rewardPoints: 5,
     category: "checkin",
@@ -51,28 +50,30 @@ const DAILY_QUEST_CATALOG = [
   },
   {
     title: "Write a short reflection",
-    description: "Add a few words about how today felt for you.",
+    description: 'Add a few words in your check-in reflection box.',
     rewardPoints: 8,
     category: "reflection",
   },
   {
-    title: "Name one good thing",
-    description: "Think of one small thing that went okay today.",
+    title: 'Mark one notification as read',
+    description: 'Open notifications and clear one unread item.',
     rewardPoints: 5,
     category: "reflection",
   },
   {
-    title: "Take a mindful pause",
-    description: "Spend one minute noticing your breath or surroundings.",
+    title: 'Change your wardrobe',
+    description: 'Open the wardrobe and save a new look.',
     rewardPoints: 5,
     category: "reflection",
   },
   {
-    title: "Plan a gentle next step",
-    description: "Choose one small thing that might help you tomorrow.",
+    title: 'Visit the shop',
+    description: 'Open the shop tab and browse the available items.',
     rewardPoints: 6,
     category: "reflection",
   },
 ];
 
-module.exports = { DAILY_QUEST_CATALOG };
+module.exports = {
+  DAILY_QUEST_CATALOG
+};

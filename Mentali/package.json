@@ -9,6 +9,7 @@
     "start:no-db": "expo start",
     "start:dev": "expo start --dev-client",
     "reset-project": "node ./scripts/reset-project.js",
+    "api:start": "node backend/server.js",
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
@@ -18,7 +19,6 @@
     "db:test": "node backend/test-connection.js",
     "db:setup": "node backend/setup-database.js",
     "db:clear-users": "node backend/clear-users.js",
-    "api:start": "node backend/server.js",
     "api:dev": "nodemon backend/server.js",
     "dev": "concurrently -n api,expo -c blue,magenta \"npm run api:dev\" \"npm start\""
   },
