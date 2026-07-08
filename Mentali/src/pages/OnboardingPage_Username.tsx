@@ -13,13 +13,13 @@ import { useRouter } from 'expo-router';
 import OnboardingProgressDots from '../components/OnboardingProgressDots';
 
 type OnboardingPageUsernameProps = {
-  onContinue?: (username: string) => void | Promise<void>;
+  onContinue?: (displayName: string) => void | Promise<void>;
   onBack?: () => void;
 };
 
 export default function OnboardingPage_Username({ onContinue, onBack }: OnboardingPageUsernameProps): React.ReactElement {
   const router = useRouter();
-  const [username, setUsername] = useState('');
+  const [displayName, setDisplayName] = useState('');
   const [saving, setSaving] = useState(false);
 
   const handleGoBack = (): void => {
@@ -32,9 +32,9 @@ export default function OnboardingPage_Username({ onContinue, onBack }: Onboardi
   };
 
   const handleContinue = async (): Promise<void> => {
-    const trimmed = username.trim();
+    const trimmed = displayName.trim();
     if (!trimmed) {
-      Alert.alert('Username required', 'Please enter a username to continue.');
+      Alert.alert('Display name required', 'Please enter a display name to continue.');
       return;
     }
 
@@ -66,16 +66,16 @@ export default function OnboardingPage_Username({ onContinue, onBack }: Onboardi
               <Text style={styles.titleMain}>.</Text>
             </Text>
             <Text style={styles.subtitle}>
-              Enter a username. This is how you will be seen by others.
+              Enter a display name. This is how you will be seen by others.
             </Text>
           </View>
 
           <View style={styles.inputSection}>
             <View style={styles.inputShell}>
               <TextInput
-                value={username}
-                onChangeText={setUsername}
-                placeholder="Enter Username"
+                value={displayName}
+                onChangeText={setDisplayName}
+                placeholder="Enter display name"
                 placeholderTextColor="#5F5F5F"
                 style={styles.input}
                 autoCapitalize="none"

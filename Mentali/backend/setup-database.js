@@ -38,6 +38,7 @@ const collectionConfigs = [
           points: NUM,
           currentStreak: NUM,
           longestStreak: NUM,
+          onboardingCompleted: BOOL,
           createdAt: DATE,
           updatedAt: DATE,
         },

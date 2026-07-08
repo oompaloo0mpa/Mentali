@@ -50,14 +50,14 @@ type PreferenceKey =
 type UserProfileContextValue = {
   profile: UserProfile;
   hydrated: boolean;
-  saveUsername: (username: string) => Promise<void>;
+  saveDisplayName: (displayName: string) => Promise<void>;
   setCurrentMood: (mood: { id: string; emoji: string }) => void;
   setAnonymousMode: (enabled: boolean) => Promise<void>;
   setHideMoodFromFriends: (enabled: boolean) => Promise<void>;
   setAllowFriendRequests: (enabled: boolean) => Promise<void>;
   setAllowNotifications: (enabled: boolean) => Promise<void>;
   setColorTheme: (theme: ColorThemeId) => void;
-  completeOnboarding: (payload: { username?: string; anonymousMode: boolean }) => Promise<void>;
+  completeOnboarding: (payload: { displayName?: string; anonymousMode: boolean }) => Promise<void>;
   applyAuthUser: (user: {
     _id?: string;
     id?: string;
@@ -206,21 +206,20 @@ export function UserProfileProvider({ children }: { children: React.ReactNode })
     [],
   );
 
-  const saveUsername = useCallback(async (username: string) => {
-    const trimmed = username.trim();
+  const saveDisplayName = useCallback(async (displayName: string) => {
+    const trimmed = displayName.trim();
     if (!trimmed) {
-      throw new Error('Username is required');
+      throw new Error('Display name is required');
     }
-    const normalized = trimmed.toLowerCase();
 
     let userId: string | null = null;
     setProfile((prev) => {
       userId = prev.userId;
-      return { ...prev, username: normalized, displayName: trimmed };
+      return { ...prev, displayName: trimmed };
     });
 
     if (userId) {
-      await updateUserProfile(userId, { username: normalized, displayName: trimmed });
+      await updateUserProfile(userId, { displayName: trimmed });
     }
   }, []);
 
@@ -244,13 +243,22 @@ export function UserProfileProvider({ children }: { children: React.ReactNode })
   }, []);
 
   const completeOnboarding = useCallback(
-    async (payload: { username?: string; anonymousMode: boolean }) => {
-      if (payload.username?.trim()) {
-        await saveUsername(payload.username);
+    async (payload: { displayName?: string; anonymousMode: boolean }) => {
+      let userId: string | null = null;
+      setProfile((prev) => {
+        userId = prev.userId;
+        return prev;
+      });
+
+      if (payload.displayName?.trim()) {
+        await saveDisplayName(payload.displayName);
       }
       await setPreference('anonymousMode', payload.anonymousMode);
+      if (userId) {
+        await updateUserProfile(userId, { onboardingCompleted: true });
+      }
     },
-    [saveUsername, setPreference],
+    [saveDisplayName, setPreference],
   );
 
   const setCurrentMood = useCallback((mood: { id: string; emoji: string }) => {
@@ -307,7 +315,7 @@ export function UserProfileProvider({ children }: { children: React.ReactNode })
     () => ({
       profile,
       hydrated,
-      saveUsername,
+      saveDisplayName,
       setAnonymousMode,
       setCurrentMood,
       setHideMoodFromFriends,
@@ -321,7 +329,7 @@ export function UserProfileProvider({ children }: { children: React.ReactNode })
     [
       profile,
       hydrated,
-      saveUsername,
+      saveDisplayName,
       setAnonymousMode,
       setCurrentMood,
       setHideMoodFromFriends,

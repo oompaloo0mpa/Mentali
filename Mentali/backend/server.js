@@ -528,6 +528,7 @@ app.post("/api/auth/register", async (req, res, next) => {
       points: 0,
       currentStreak: 0,
       longestStreak: 0,
+      onboardingCompleted: false,
       createdAt: now,
       updatedAt: now,
       ...(authProvider === "email" ? {
@@ -652,13 +653,15 @@ app.patch("/api/users/:userId", requireAuth, async (req, res, next) => {
     const uid = toObjectId(req.params.userId, "userId");
     const {
       displayName,
-      username
+      username,
+      onboardingCompleted,
     } = req.body || {};
     const patch = {
       updatedAt: new Date()
     };
     if (displayName != null) patch.displayName = String(displayName).trim();
     if (username != null) patch.username = String(username).trim().toLowerCase();
+    if (onboardingCompleted != null) patch.onboardingCompleted = !!onboardingCompleted;
     if (patch.username) {
       const taken = await db.collection("users").findOne({
         username: patch.username,
@@ -732,7 +735,9 @@ app.post("/api/auth/social", async (req, res, next) => {
 
     const now = new Date();
 
+    let isNewUser = false;
     if (!user) {
+      isNewUser = true;
       const displayName =
         String(fullName || claims ?.name || "").trim() ||
         (providerEmail ? providerEmail.split("@")[0] : "Mentali user");
@@ -751,6 +756,7 @@ app.post("/api/auth/social", async (req, res, next) => {
         points: 0,
         currentStreak: 0,
         longestStreak: 0,
+        onboardingCompleted: false,
         createdAt: now,
         updatedAt: now,
         [providerKey]: providerSub,
@@ -798,7 +804,10 @@ app.post("/api/auth/social", async (req, res, next) => {
       upsert: true
     });
 
-    res.json(authPayload(user));
+    res.json({
+      ...authPayload(user),
+      isNewUser,
+    });
   } catch (e) {
     next(e);
   }

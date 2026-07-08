@@ -244,7 +244,7 @@ export async function fetchUserProfile(userId: string) {
 
 export async function updateUserProfile(
   userId: string,
-  payload: { displayName?: string; username?: string },
+  payload: { displayName?: string; username?: string; onboardingCompleted?: boolean },
 ) {
   const result = await apiRequest(`/users/${userId}`, {
     method: "PATCH",

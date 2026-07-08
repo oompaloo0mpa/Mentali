@@ -96,7 +96,7 @@ export default function App() {
 }
 
 function AppRoot() {
-  const { applyAuthUser, clearProfile, completeOnboarding, profile, saveUsername, setAnonymousMode } =
+  const { applyAuthUser, clearProfile, completeOnboarding, profile, saveDisplayName, setAnonymousMode } =
     useUserProfile();
   const [screenState, setScreenState] = useState<ScreenState>({ screen: 'welcome' });
   const [loginMode, setLoginMode] = useState<'phone' | 'email'>('email');
@@ -112,7 +112,7 @@ function AppRoot() {
     lastCheckInDate: null,
   });
   const [checkInProfile, setCheckInProfile] = useState(EMPTY_PROFILE);
-  const [onboardingUsername, setOnboardingUsername] = useState('');
+  const [onboardingDisplayName, setOnboardingDisplayName] = useState('');
   const [onboardingAnonymous, setOnboardingAnonymous] = useState(true);
 
   useEffect(() => {
@@ -297,10 +297,13 @@ function AppRoot() {
     setScreenState({ screen: 'home', selectedNav: homeNav });
   };
 
+  const needsOnboarding = (user: { onboardingCompleted?: boolean } | null | undefined, isNewUser = false) =>
+    isNewUser || user?.onboardingCompleted === false;
+
   const handleOnboardingComplete = async () => {
     try {
       await completeOnboarding({
-        username: onboardingUsername,
+        displayName: onboardingDisplayName,
         anonymousMode: onboardingAnonymous,
       });
       handleAuthSuccess();
@@ -325,6 +328,10 @@ function AppRoot() {
       setCurrentUserId(result?.user?._id ?? null);
       await applyAuthUser(result.user, result.token);
       syncUserFromServer(result?.user?._id).catch(() => {});
+      if (needsOnboarding(result.user, !!result.isNewUser)) {
+        setScreenState({ screen: 'onboarding-1' });
+        return;
+      }
       handleAuthSuccess();
     } catch (error) {
       Alert.alert(
@@ -361,6 +368,10 @@ function AppRoot() {
       setCurrentUserId(result?.user?._id ?? null);
       await applyAuthUser(result.user, result.token);
       syncUserFromServer(result?.user?._id).catch(() => {});
+      if (needsOnboarding(result.user)) {
+        setScreenState({ screen: 'onboarding-1' });
+        return;
+      }
       handleAuthSuccess();
     } catch (error) {
       Alert.alert('Login failed', error instanceof Error ? error.message : 'Unable to login.');
@@ -483,14 +494,14 @@ function AppRoot() {
           <OnboardingPage_1 onContinue={() => setScreenState({ screen: 'onboarding-username' })} />
         ) : screenState.screen === 'onboarding-username' ? (
           <OnboardingPage_Username
-            onContinue={async (username) => {
-              setOnboardingUsername(username);
+            onContinue={async (displayName) => {
+              setOnboardingDisplayName(displayName);
               try {
-                await saveUsername(username);
+                await saveDisplayName(displayName);
                 setScreenState({ screen: 'onboarding-2' });
               } catch (error) {
                 Alert.alert(
-                  'Could not save username',
+                  'Could not save display name',
                   error instanceof Error ? error.message : 'Please try again.',
                 );
               }
