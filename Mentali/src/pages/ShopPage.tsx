@@ -12,6 +12,7 @@ import {
   Text,
   View,
 } from 'react-native';
+import { useRouter } from 'expo-router';
 
 type ShopItemId =
   | 'sonic-shoes'
@@ -212,6 +213,7 @@ function FeaturedCard({
 }
 
 export default function ShopPage() {
+  const router = useRouter();
   const [coins, setCoins] = useState(500);
   const [selectedItem, setSelectedItem] = useState<ShopItem>(cosmetics[0]);
   const [screenMode, setScreenMode] = useState<ScreenMode>('shop');
@@ -348,6 +350,10 @@ export default function ShopPage() {
                 <Pressable
                   key={key}
                   onPress={() => {
+                    if (key === 'leaderboard') {
+                      router.replace('/RewardsPage');
+                      return;
+                    }
                     if (key === 'preview') {
                       setScreenMode('preview');
                     } else if (key === 'shop') {
