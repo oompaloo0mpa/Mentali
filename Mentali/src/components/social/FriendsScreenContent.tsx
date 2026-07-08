@@ -30,19 +30,26 @@ function lastMotivationText(messages: { text: string; sender: 'me' | 'them' }[])
 
 type Props = {
   showHeader?: boolean;
+  checkInStreak?: number;
+  userPoints?: number;
+  longestStreak?: number;
   onOpenChat?: (friend: Friend) => void;
   onSendMotivation?: (friend: Friend) => void;
 };
 
-export function FriendsScreenContent({ showHeader = true, onOpenChat, onSendMotivation }: Props) {
+export function FriendsScreenContent({
+  showHeader = true,
+  checkInStreak = 0,
+  userPoints = 0,
+  longestStreak = 0,
+  onOpenChat,
+  onSendMotivation,
+}: Props) {
   const {
     friends,
     requests,
     quests,
     notifications,
-    gems,
-    diamonds,
-    fireStreak,
     unreadNotifications,
     pendingMilestone,
     chatFor,
@@ -154,9 +161,9 @@ export function FriendsScreenContent({ showHeader = true, onOpenChat, onSendMoti
         }>
         {showHeader ? (
           <StatBar
-            fire={fireStreak}
-            diamonds={diamonds}
-            gems={gems}
+            fire={checkInStreak}
+            diamonds={userPoints}
+            gems={longestStreak}
             unreadCount={unreadNotifications}
             onPressNotifications={() => setNotifVisible(true)}
             onPressMenu={() => setMenuVisible(true)}

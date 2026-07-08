@@ -4,6 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import { CURRENT_USER } from '@/data/mockData';
 import type { ColorThemeId } from '@/data/colorThemes';
 import { getDisplayNameChangeAvailability } from '@/logic/displayName';
+import { completeMoodQuests } from '@/services/dailyQuestProgress';
 import { fetchUserPreferences, fetchUserProfile, updateUserPreferences, updateUserProfile } from '@/services/api';
 import { clearAuthToken, saveAuthToken } from '@/storage/authStorage';
 
@@ -17,6 +18,7 @@ export type UserProfile = {
   friendCode: string;
   points: number;
   currentTier: string;
+  longestStreak: number;
   /** Current mood chosen on homepage; shared across profile and friends visibility. */
   currentMoodId: string;
   currentMoodEmoji: string;
@@ -35,6 +37,7 @@ const DEFAULT_PROFILE: UserProfile = {
   friendCode: CURRENT_USER.friendCode,
   points: 0,
   currentTier: 'Bronze',
+  longestStreak: 0,
   currentMoodId: 'okay',
   currentMoodEmoji: '😐',
   anonymousMode: false,
@@ -63,6 +66,7 @@ type UserProfileContextValue = {
   setAllowNotifications: (enabled: boolean) => Promise<void>;
   setColorTheme: (theme: ColorThemeId) => void;
   completeOnboarding: (payload: { displayName?: string; anonymousMode: boolean }) => Promise<void>;
+  refreshProfileStats: () => Promise<void>;
   applyAuthUser: (user: {
     _id?: string;
     id?: string;
@@ -189,6 +193,7 @@ export function UserProfileProvider({ children }: { children: React.ReactNode })
       };
       let points = user.points ?? 0;
       let currentTier = user.currentTier ?? 'Bronze';
+      let longestStreak = Number(user.longestStreak ?? 0);
       let displayNameChangedAt: string | null = parseDisplayNameChangedAt(user.displayNameChangedAt);
 
       if (userId) {
@@ -201,6 +206,7 @@ export function UserProfileProvider({ children }: { children: React.ReactNode })
           if (remoteUser) {
             points = Number(remoteUser.points ?? points);
             currentTier = String(remoteUser.currentTier ?? currentTier);
+            longestStreak = Number(remoteUser.longestStreak ?? longestStreak);
             displayNameChangedAt = parseDisplayNameChangedAt(remoteUser.displayNameChangedAt);
           }
         } catch {
@@ -217,6 +223,7 @@ export function UserProfileProvider({ children }: { children: React.ReactNode })
         friendCode: user.friendCode ?? prev.friendCode,
         points,
         currentTier,
+        longestStreak,
         ...loadedPrefs,
       }));
     },
@@ -317,6 +324,25 @@ export function UserProfileProvider({ children }: { children: React.ReactNode })
     [saveDisplayName, setPreference],
   );
 
+  const refreshProfileStats = useCallback(async () => {
+    let userId: string | null = null;
+    setProfile((prev) => {
+      userId = prev.userId;
+      return prev;
+    });
+    if (!userId) return;
+
+    const remoteUser = await fetchUserProfile(userId);
+    if (!remoteUser) return;
+
+    setProfile((prev) => ({
+      ...prev,
+      points: Number(remoteUser.points ?? prev.points),
+      currentTier: String(remoteUser.currentTier ?? prev.currentTier),
+      longestStreak: Number(remoteUser.longestStreak ?? prev.longestStreak),
+    }));
+  }, []);
+
   const setCurrentMood = useCallback((mood: { id: string; emoji: string }) => {
     let userId: string | null = null;
     setProfile((prev) => {
@@ -328,8 +354,11 @@ export function UserProfileProvider({ children }: { children: React.ReactNode })
         currentMoodId: mood.id,
         currentMoodEmoji: mood.emoji,
       }).catch(() => {});
+      completeMoodQuests(userId)
+        .then(() => refreshProfileStats())
+        .catch(() => {});
     }
-  }, []);
+  }, [refreshProfileStats]);
 
   const setAnonymousMode = useCallback(
     (enabled: boolean) => setPreference('anonymousMode', enabled),
@@ -381,6 +410,7 @@ export function UserProfileProvider({ children }: { children: React.ReactNode })
       setAllowNotifications,
       setColorTheme,
       completeOnboarding,
+      refreshProfileStats,
       applyAuthUser,
       clearProfile,
     }),
@@ -397,6 +427,7 @@ export function UserProfileProvider({ children }: { children: React.ReactNode })
       setAllowNotifications,
       setColorTheme,
       completeOnboarding,
+      refreshProfileStats,
       applyAuthUser,
       clearProfile,
     ],

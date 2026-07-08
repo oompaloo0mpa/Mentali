@@ -257,6 +257,37 @@ export async function blockFriendship(friendshipId: string) {
   return apiRequest(`/friends/${friendshipId}/block`, { method: "POST" });
 }
 
+export async function completeUserQuest(userQuestId: string) {
+  return apiRequest(`/user-quests/${userQuestId}/complete`, { method: 'POST' });
+}
+
+export type NotificationRow = {
+  id: string;
+  icon: 'person-add' | 'flame' | 'chatbubble-ellipses' | 'trophy';
+  title: string;
+  time: string;
+  read: boolean;
+  recent: boolean;
+  createdAt?: string;
+};
+
+export async function fetchNotifications(userId: string): Promise<NotificationRow[]> {
+  const result = await apiRequest(`/notifications/${userId}`);
+  return (result?.data ?? []) as NotificationRow[];
+}
+
+export async function markNotificationRead(notificationId: string) {
+  return apiRequest(`/notifications/${notificationId}/read`, { method: 'PATCH' });
+}
+
+export async function markAllNotificationsRead(userId: string) {
+  return apiRequest(`/notifications/${userId}/read-all`, { method: 'PATCH' });
+}
+
+export async function clearNotifications(userId: string) {
+  return apiRequest(`/notifications/${userId}`, { method: 'DELETE' });
+}
+
 export async function fetchActiveQuests() {
   const result = await apiRequest("/quests/active");
   return result?.data ?? [];

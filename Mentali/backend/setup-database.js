@@ -459,6 +459,27 @@ const collectionConfigs = [
     indexes: [{ key: { userId: 1 }, options: { unique: true } }],
   },
   {
+    name: "notifications",
+    validator: {
+      $jsonSchema: {
+        bsonType: "object",
+        required: ["userId", "icon", "title", "read", "createdAt"],
+        properties: {
+          _id: OID,
+          userId: OID,
+          icon: { enum: ["person-add", "flame", "chatbubble-ellipses", "trophy"] },
+          title: STR,
+          read: BOOL,
+          createdAt: DATE,
+        },
+      },
+    },
+    indexes: [
+      { key: { userId: 1, createdAt: -1 }, options: {} },
+      { key: { userId: 1, read: 1 }, options: {} },
+    ],
+  },
+  {
     name: "passwordResetCodes",
     validator: {
       $jsonSchema: {

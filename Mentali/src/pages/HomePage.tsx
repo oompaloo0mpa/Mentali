@@ -15,7 +15,6 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import {
-  initialNotifications,
   moods,
   navItems,
   questPool,
@@ -29,7 +28,15 @@ import { FriendsScreenContent } from '../components/social/FriendsScreenContent'
 import { BottomNav } from '@/components/nav/BottomNav';
 import { useSettingsOverlay } from '@/storage/settingsOverlayStore';
 import { moodById, moodFromHomeIndex } from '@/data/checkInContent';
-import { assignDailyQuests, fetchDailyQuests } from '@/services/api';
+import {
+  assignDailyQuests,
+  fetchDailyQuests,
+  fetchNotifications,
+  markAllNotificationsRead as markAllNotificationsReadApi,
+  markNotificationRead as markNotificationReadApi,
+  clearNotifications as clearNotificationsApi,
+  type NotificationRow,
+} from '@/services/api';
 import type { Friend } from '@/data/mockData';
 import type { MoodOption } from '@/logic/checkin';
 import { useUserProfile } from '@/storage/userProfileStore';
@@ -119,6 +126,17 @@ function QuestCard({ item }: { item: QuestItem }) {
       </View>
     </View>
   );
+}
+
+function mapNotificationRows(rows: NotificationRow[]): AppNotification[] {
+  return rows.map((row) => ({
+    id: row.id,
+    icon: row.icon,
+    title: row.title,
+    time: row.time,
+    read: row.read,
+    recent: row.recent,
+  }));
 }
 
 function mapDailyQuestRows(rows: Awaited<ReturnType<typeof fetchDailyQuests>>): QuestItem[] {
@@ -330,7 +348,7 @@ export default function HomePage({
   const [selectedNav, setSelectedNav] = useState(initialSelectedNav);
   const [notificationsVisible, setNotificationsVisible] = useState(false);
   const [moreMenuVisible, setMoreMenuVisible] = useState(false);
-  const [notifications, setNotifications] = useState<AppNotification[]>(initialNotifications);
+  const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [dailyQuests, setDailyQuests] = useState<QuestItem[]>(() => sampleDailyQuests());
   const [refreshingQuests, setRefreshingQuests] = useState(false);
   const insets = useSafeAreaInsets();
@@ -340,7 +358,7 @@ export default function HomePage({
   const headerStats: StatItem[] = [
     { ...stats[0], value: String(checkInStreak) },
     { ...stats[1], value: String(userPoints) },
-    stats[2],
+    { ...stats[2], value: String(profile.longestStreak) },
   ];
   const unreadCount = notifications.filter((notification) => !notification.read).length;
   const isHomeSelected = selectedNav === 'home-outline';
@@ -376,7 +394,28 @@ export default function HomePage({
     return () => {
       active = false;
     };
-  }, [profile.userId]);
+  }, [profile.userId, profile.points]);
+
+  useEffect(() => {
+    if (!profile.userId) {
+      setNotifications([]);
+      return;
+    }
+
+    let active = true;
+    fetchNotifications(profile.userId)
+      .then((rows) => {
+        if (!active) return;
+        setNotifications(mapNotificationRows(rows));
+      })
+      .catch(() => {
+        if (active) setNotifications([]);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [profile.userId, profile.points]);
 
   const refreshDailyQuests = async () => {
     setRefreshingQuests(true);
@@ -408,16 +447,25 @@ export default function HomePage({
         notification.id === id ? { ...notification, read: true } : notification,
       ),
     );
+    if (profile.userId) {
+      markNotificationReadApi(id).catch(() => {});
+    }
   };
 
   const markAllNotificationsRead = () => {
     setNotifications((currentNotifications) =>
       currentNotifications.map((notification) => ({ ...notification, read: true })),
     );
+    if (profile.userId) {
+      markAllNotificationsReadApi(profile.userId).catch(() => {});
+    }
   };
 
   const clearNotifications = () => {
     setNotifications([]);
+    if (profile.userId) {
+      clearNotificationsApi(profile.userId).catch(() => {});
+    }
   };
 
   return (
@@ -608,6 +656,9 @@ export default function HomePage({
         ) : selectedNav === 'people-outline' ? (
           <FriendsScreenContent
             showHeader={false}
+            checkInStreak={checkInStreak}
+            userPoints={userPoints}
+            longestStreak={profile.longestStreak}
             onOpenChat={(friend) => onOpenChat?.(friend)}
             onSendMotivation={(friend) => onOpenChat?.(friend, true)}
           />
