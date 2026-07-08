@@ -10,9 +10,6 @@ export default function SocialScreen() {
     <SafeAreaView style={{ flex: 1, backgroundColor: '#282425' }} edges={['top']}>
       <FriendsScreenContent
         onOpenChat={(friend) => router.push({ pathname: '/chat/[friendId]', params: { friendId: friend.id } })}
-        onSendMotivation={(friend) =>
-          router.push({ pathname: '/chat/[friendId]', params: { friendId: friend.id, prefill: '1' } })
-        }
       />
     </SafeAreaView>
   );

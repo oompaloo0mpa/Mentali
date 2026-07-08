@@ -1744,10 +1744,27 @@ app.get("/api/friends/view/:userId", requireAuth, async (req, res, next) => {
         username: 1,
         friendCode: 1,
         currentStreak: 1,
+        currentTier: 1,
         updatedAt: 1
       })
       .toArray();
     const userMap = new Map(users.map((u) => [String(u._id), u]));
+
+    const activeContests = await db.collection("leaderboardContests").find({
+      status: "active"
+    }).toArray();
+    const activeContestIds = activeContests.map((c) => c._id);
+    const participants = activeContestIds.length ?
+      await db.collection("contestParticipants").find({
+        userId: {
+          $in: otherIds
+        },
+        contestId: {
+          $in: activeContestIds
+        }
+      }).toArray() :
+      [];
+    const rankByUserId = new Map(participants.map((p) => [String(p.userId), Number(p.rank)]));
 
     const prefs = await db.collection("userPreferences").find({
       userId: {
@@ -1798,6 +1815,8 @@ app.get("/api/friends/view/:userId", requireAuth, async (req, res, next) => {
           blocked: r.status === "blocked",
           moodId: showMood ? pref ?.currentMoodId || null : null,
           moodEmoji: showMood ? pref ?.currentMoodEmoji || checkin ?.moodEmoji || null : null,
+          currentTier: user.currentTier || "Bronze",
+          leaderboardRank: rankByUserId.get(otherId) ?? null,
         };
       })
       .filter(Boolean);

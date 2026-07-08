@@ -3,6 +3,7 @@ import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { AppIcon } from '@/components/AppIcon';
 import { Avatar } from '@/components/Avatar';
+import { RankBadge } from '@/components/social/RankBadge';
 import { Brand, Radius, getStreakVisuals } from '@/theme/theme';
 import { friendMoodImage, isMuted, isStreakDoneToday, type FriendBadge } from '@/storage/socialStore';
 import type { Friend } from '@/data/mockData';
@@ -13,7 +14,6 @@ type Props = {
   onPress?: (friend: Friend) => void;
   onLongPress?: (friend: Friend) => void;
   onPressProfile?: (friend: Friend) => void;
-  onSendMotivation?: (friend: Friend) => void;
 };
 
 const BADGE_STYLES = {
@@ -23,7 +23,7 @@ const BADGE_STYLES = {
 } as const;
 
 /** Tap opens chat; tap avatar opens the profile sheet; long-press opens friend options. */
-export function FriendRow({ friend, badges = [], onPress, onLongPress, onPressProfile, onSendMotivation }: Props) {
+export function FriendRow({ friend, badges = [], onPress, onLongPress, onPressProfile }: Props) {
   const muted = isMuted(friend);
   const streakVisuals = getStreakVisuals(friend.streak);
 
@@ -78,14 +78,7 @@ export function FriendRow({ friend, badges = [], onPress, onLongPress, onPressPr
       </View>
 
       {!friend.blocked && (
-        <Pressable
-          style={({ pressed }) => [styles.motivate, pressed && styles.motivatePressed]}
-          onPress={() => onSendMotivation?.(friend)}
-          hitSlop={8}
-          accessibilityRole="button"
-          accessibilityLabel={`Send motivation to ${friend.name}`}>
-          <Ionicons name="heart" size={16} color="#FFFFFF" />
-        </Pressable>
+        <RankBadge tier={friend.currentTier} rank={friend.leaderboardRank} />
       )}
 
       <Ionicons name="chevron-forward" size={20} color={Brand.textSecondary} />
@@ -124,13 +117,4 @@ const styles = StyleSheet.create({
   badgeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 4 },
   badge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: Radius.pill },
   badgeText: { fontSize: 11, fontWeight: '700' },
-  motivate: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: Brand.pink,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  motivatePressed: { opacity: 0.7 },
 });

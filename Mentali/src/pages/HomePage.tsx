@@ -660,7 +660,6 @@ export default function HomePage({
             userPoints={userPoints}
             longestStreak={profile.longestStreak}
             onOpenChat={(friend) => onOpenChat?.(friend)}
-            onSendMotivation={(friend) => onOpenChat?.(friend, true)}
           />
         ) : selectedNav === 'shirt-outline' ? (
           <WardrobeScreenContent

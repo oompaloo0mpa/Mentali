@@ -235,6 +235,8 @@ function fromApiFriend(row: FriendListRow): Friend {
     moodId: row.moodId,
     moodEmoji: row.moodEmoji,
     lastStreakDate: row.lastStreakDate ?? null,
+    currentTier: row.currentTier,
+    leaderboardRank: row.leaderboardRank ?? null,
   });
 }
 
