@@ -38,6 +38,7 @@ type HomePageProps = {
   onSelectedNavChange?: (selectedNav: string) => void;
   onOpenChat?: (friend: Friend, prefillMotivation?: boolean) => void;
   onOpenCheckIn?: (mood: MoodOption) => void;
+  onOpenLeaderboard?: () => void;
   onOpenWardrobe?: () => void;
 };
 
@@ -292,6 +293,7 @@ export default function HomePage({
   onSelectedNavChange,
   onOpenChat,
   onOpenCheckIn,
+  onOpenLeaderboard,
   onOpenWardrobe,
 }: HomePageProps) {
   const { openSettings, requestLogout } = useSettingsOverlay();
@@ -525,7 +527,9 @@ export default function HomePage({
       <BottomNav
         activeIcon={selectedNav}
         onSelect={(icon) => {
-          if (icon === 'shirt-outline') {
+          if (icon === 'trophy-outline') {
+            onOpenLeaderboard?.();
+          } else if (icon === 'shirt-outline') {
             onOpenWardrobe?.();
           } else {
             setSelectedNav(icon);

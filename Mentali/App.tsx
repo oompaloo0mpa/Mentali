@@ -15,6 +15,7 @@ import OnboardingPage_4 from '@/pages/OnboardingPage_4';
 import OnboardingPage_5 from '@/pages/OnboardingPage_5';
 import NonAnonymousWarningPage from '@/pages/NonAnonymousWarningPage';
 import HomePage from '@/pages/HomePage';
+import LeaderboardPage from '@/pages/LeaderboardPage';
 import WardrobePage from '@/pages/WardrobePage';
 import { SocialProvider } from '@/storage/socialStore';
 import { SettingsOverlayProvider } from '@/storage/settingsOverlayStore';
@@ -59,6 +60,7 @@ type ScreenState =
   | { screen: 'onboarding-4' }
   | { screen: 'onboarding-5' }
   | { screen: 'home'; selectedNav?: string }
+  | { screen: 'leaderboard' }
   | { screen: 'chat'; friendId: string; prefill?: boolean; returnToNav: string }
   | { screen: 'streak-guide'; friendId: string; prefill?: boolean; returnToNav: string }
   | {
@@ -425,12 +427,36 @@ function AppRoot() {
             onSelectedNavChange={setHomeNav}
             onOpenChat={(friend, prefill) => openChat(friend.id, prefill)}
             onOpenCheckIn={(mood) => setScreenState({ screen: 'check-in', scale: 'phq4', mood })}
+            onOpenLeaderboard={() => {
+              setHomeNav('trophy-outline');
+              setScreenState({ screen: 'leaderboard' });
+            }}
             onOpenWardrobe={() => setScreenState({ screen: 'wardrobe', returnToNav: homeNav })}
+          />
+        ) : screenState.screen === 'leaderboard' ? (
+          <LeaderboardPage
+            onNavigate={(navItem) => {
+              if (navItem === 'trophy-outline') {
+                return;
+              }
+              if (navItem === 'shirt-outline') {
+                setHomeNav(navItem);
+                setScreenState({ screen: 'wardrobe', returnToNav: navItem });
+                return;
+              }
+              setHomeNav(navItem);
+              setScreenState({ screen: 'home', selectedNav: navItem });
+            }}
           />
         ) : screenState.screen === 'wardrobe' ? (
           <WardrobePage
             onNavigate={(navItem) => {
               if (navItem === 'shirt-outline') return;
+              if (navItem === 'trophy-outline') {
+                setHomeNav(navItem);
+                setScreenState({ screen: 'leaderboard' });
+                return;
+              }
               setScreenState({ screen: 'home', selectedNav: navItem });
             }}
           />

@@ -3,13 +3,14 @@ import {
   Image,
   ImageSourcePropType,
   Pressable,
-  SafeAreaView,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useRouter } from 'expo-router';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { BottomNav } from '@/components/nav/BottomNav';
 import { DEFAULT_TODAY_MOOD_INDEX, getMoodForDate, useMoodForDate } from '../data/moodStore';
 import { moodSources } from '../data/moodAssets';
 import { getSingaporeTodayKey, getSingaporeTodayParts, isDateOnOrBeforeSingaporeToday, isMonthInFutureSingapore } from '../data/sgDate';
@@ -69,7 +70,11 @@ function buildCalendar(year: number, monthIndex: number): Array<MoodCell | null>
   return calendar;
 }
 
-export default function StatisticPage() {
+type StatisticPageProps = {
+  onNavigate?: (navItem: string) => void;
+};
+
+export default function StatisticPage({ onNavigate }: StatisticPageProps) {
   const router = useRouter();
   const todayKey = getSingaporeTodayKey();
   const singaporeToday = getSingaporeTodayParts();
@@ -109,14 +114,14 @@ export default function StatisticPage() {
   };
 
   return (
-    <SafeAreaView style={styles.screen}>
+    <SafeAreaView style={styles.screen} edges={['top', 'left', 'right']}>
       <StatusBar style="light" />
 
       <View style={styles.page}>
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Back"
-          onPress={() => {}}
+          onPress={() => onNavigate?.('home-outline')}
           style={({ pressed }) => [styles.backButton, pressed && styles.backButtonPressed]}>
           <Text style={styles.backButtonText}>Back</Text>
         </Pressable>
@@ -257,6 +262,8 @@ export default function StatisticPage() {
           </View>
         </View>
       </View>
+
+      <BottomNav activeIcon="trophy-outline" onSelect={(icon) => onNavigate?.(icon)} />
     </SafeAreaView>
   );
 }
