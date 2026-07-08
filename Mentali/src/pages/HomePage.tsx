@@ -50,6 +50,7 @@ type HomePageProps = {
   userTier?: string;
   onOpenChat?: (friend: Friend, prefillMotivation?: boolean) => void;
   onOpenCheckIn?: (mood: MoodOption) => void;
+  onOpenLeaderboard?: () => void;
   onOpenWardrobe?: () => void;
   onOpenShop?: () => void;
   onOpenRewards?: () => void;
@@ -343,6 +344,7 @@ export default function HomePage({
   userTier = 'Bronze',
   onOpenChat,
   onOpenCheckIn,
+  onOpenLeaderboard,
   onOpenWardrobe,
   onOpenShop,
   onOpenRewards,
@@ -680,7 +682,9 @@ export default function HomePage({
       <BottomNav
         activeIcon={selectedNav}
         onSelect={(icon) => {
-          if (icon === 'shirt-outline') {
+          if (icon === 'trophy-outline') {
+            onOpenLeaderboard?.();
+          } else if (icon === 'shirt-outline') {
             onOpenWardrobe?.();
           } else if (icon === 'bag-outline') {
             onOpenShop?.();
