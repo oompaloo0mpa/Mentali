@@ -452,6 +452,12 @@ export type ChatMessageRow = {
   fileName?: string;
   fileUri?: string;
   createdAt: string;
+  replyToMessageId?: string | null;
+  replyToText?: string | null;
+  replyToSenderUserId?: string | null;
+  pinned?: boolean;
+  editedAt?: string | null;
+  deletedAt?: string | null;
 };
 
 export async function fetchChatMessages(friendshipId: string, viewerUserId: string): Promise<ChatMessageRow[]> {
@@ -468,10 +474,44 @@ export async function sendChatMessage(
     imageUri?: string;
     fileName?: string;
     fileUri?: string;
+    replyToMessageId?: string;
   },
 ): Promise<{ data: ChatMessageRow; streak?: number; streakUnlocked?: boolean }> {
   return apiRequest(`/chats/${friendshipId}/messages`, {
     method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function editChatMessage(
+  friendshipId: string,
+  messageId: string,
+  payload: { senderUserId: string; text: string },
+) {
+  return apiRequest(`/chats/${friendshipId}/messages/${messageId}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ ...payload, action: 'edit' }),
+  });
+}
+
+export async function pinChatMessage(
+  friendshipId: string,
+  messageId: string,
+  payload: { senderUserId: string; pinned: boolean },
+) {
+  return apiRequest(`/chats/${friendshipId}/messages/${messageId}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ ...payload, action: payload.pinned ? 'pin' : 'unpin' }),
+  });
+}
+
+export async function deleteChatMessage(
+  friendshipId: string,
+  messageId: string,
+  payload: { senderUserId: string },
+) {
+  return apiRequest(`/chats/${friendshipId}/messages/${messageId}`, {
+    method: 'DELETE',
     body: JSON.stringify(payload),
   });
 }

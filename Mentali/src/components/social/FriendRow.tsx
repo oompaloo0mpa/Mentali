@@ -1,12 +1,14 @@
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { AppIcon } from '@/components/AppIcon';
 import { Avatar } from '@/components/Avatar';
+import { FlameIcon } from '@/components/chat/FlameIcon';
 import { RankBadge } from '@/components/social/RankBadge';
 import { Brand, Radius, getStreakVisuals } from '@/theme/theme';
 import { friendMoodImage, isMuted, isStreakDoneToday, type FriendBadge } from '@/storage/socialStore';
 import type { Friend } from '@/data/mockData';
+
+const RAINBOW_DIGIT_COLORS = ['#FF6B6B', '#FFB347', '#FFE066', '#6DDC6D', '#4FC3F7', '#7E57C2'];
 
 type Props = {
   friend: Friend;
@@ -26,6 +28,22 @@ const BADGE_STYLES = {
 export function FriendRow({ friend, badges = [], onPress, onLongPress, onPressProfile }: Props) {
   const muted = isMuted(friend);
   const streakVisuals = getStreakVisuals(friend.streak);
+
+  const renderStreakNumber = (streak: number) => {
+    if (streak < 500) return <Text style={[styles.streak, { color: streakVisuals.color }]}>{streak}</Text>;
+    return (
+      <View style={styles.rainbowDigitsRow}>
+        {String(streak).split('').map((digit, idx) => (
+          <Text
+            key={`${digit}-${idx}`}
+            style={[styles.streak, { color: RAINBOW_DIGIT_COLORS[idx % RAINBOW_DIGIT_COLORS.length] }]}
+          >
+            {digit}
+          </Text>
+        ))}
+      </View>
+    );
+  };
 
   return (
     <Pressable
@@ -53,8 +71,8 @@ export function FriendRow({ friend, badges = [], onPress, onLongPress, onPressPr
           {friend.blocked && <Ionicons name="ban" size={13} color={Brand.danger} />}
           {muted && <Ionicons name="notifications-off" size={13} color={Brand.textMuted} />}
           <View style={[styles.streakPill, { backgroundColor: streakVisuals.pillBg }]}>
-            <AppIcon name="fire" size={14} />
-            <Text style={[styles.streak, { color: streakVisuals.color }]}>{friend.streak}</Text>
+            <FlameIcon streak={friend.streak} size={14} />
+            {renderStreakNumber(friend.streak)}
           </View>
           <Image
             source={friendMoodImage(friend)}
@@ -112,6 +130,7 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
   },
   streak: { fontSize: 14, fontWeight: '700' },
+  rainbowDigitsRow: { flexDirection: 'row', alignItems: 'center' },
   moodImage: { width: 24, height: 24 },
   lastSeen: { color: Brand.textSecondary, fontSize: 13 },
   badgeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 4 },

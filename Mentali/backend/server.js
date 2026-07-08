@@ -1951,6 +1951,12 @@ app.get("/api/chats/:friendshipId/messages", requireAuth, async (req, res, next)
         fileName: r.fileName || null,
         fileUri: r.fileUri || null,
         createdAt: r.createdAt,
+        replyToMessageId: r.replyToMessageId ? String(r.replyToMessageId) : null,
+        replyToText: r.replyToText || null,
+        replyToSenderUserId: r.replyToSenderUserId ? String(r.replyToSenderUserId) : null,
+        pinned: !!r.pinned,
+        editedAt: r.editedAt || null,
+        deletedAt: r.deletedAt || null,
       })),
     });
   } catch (e) {
@@ -1968,7 +1974,8 @@ app.post("/api/chats/:friendshipId/messages", requireAuth, async (req, res, next
       text = "",
       imageUri = null,
       fileName = null,
-      fileUri = null
+      fileUri = null,
+      replyToMessageId = null
     } = req.body || {};
     if (!assertSelf(req, res, senderUserId)) return;
     if (!senderUserId) return res.status(400).json({
@@ -2016,6 +2023,20 @@ app.post("/api/chats/:friendshipId/messages", requireAuth, async (req, res, next
     const recipientUserId =
       String(friendship.userAId) === String(viewerId) ? friendship.userBId : friendship.userAId;
     const now = new Date();
+    let replyRef = null;
+    let replyToText = null;
+    let replyToSenderUserId = null;
+    if (replyToMessageId) {
+      replyRef = toObjectId(replyToMessageId, "replyToMessageId");
+      const replied = await db.collection("chatMessages").findOne({
+        _id: replyRef,
+        friendshipId: friendship._id
+      });
+      if (replied) {
+        replyToText = String(replied.text || replied.fileName || "Attachment").slice(0, 160);
+        replyToSenderUserId = replied.senderUserId;
+      }
+    }
 
     const out = await db.collection("chatMessages").insertOne({
       friendshipId: friendship._id,
@@ -2025,6 +2046,12 @@ app.post("/api/chats/:friendshipId/messages", requireAuth, async (req, res, next
       imageUri: storedImageUri,
       fileName: fileName || null,
       fileUri: storedFileUri,
+      replyToMessageId: replyRef,
+      replyToText,
+      replyToSenderUserId,
+      pinned: false,
+      editedAt: null,
+      deletedAt: null,
       createdAt: now,
     });
 
@@ -2058,11 +2085,84 @@ app.post("/api/chats/:friendshipId/messages", requireAuth, async (req, res, next
         imageUri: storedImageUri,
         fileName: fileName || null,
         fileUri: storedFileUri,
+        replyToMessageId: replyRef ? String(replyRef) : null,
+        replyToText,
+        replyToSenderUserId: replyToSenderUserId ? String(replyToSenderUserId) : null,
+        pinned: false,
+        editedAt: null,
+        deletedAt: null,
         createdAt: now,
       },
       streak: streakUpdate.streak,
       streakUnlocked: streakUpdate.streakUnlocked,
     });
+  } catch (e) {
+    next(e);
+  }
+});
+
+app.patch("/api/chats/:friendshipId/messages/:messageId", requireAuth, async (req, res, next) => {
+  try {
+    const { db } = await connectMongo();
+    const { senderUserId, action, text = "", pinned = false } = req.body || {};
+    if (!assertSelf(req, res, senderUserId)) return;
+    const { friendship, viewerId } = await loadFriendshipForUser(db, req.params.friendshipId, senderUserId);
+    const messageId = toObjectId(req.params.messageId, "messageId");
+    const row = await db.collection("chatMessages").findOne({ _id: messageId, friendshipId: friendship._id });
+    if (!row) return res.status(404).json({ error: "Message not found" });
+
+    if (action === "edit") {
+      if (String(row.senderUserId) !== String(viewerId)) {
+        return res.status(403).json({ error: "Only the sender can edit this message" });
+      }
+      if (row.deletedAt) {
+        return res.status(400).json({ error: "Deleted messages cannot be edited" });
+      }
+      await db.collection("chatMessages").updateOne(
+        { _id: messageId },
+        { $set: { text: String(text).trim(), editedAt: new Date() } },
+      );
+    } else if (action === "pin" || action === "unpin") {
+      await db.collection("chatMessages").updateOne(
+        { _id: messageId },
+        { $set: { pinned: !!pinned } },
+      );
+    } else {
+      return res.status(400).json({ error: "Unsupported action" });
+    }
+
+    res.json({ ok: true });
+  } catch (e) {
+    next(e);
+  }
+});
+
+app.delete("/api/chats/:friendshipId/messages/:messageId", requireAuth, async (req, res, next) => {
+  try {
+    const { db } = await connectMongo();
+    const { senderUserId } = req.body || {};
+    if (!assertSelf(req, res, senderUserId)) return;
+    const { friendship, viewerId } = await loadFriendshipForUser(db, req.params.friendshipId, senderUserId);
+    const messageId = toObjectId(req.params.messageId, "messageId");
+    const row = await db.collection("chatMessages").findOne({ _id: messageId, friendshipId: friendship._id });
+    if (!row) return res.status(404).json({ error: "Message not found" });
+    if (String(row.senderUserId) !== String(viewerId)) {
+      return res.status(403).json({ error: "Only the sender can delete this message" });
+    }
+    await db.collection("chatMessages").updateOne(
+      { _id: messageId },
+      {
+        $set: {
+          text: "",
+          imageUri: null,
+          fileName: null,
+          fileUri: null,
+          deletedAt: new Date(),
+          editedAt: null,
+        },
+      },
+    );
+    res.json({ ok: true });
   } catch (e) {
     next(e);
   }

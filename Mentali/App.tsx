@@ -229,6 +229,14 @@ function AppRoot() {
     syncUserFromServer(currentUserId).catch(() => {});
   }, [currentUserId, syncWellbeingHistory, syncUserFromServer]);
 
+  useEffect(() => {
+    if (!currentUserId) return;
+    const timer = setInterval(() => {
+      syncUserFromServer(currentUserId).catch(() => {});
+    }, 8000);
+    return () => clearInterval(timer);
+  }, [currentUserId, syncUserFromServer]);
+
   const activeCheckInPlan = useMemo(() => {
     if (screenState.screen !== 'check-in') return null;
     const mood = screenState.mood ?? MOOD_OPTIONS[2];

@@ -4,7 +4,7 @@ import { Image, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { AppIcon } from '@/components/AppIcon';
 import { Avatar } from '@/components/Avatar';
 import { Brand, Radius, Spacing, getStreakVisuals } from '@/theme/theme';
-import { friendMood, friendMoodImage, highestMilestone, isMuted } from '@/storage/socialStore';
+import { friendMoodImage, highestMilestone, isMuted } from '@/storage/socialStore';
 import type { Friend } from '@/data/mockData';
 
 type Props = {
@@ -42,7 +42,7 @@ export function FriendProfileSheet({ friend, lastMotivation, onClose, onMessage 
                 <View style={styles.headerText}>
                   <View style={styles.nameRow}>
                     <Text style={styles.name}>{friend.name}</Text>
-                    <Text style={styles.mood}>{friendMood(friend)}</Text>
+                    <Image source={friendMoodImage(friend)} resizeMode="contain" style={styles.nameMoodImage} />
                     {friend.pinned && <Ionicons name="pin" size={14} color={Brand.pink} />}
                     {isMuted(friend) && <Ionicons name="notifications-off" size={14} color={Brand.textMuted} />}
                   </View>
@@ -109,7 +109,7 @@ const styles = StyleSheet.create({
   headerText: { flex: 1, gap: 4 },
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   name: { color: Brand.text, fontSize: 20, fontWeight: '800' },
-  mood: { fontSize: 18 },
+  nameMoodImage: { width: 20, height: 20 },
   lastSeen: { color: Brand.textSecondary, fontSize: 13 },
   stats: {
     flexDirection: 'row',
