@@ -1,0 +1,6 @@
+{
+  "watch": ["backend"],
+  "ext": "js,json",
+  "ignore": ["backend/test-connection.js", "backend/setup-database.js", "backend/clear-users.js"],
+  "delay": "300"
+}

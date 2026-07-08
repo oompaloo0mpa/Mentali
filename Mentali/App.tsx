@@ -434,8 +434,11 @@ function AppRoot() {
         setRecoveryMode('email');
         setScreenState({ screen: 'forgot-password' });
       },
+      onOpenWardrobe: () => {
+        setScreenState({ screen: 'wardrobe', returnToNav: homeNav });
+      },
     }),
-    [handleLogout],
+    [handleLogout, homeNav],
   );
 
   return (

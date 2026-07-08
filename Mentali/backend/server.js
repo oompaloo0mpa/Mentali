@@ -93,6 +93,8 @@ function pickPreferencePatch(body) {
   return patch;
 }
 
+const DISPLAY_NAME_CHANGE_COOLDOWN_MS = 3 * 24 * 60 * 60 * 1000;
+
 const DEFAULT_USER_PREFERENCES = {
   anonymousMode: false,
   theme: "pastel",
@@ -651,6 +653,13 @@ app.patch("/api/users/:userId", requireAuth, async (req, res, next) => {
       db
     } = await connectMongo();
     const uid = toObjectId(req.params.userId, "userId");
+    const user = await db.collection("users").findOne({
+      _id: uid
+    });
+    if (!user) return res.status(404).json({
+      error: "User not found"
+    });
+
     const {
       displayName,
       username,
@@ -659,7 +668,32 @@ app.patch("/api/users/:userId", requireAuth, async (req, res, next) => {
     const patch = {
       updatedAt: new Date()
     };
-    if (displayName != null) patch.displayName = String(displayName).trim();
+
+    if (displayName != null) {
+      const nextName = String(displayName).trim();
+      if (!nextName) {
+        return res.status(400).json({
+          error: "Display name is required"
+        });
+      }
+      const currentName = String(user.displayName || "").trim();
+      if (nextName !== currentName) {
+        const lastChanged = user.displayNameChangedAt ?
+          new Date(user.displayNameChangedAt).getTime() :
+          0;
+        if (lastChanged && Date.now() - lastChanged < DISPLAY_NAME_CHANGE_COOLDOWN_MS) {
+          const daysLeft = Math.ceil(
+            (DISPLAY_NAME_CHANGE_COOLDOWN_MS - (Date.now() - lastChanged)) / (24 * 60 * 60 * 1000),
+          );
+          return res.status(429).json({
+            error: `Display name can only be changed every 3 days. Try again in ${daysLeft} day(s).`,
+          });
+        }
+        patch.displayName = nextName;
+        patch.displayNameChangedAt = new Date();
+      }
+    }
+
     if (username != null) patch.username = String(username).trim().toLowerCase();
     if (onboardingCompleted != null) patch.onboardingCompleted = !!onboardingCompleted;
     if (patch.username) {
@@ -678,11 +712,11 @@ app.patch("/api/users/:userId", requireAuth, async (req, res, next) => {
     }, {
       $set: patch
     });
-    const user = await db.collection("users").findOne({
+    const updatedUser = await db.collection("users").findOne({
       _id: uid
     });
     res.json({
-      user: stripSensitive(user)
+      user: stripSensitive(updatedUser)
     });
   } catch (e) {
     next(e);

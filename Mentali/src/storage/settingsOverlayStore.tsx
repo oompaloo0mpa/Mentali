@@ -9,6 +9,7 @@ import { useUserProfile } from '@/storage/userProfileStore';
 export type SettingsHostActions = {
   onLogout: () => void;
   onResetPassword: () => void;
+  onOpenWardrobe: () => void;
 };
 
 type SettingsOverlayContextValue = {
@@ -43,6 +44,11 @@ export function SettingsOverlayProvider({ children, actions }: ProviderProps) {
   const handleResetPassword = useCallback(() => {
     closeSettings();
     actions.onResetPassword();
+  }, [actions, closeSettings]);
+
+  const handleOpenWardrobe = useCallback(() => {
+    closeSettings();
+    actions.onOpenWardrobe();
   }, [actions, closeSettings]);
 
   const handleDeleteRequest = useCallback(() => {
@@ -81,6 +87,7 @@ export function SettingsOverlayProvider({ children, actions }: ProviderProps) {
         visible={settingsVisible}
         onClose={closeSettings}
         onResetPassword={handleResetPassword}
+        onOpenWardrobe={handleOpenWardrobe}
         onDeleteAccount={handleDeleteRequest}
       />
       <DeleteAccountModal

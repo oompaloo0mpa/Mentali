@@ -3,6 +3,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 
 import { CURRENT_USER } from '@/data/mockData';
 import type { ColorThemeId } from '@/data/colorThemes';
+import { getDisplayNameChangeAvailability } from '@/logic/displayName';
 import { fetchUserPreferences, fetchUserProfile, updateUserPreferences, updateUserProfile } from '@/services/api';
 import { clearAuthToken, saveAuthToken } from '@/storage/authStorage';
 
@@ -12,6 +13,7 @@ export type UserProfile = {
   userId: string | null;
   username: string;
   displayName: string;
+  displayNameChangedAt: string | null;
   friendCode: string;
   points: number;
   currentTier: string;
@@ -29,6 +31,7 @@ const DEFAULT_PROFILE: UserProfile = {
   userId: null,
   username: CURRENT_USER.name.toLowerCase(),
   displayName: CURRENT_USER.name,
+  displayNameChangedAt: null,
   friendCode: CURRENT_USER.friendCode,
   points: 0,
   currentTier: 'Bronze',
@@ -51,6 +54,8 @@ type UserProfileContextValue = {
   profile: UserProfile;
   hydrated: boolean;
   saveDisplayName: (displayName: string) => Promise<void>;
+  changeDisplayName: (displayName: string) => Promise<void>;
+  getDisplayNameChangeStatus: () => { allowed: boolean; daysRemaining: number };
   setCurrentMood: (mood: { id: string; emoji: string }) => void;
   setAnonymousMode: (enabled: boolean) => Promise<void>;
   setHideMoodFromFriends: (enabled: boolean) => Promise<void>;
@@ -63,6 +68,7 @@ type UserProfileContextValue = {
     id?: string;
     username?: string;
     displayName?: string;
+    displayNameChangedAt?: string | Date | null;
     friendCode?: string;
     points?: number;
     currentTier?: string;
@@ -71,6 +77,13 @@ type UserProfileContextValue = {
 };
 
 const UserProfileContext = createContext<UserProfileContextValue | null>(null);
+
+function parseDisplayNameChangedAt(value: unknown): string | null {
+  if (!value) return null;
+  if (typeof value === 'string') return value;
+  if (value instanceof Date) return value.toISOString();
+  return null;
+}
 
 function prefsFromApi(prefs: Record<string, unknown> | null | undefined): Pick<
   UserProfile,
@@ -155,6 +168,7 @@ export function UserProfileProvider({ children }: { children: React.ReactNode })
         id?: string;
         username?: string;
         displayName?: string;
+        displayNameChangedAt?: string | Date | null;
         friendCode?: string;
         points?: number;
         currentTier?: string;
@@ -175,6 +189,7 @@ export function UserProfileProvider({ children }: { children: React.ReactNode })
       };
       let points = user.points ?? 0;
       let currentTier = user.currentTier ?? 'Bronze';
+      let displayNameChangedAt: string | null = parseDisplayNameChangedAt(user.displayNameChangedAt);
 
       if (userId) {
         try {
@@ -186,6 +201,7 @@ export function UserProfileProvider({ children }: { children: React.ReactNode })
           if (remoteUser) {
             points = Number(remoteUser.points ?? points);
             currentTier = String(remoteUser.currentTier ?? currentTier);
+            displayNameChangedAt = parseDisplayNameChangedAt(remoteUser.displayNameChangedAt);
           }
         } catch {
           // Offline or API unavailable — keep local default.
@@ -197,6 +213,7 @@ export function UserProfileProvider({ children }: { children: React.ReactNode })
         userId,
         username: user.username ?? prev.username,
         displayName: user.displayName ?? prev.displayName,
+        displayNameChangedAt,
         friendCode: user.friendCode ?? prev.friendCode,
         points,
         currentTier,
@@ -206,22 +223,61 @@ export function UserProfileProvider({ children }: { children: React.ReactNode })
     [],
   );
 
-  const saveDisplayName = useCallback(async (displayName: string) => {
+  const persistDisplayName = useCallback(async (displayName: string, enforceCooldown: boolean) => {
     const trimmed = displayName.trim();
     if (!trimmed) {
       throw new Error('Display name is required');
     }
 
     let userId: string | null = null;
+    let changedAt: string | null = null;
+    let currentDisplayName = '';
+
     setProfile((prev) => {
       userId = prev.userId;
-      return { ...prev, displayName: trimmed };
+      changedAt = prev.displayNameChangedAt;
+      currentDisplayName = prev.displayName;
+      return prev;
     });
 
-    if (userId) {
-      await updateUserProfile(userId, { displayName: trimmed });
+    if (enforceCooldown) {
+      const status = getDisplayNameChangeAvailability(changedAt);
+      if (!status.allowed) {
+        throw new Error(`You can change your display name again in ${status.daysRemaining} day(s).`);
+      }
+      if (trimmed === currentDisplayName.trim()) {
+        throw new Error('That is already your display name.');
+      }
     }
+
+    if (!userId) {
+      setProfile((prev) => ({ ...prev, displayName: trimmed }));
+      return;
+    }
+
+    const updated = await updateUserProfile(userId, { displayName: trimmed });
+    setProfile((prev) => ({
+      ...prev,
+      displayName: String(updated?.displayName ?? trimmed),
+      displayNameChangedAt:
+        parseDisplayNameChangedAt(updated?.displayNameChangedAt) ?? prev.displayNameChangedAt,
+    }));
   }, []);
+
+  const saveDisplayName = useCallback(
+    (displayName: string) => persistDisplayName(displayName, false),
+    [persistDisplayName],
+  );
+
+  const changeDisplayName = useCallback(
+    (displayName: string) => persistDisplayName(displayName, true),
+    [persistDisplayName],
+  );
+
+  const getDisplayNameChangeStatus = useCallback(
+    () => getDisplayNameChangeAvailability(profile.displayNameChangedAt),
+    [profile.displayNameChangedAt],
+  );
 
   const setPreference = useCallback(async (key: PreferenceKey, enabled: boolean) => {
     let userId: string | null = null;
@@ -316,6 +372,8 @@ export function UserProfileProvider({ children }: { children: React.ReactNode })
       profile,
       hydrated,
       saveDisplayName,
+      changeDisplayName,
+      getDisplayNameChangeStatus,
       setAnonymousMode,
       setCurrentMood,
       setHideMoodFromFriends,
@@ -330,6 +388,8 @@ export function UserProfileProvider({ children }: { children: React.ReactNode })
       profile,
       hydrated,
       saveDisplayName,
+      changeDisplayName,
+      getDisplayNameChangeStatus,
       setAnonymousMode,
       setCurrentMood,
       setHideMoodFromFriends,

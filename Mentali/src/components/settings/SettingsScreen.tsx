@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { type ReactNode } from 'react';
+import { type ReactNode, useEffect, useState } from 'react';
 import {
   Alert,
   Modal,
@@ -8,12 +8,13 @@ import {
   StyleSheet,
   Switch,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { MoodFacePicker } from '@/components/mood/MoodFacePicker';
 import { COLOR_THEME_OPTIONS } from '@/data/colorThemes';
+import { DISPLAY_NAME_CHANGE_COOLDOWN_DAYS } from '@/logic/displayName';
 import { useUserProfile } from '@/storage/userProfileStore';
 import { Spacing } from '@/theme/theme';
 
@@ -33,6 +34,7 @@ type Props = {
   visible: boolean;
   onClose: () => void;
   onResetPassword: () => void;
+  onOpenWardrobe: () => void;
   onDeleteAccount: () => void;
 };
 
@@ -103,16 +105,34 @@ function SettingsSection({ title, children }: SectionProps) {
   );
 }
 
-export function SettingsScreen({ visible, onClose, onResetPassword, onDeleteAccount }: Props) {
+export function SettingsScreen({
+  visible,
+  onClose,
+  onResetPassword,
+  onOpenWardrobe,
+  onDeleteAccount,
+}: Props) {
   const insets = useSafeAreaInsets();
   const {
     profile,
+    changeDisplayName,
+    getDisplayNameChangeStatus,
     setAnonymousMode,
     setHideMoodFromFriends,
     setAllowFriendRequests,
     setAllowNotifications,
-    setCurrentMood,
   } = useUserProfile();
+  const [displayNameModalVisible, setDisplayNameModalVisible] = useState(false);
+  const [draftDisplayName, setDraftDisplayName] = useState('');
+  const [savingDisplayName, setSavingDisplayName] = useState(false);
+
+  const displayNameStatus = getDisplayNameChangeStatus();
+
+  useEffect(() => {
+    if (displayNameModalVisible) {
+      setDraftDisplayName(profile.displayName);
+    }
+  }, [displayNameModalVisible, profile.displayName]);
 
   const persistSetting = async (
     label: string,
@@ -127,6 +147,57 @@ export function SettingsScreen({ visible, onClose, onResetPassword, onDeleteAcco
         error instanceof Error ? error.message : `Unable to update ${label}.`,
       );
     }
+  };
+
+  const openDisplayNameEditor = () => {
+    if (!displayNameStatus.allowed) {
+      Alert.alert(
+        'Display name locked',
+        `You can change your display name again in ${displayNameStatus.daysRemaining} day(s).`,
+      );
+      return;
+    }
+    setDisplayNameModalVisible(true);
+  };
+
+  const submitDisplayNameChange = () => {
+    const trimmed = draftDisplayName.trim();
+    if (!trimmed) {
+      Alert.alert('Display name required', 'Please enter a display name.');
+      return;
+    }
+    if (trimmed === profile.displayName.trim()) {
+      Alert.alert('No change', 'That is already your display name.');
+      return;
+    }
+
+    Alert.alert(
+      'Change display name?',
+      `Your name will change to "${trimmed}". You will not be able to change it again for ${DISPLAY_NAME_CHANGE_COOLDOWN_DAYS} days.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Confirm',
+          onPress: () => {
+            void (async () => {
+              setSavingDisplayName(true);
+              try {
+                await changeDisplayName(trimmed);
+                setDisplayNameModalVisible(false);
+                Alert.alert('Display name updated', 'Your new display name has been saved.');
+              } catch (error) {
+                Alert.alert(
+                  'Could not update display name',
+                  error instanceof Error ? error.message : 'Please try again.',
+                );
+              } finally {
+                setSavingDisplayName(false);
+              }
+            })();
+          },
+        },
+      ],
+    );
   };
 
   return (
@@ -180,21 +251,23 @@ export function SettingsScreen({ visible, onClose, onResetPassword, onDeleteAcco
           </SettingsSection>
 
           <SettingsSection title="Appearance">
-            <View style={styles.mentalitySection}>
-              <Text style={styles.mentalityTitle}>Edit your mentality</Text>
-              <Text style={styles.mentalityHint}>
-                Pick the mood face that matches how you feel. This is the same set shown on your homepage.
-              </Text>
-              <MoodFacePicker
-                selectedId={profile.currentMoodId}
-                onSelect={(mood) => setCurrentMood({ id: mood.id, emoji: mood.emoji })}
-                variant="light"
-                compact
-              />
-            </View>
+            <LinkRow
+              label="Edit your mentality"
+              subtitle="Customise your mascot and wardrobe items"
+              onPress={onOpenWardrobe}
+            />
           </SettingsSection>
 
           <SettingsSection title="Account Management">
+            <LinkRow
+              label="Change display name"
+              subtitle={
+                displayNameStatus.allowed
+                  ? `Current: ${profile.displayName}`
+                  : `Current: ${profile.displayName} · Available in ${displayNameStatus.daysRemaining} day(s)`
+              }
+              onPress={openDisplayNameEditor}
+            />
             <LinkRow
               label="Reset password"
               subtitle="We'll send a verification code to your email or phone"
@@ -228,6 +301,53 @@ export function SettingsScreen({ visible, onClose, onResetPassword, onDeleteAcco
             </View>
           </View>
         </ScrollView>
+
+        <Modal
+          visible={displayNameModalVisible}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setDisplayNameModalVisible(false)}>
+          <Pressable style={styles.displayNameOverlay} onPress={() => setDisplayNameModalVisible(false)}>
+            <Pressable style={styles.displayNameCard} onPress={() => {}}>
+              <Text style={styles.displayNameTitle}>Change display name</Text>
+              <Text style={styles.displayNameHint}>
+                This is how friends see you. You can only change it once every {DISPLAY_NAME_CHANGE_COOLDOWN_DAYS}{' '}
+                days.
+              </Text>
+              <TextInput
+                value={draftDisplayName}
+                onChangeText={setDraftDisplayName}
+                placeholder="Enter display name"
+                placeholderTextColor={Screen.hint}
+                style={styles.displayNameInput}
+                autoCapitalize="words"
+                autoCorrect={false}
+                editable={!savingDisplayName}
+              />
+              <View style={styles.displayNameActions}>
+                <Pressable
+                  style={({ pressed }) => [styles.displayNameButton, pressed && styles.pressed]}
+                  onPress={() => setDisplayNameModalVisible(false)}
+                  disabled={savingDisplayName}>
+                  <Text style={styles.displayNameButtonText}>Cancel</Text>
+                </Pressable>
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.displayNameButton,
+                    styles.displayNameButtonPrimary,
+                    pressed && styles.pressed,
+                    savingDisplayName && styles.displayNameButtonDisabled,
+                  ]}
+                  onPress={submitDisplayNameChange}
+                  disabled={savingDisplayName}>
+                  <Text style={[styles.displayNameButtonText, styles.displayNameButtonPrimaryText]}>
+                    {savingDisplayName ? 'Saving...' : 'Save'}
+                  </Text>
+                </Pressable>
+              </View>
+            </Pressable>
+          </Pressable>
+        </Modal>
       </View>
     </Modal>
   );
@@ -346,21 +466,6 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     lineHeight: 18,
   },
-  mentalitySection: {
-    paddingVertical: Spacing.two,
-    gap: Spacing.two,
-  },
-  mentalityTitle: {
-    color: Screen.cardText,
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  mentalityHint: {
-    color: Screen.hint,
-    fontSize: 13,
-    fontWeight: '500',
-    lineHeight: 18,
-  },
   themeRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -389,5 +494,64 @@ const styles = StyleSheet.create({
   },
   pressed: {
     opacity: 0.8,
+  },
+  displayNameOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.55)',
+    justifyContent: 'center',
+    paddingHorizontal: Spacing.three,
+  },
+  displayNameCard: {
+    backgroundColor: Screen.card,
+    borderRadius: 16,
+    padding: Spacing.three,
+    gap: Spacing.two,
+  },
+  displayNameTitle: {
+    color: Screen.cardText,
+    fontSize: 18,
+    fontWeight: '800',
+  },
+  displayNameHint: {
+    color: Screen.hint,
+    fontSize: 13,
+    fontWeight: '500',
+    lineHeight: 18,
+  },
+  displayNameInput: {
+    borderWidth: 1,
+    borderColor: 'rgba(92, 42, 56, 0.25)',
+    borderRadius: 12,
+    paddingHorizontal: Spacing.two,
+    paddingVertical: Spacing.two,
+    fontSize: 16,
+    fontWeight: '600',
+    color: Screen.cardText,
+    backgroundColor: '#FFFFFF',
+  },
+  displayNameActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: Spacing.two,
+  },
+  displayNameButton: {
+    paddingHorizontal: Spacing.three,
+    paddingVertical: Spacing.two,
+    borderRadius: 10,
+    backgroundColor: 'rgba(92, 42, 56, 0.08)',
+  },
+  displayNameButtonPrimary: {
+    backgroundColor: Screen.toggleOn,
+  },
+  displayNameButtonDisabled: {
+    opacity: 0.7,
+  },
+  displayNameButtonText: {
+    color: Screen.cardText,
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  displayNameButtonPrimaryText: {
+    color: '#FFFFFF',
   },
 });

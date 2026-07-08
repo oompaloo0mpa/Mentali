@@ -39,6 +39,7 @@ const collectionConfigs = [
           currentStreak: NUM,
           longestStreak: NUM,
           onboardingCompleted: BOOL,
+          displayNameChangedAt: { bsonType: ["date", "null"] },
           createdAt: DATE,
           updatedAt: DATE,
         },
