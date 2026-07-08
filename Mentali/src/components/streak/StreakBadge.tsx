@@ -1,5 +1,6 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 
 import { AppIcon } from '@/components/AppIcon';
 import { colors, radius, spacing, typography } from '@/theme/colors';
@@ -25,9 +26,19 @@ export function StreakBadge({ current, longest, checkedInToday, onReset }: Props
       android_ripple={onReset ? { color: 'rgba(255,255,255,0.06)' } : undefined}
       style={styles.card}
     >
-      <View style={[styles.flameWrap, { backgroundColor: active ? visuals.pillBg : 'rgba(255,255,255,0.06)' }]}>
-        <AppIcon name="fire" size={26} />
-      </View>
+      {active && visuals.pillGradientColors ? (
+        <LinearGradient
+          colors={[...visuals.pillGradientColors]}
+          start={{ x: 0, y: 0.5 }}
+          end={{ x: 1, y: 0.5 }}
+          style={styles.flameWrap}>
+          <AppIcon name="fire" size={26} />
+        </LinearGradient>
+      ) : (
+        <View style={[styles.flameWrap, { backgroundColor: active ? visuals.pillBg : 'rgba(255,255,255,0.06)' }]}> 
+          <AppIcon name="fire" size={26} />
+        </View>
+      )}
       <View style={styles.body}>
         <Text style={[styles.headline, active && { color: visuals.color }]}>{headline}</Text>
         <Text style={styles.sub}>

@@ -1,5 +1,6 @@
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 
 import { AppIcon } from '@/components/AppIcon';
 import { Avatar } from '@/components/Avatar';
@@ -53,8 +54,21 @@ export function FriendRow({ friend, badges = [], onPress, onLongPress, onPressPr
           {friend.blocked && <Ionicons name="ban" size={13} color={Brand.danger} />}
           {muted && <Ionicons name="notifications-off" size={13} color={Brand.textMuted} />}
           <View style={[styles.streakPill, { backgroundColor: streakVisuals.pillBg }]}>
-            <AppIcon name="fire" size={14} />
-            <Text style={[styles.streak, { color: streakVisuals.color }]}>{friend.streak}</Text>
+            {streakVisuals.pillGradientColors ? (
+              <LinearGradient
+                colors={[...streakVisuals.pillGradientColors]}
+                start={{ x: 0, y: 0.5 }}
+                end={{ x: 1, y: 0.5 }}
+                style={styles.streakGradient}>
+                <AppIcon name="fire" size={14} />
+                <Text style={styles.streak}>{friend.streak}</Text>
+              </LinearGradient>
+            ) : (
+              <>
+                <AppIcon name="fire" size={14} />
+                <Text style={[styles.streak, { color: streakVisuals.color }]}>{friend.streak}</Text>
+              </>
+            )}
           </View>
           <Image
             source={friendMoodImage(friend)}
@@ -111,6 +125,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 2,
   },
+  streakGradient: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   streak: { fontSize: 14, fontWeight: '700' },
   moodImage: { width: 24, height: 24 },
   lastSeen: { color: Brand.textSecondary, fontSize: 13 },

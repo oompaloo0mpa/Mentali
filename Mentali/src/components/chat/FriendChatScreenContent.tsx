@@ -14,6 +14,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 
 import { AppIcon } from '@/components/AppIcon';
 import { AttachmentSheet } from '@/components/chat/AttachmentSheet';
@@ -206,8 +207,21 @@ export function FriendChatScreenContent({ friendId, prefill, onBack, onOpenStrea
               style={({ pressed }) => [styles.streakBadge, pressed && styles.pressed]}
               accessibilityRole="button"
               accessibilityLabel={`${friend.streak} day streak. Tap for streak guide.`}>
-              <AppIcon name="fire" size={20} />
-              <Text style={[styles.headerStreak, { color: streakVisuals.color }]}>{friend.streak}</Text>
+              {streakVisuals.pillGradientColors ? (
+                <LinearGradient
+                  colors={[...streakVisuals.pillGradientColors]}
+                  start={{ x: 0, y: 0.5 }}
+                  end={{ x: 1, y: 0.5 }}
+                  style={styles.headerStreakGradient}>
+                  <AppIcon name="fire" size={20} />
+                  <Text style={styles.headerStreak}>{friend.streak}</Text>
+                </LinearGradient>
+              ) : (
+                <>
+                  <AppIcon name="fire" size={20} />
+                  <Text style={[styles.headerStreak, { color: streakVisuals.color }]}>{friend.streak}</Text>
+                </>
+              )}
             </Pressable>
           )}
           {friend && <Image source={friendMoodImage(friend)} resizeMode="contain" style={styles.headerMoodImage} />}
@@ -342,6 +356,11 @@ const styles = StyleSheet.create({
   headerTitle: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6 },
   headerName: { color: Brand.text, fontSize: 17, fontWeight: '700', flexShrink: 1 },
   streakBadge: { flexDirection: 'row', alignItems: 'center', gap: 3 },
+  headerStreakGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+  },
   headerStreak: { fontSize: 14, fontWeight: '700' },
   headerMoodImage: { width: 22, height: 22 },
   headerActions: { flexDirection: 'row', alignItems: 'center', gap: Spacing.one },

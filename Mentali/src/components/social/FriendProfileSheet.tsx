@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 
 import { AppIcon } from '@/components/AppIcon';
 import { Avatar } from '@/components/Avatar';
@@ -52,8 +53,21 @@ export function FriendProfileSheet({ friend, lastMotivation, onClose, onMessage 
 
               <View style={styles.stats}>
                 <View style={styles.stat}>
-                  <AppIcon name="fire" size={20} />
-                  <Text style={[styles.statValue, { color: streakVisuals.color }]}>{friend.streak}</Text>
+                  {streakVisuals.pillGradientColors ? (
+                    <LinearGradient
+                      colors={[...streakVisuals.pillGradientColors]}
+                      start={{ x: 0, y: 0.5 }}
+                      end={{ x: 1, y: 0.5 }}
+                      style={styles.streakGradient}>
+                      <AppIcon name="fire" size={20} />
+                      <Text style={styles.statValue}>{friend.streak}</Text>
+                    </LinearGradient>
+                  ) : (
+                    <>
+                      <AppIcon name="fire" size={20} />
+                      <Text style={[styles.statValue, { color: streakVisuals.color }]}>{friend.streak}</Text>
+                    </>
+                  )}
                   <Text style={styles.statLabel}>Day streak</Text>
                 </View>
                 <View style={styles.statDivider} />
@@ -119,6 +133,7 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.two,
   },
   stat: { flex: 1, alignItems: 'center', gap: 2 },
+  streakGradient: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   statDivider: { width: StyleSheet.hairlineWidth, height: '70%', backgroundColor: Brand.divider },
   statValue: { color: Brand.text, fontSize: 18, fontWeight: '800' },
   statMood: { fontSize: 20 },

@@ -32,6 +32,13 @@ export const StreakColors = {
   rainbow: '#FF4FD8',
 } as const;
 
+export type StreakVisuals = {
+  tier: StreakTier;
+  color: string;
+  pillBg: string;
+  pillGradientColors?: readonly [string, string, string, string, string, string];
+};
+
 export function getStreakColor(streak: number): string {
   if (streak >= 500) return StreakColors.rainbow;
   if (streak >= 250) return StreakColors.purple;
@@ -48,11 +55,16 @@ export function getStreakTier(streak: number): StreakTier {
   return 'warming';
 }
 
-export function getStreakVisuals(streak: number): { tier: StreakTier; color: string; pillBg: string } {
+export function getStreakVisuals(streak: number): StreakVisuals {
   const tier = getStreakTier(streak);
   switch (tier) {
     case 'rainbow':
-      return { tier, color: '#FF4FD8', pillBg: 'rgba(255,79,216,0.2)' };
+      return {
+        tier,
+        color: '#FF4FD8',
+        pillBg: 'rgba(255,79,216,0.2)',
+        pillGradientColors: ['#FF3D9E', '#FF6B6B', '#FFD84D', '#6EE7B7', '#4FC3F7', '#B76EFF'],
+      };
     case 'purple':
       return { tier, color: '#C57BFF', pillBg: 'rgba(155,89,182,0.24)' };
     case 'blue':
