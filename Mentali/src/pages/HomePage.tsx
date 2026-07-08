@@ -110,7 +110,7 @@ function QuestCard({ item }: { item: QuestItem }) {
 }
 
 function MascotArt({ wardrobe }: { wardrobe: WardrobeSelection }) {
-  return <WardrobeMascotPreview wardrobe={wardrobe} size={112} />;
+  return <WardrobeMascotPreview wardrobe={wardrobe} size={126} preset="home" />;
 }
 
 function NavPlaceholder({ title, icon }: { title: string; icon: ComponentProps<typeof Ionicons>['name'] }) {

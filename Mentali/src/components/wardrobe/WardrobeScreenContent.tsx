@@ -19,8 +19,8 @@ const necklaceSprite = require('../../../assets/images/sprites/necklace.png') as
 const fedoraSprite = require('../../../assets/images/sprites/fedora.png') as ImageSourcePropType;
 const cuteFaceSprite = require('../../../assets/images/sprites/cuteFace.png') as ImageSourcePropType;
 const shockedFaceSprite = require('../../../assets/images/sprites/shockedFace.png') as ImageSourcePropType;
-const ponytailSprite = require('../../../assets/images/sprites/ponytail.png') as ImageSourcePropType;
-const wavvyHairSprite = require('../../../assets/images/sprites/wavvyhair.png') as ImageSourcePropType;
+const ponytailPreviewSprite = require('../../../assets/images/sprites/ponytailPreview.png') as ImageSourcePropType;
+const wavvyHairPreviewSprite = require('../../../assets/images/sprites/wavvyhairPreview.png') as ImageSourcePropType;
 
 type WardrobeItem = {
   id: string;
@@ -47,8 +47,8 @@ const CATEGORIES: Category[] = [
     label: 'Hair',
     slot: 'hair',
     items: [
-      { id: 'ponytail', label: 'Ponytail', image: ponytailSprite, slot: 'hair' },
-      { id: 'wavvyhair', label: 'Wavy Hair', image: wavvyHairSprite, slot: 'hair' },
+      { id: 'ponytail', label: 'Ponytail', image: ponytailPreviewSprite, slot: 'hair' },
+      { id: 'wavvyhair', label: 'Wavy Hair', image: wavvyHairPreviewSprite, slot: 'hair' },
     ],
   },
   {
@@ -103,9 +103,10 @@ function EmptyCategoryView({ label }: { label: string }) {
 type MascotPreviewProps = {
   wardrobe: WardrobeSelection;
   size: number;
+  preset?: 'wardrobe' | 'home';
 };
 
-export function WardrobeMascotPreview({ wardrobe, size }: MascotPreviewProps) {
+export function WardrobeMascotPreview({ wardrobe, size, preset = 'wardrobe' }: MascotPreviewProps) {
   const shadowWidth = size * 0.56;
   const mascotBox = { width: size, height: size };
   const baseMascot = wardrobe.accessory === 'necklace'
@@ -114,34 +115,84 @@ export function WardrobeMascotPreview({ wardrobe, size }: MascotPreviewProps) {
       ? facelessNakedMascot
       : nakedMascot;
 
-  const faceStyle = {
-    width: size * 0.54,
-    height: size * 0.42,
-    left: size * 0.23,
-    top: size * 0.27,
-  };
+  const faceStyle =
+    preset === 'home'
+      ? {
+          width: size * 0.54,
+          height: size * 0.35,
+          left: size * 0.23,
+          top: size * 0.38,
+        }
+      : {
+          width: size * 0.54,
+          height: size * 0.38,
+          left: size * 0.23,
+          top: size * 0.34,
+        };
 
-  const hairStyle = {
-    width: size * 0.78,
-    height: size * 0.7,
-    left: size * 0.21,
-    top: size * 0.02,
-    transform: [{ scaleX: 2.5 }],
-  };
+  const ponytailHairStyle =
+    preset === 'home'
+      ? {
+          width: size * 0.54,
+          height: size * 0.66,
+          left: size * 0.27,
+          top: size * 0.18,
+          transform: [{ scaleX: 2.05 }],
+        }
+      : {
+          width: size * 0.52,
+          height: size * 0.68,
+          left: size * 0.29,
+          top: size * 0.1,
+          transform: [{ scaleX: 2.15 }],
+        };
 
-  const necklaceStyle = {
-    width: size * 0.80,
-    height: size * 1.2,
-    left: size * 0.10,
-    top: size * 0,
-  };
+  const wavvyHairStyle =
+    preset === 'home'
+      ? {
+          width: size * 0.68,
+          height: size * 0.60,
+          left: size * 0.17,
+          top: size * 0.18,
+          transform: [{ scaleX: 1.9 }],
+        }
+      : {
+          width: size * 0.66,
+          height: size * 0.62,
+          left: size * 0.18,
+          top: size * 0.11,
+          transform: [{ scaleX: 1.95 }],
+        };
 
-  const hatStyle = {
-    width: size * 0.60,
-    height: size * 0.36,
-    left: size * 0.20,
-    top: size * 0.1,
-  };
+  const necklaceStyle =
+    preset === 'home'
+      ? {
+          width: size * 0.84,
+          height: size * 1.1,
+          left: size * 0.08,
+          top: size * 0.04,
+        }
+      : {
+          width: size * 0.80,
+          height: size * 1.2,
+          left: size * 0.10,
+          top: size * 0,
+        };
+
+  const hatStyle =
+    preset === 'home'
+      ? {
+          width: size * 0.58,
+          height: size * 0.34,
+          left: size * 0.21,
+          top: size * 0.12,
+        }
+      : {
+          width: size * 0.60,
+          height: size * 0.36,
+          left: size * 0.20,
+          top: size * 0.1,
+        };
 
   return (
     <View style={[styles.mascotStage, { width: size, height: size + 28 }]}> 
@@ -152,9 +203,9 @@ export function WardrobeMascotPreview({ wardrobe, size }: MascotPreviewProps) {
         <Image source={shockedFaceSprite} resizeMode="contain" style={[styles.mascotLayer, faceStyle]} />
       ) : null}
       {wardrobe.hair === 'ponytail' ? (
-        <Image source={ponytailSprite} resizeMode="contain" style={[styles.mascotLayer, hairStyle]} />
+        <Image source={ponytailPreviewSprite} resizeMode="contain" style={[styles.mascotLayer, ponytailHairStyle]} />
       ) : wardrobe.hair === 'wavvyhair' ? (
-        <Image source={wavvyHairSprite} resizeMode="contain" style={[styles.mascotLayer, hairStyle]} />
+        <Image source={wavvyHairPreviewSprite} resizeMode="contain" style={[styles.mascotLayer, wavvyHairStyle]} />
       ) : null}
       {wardrobe.hat === 'fedora' ? (
         <Image source={fedoraSprite} resizeMode="contain" style={[styles.mascotLayer, hatStyle]} />
@@ -255,14 +306,17 @@ const styles = StyleSheet.create({
   mascotLayer: {
     position: 'absolute',
     resizeMode: 'contain',
+    zIndex: 1,
   },
   mascotShadow: {
     position: 'absolute',
-    bottom: 14,
-    height: 18,
+    bottom: -20,
+    height: 100,
     borderRadius: 999,
     backgroundColor: '#000',
-    opacity: 0.28,
+    opacity: 0.4,
+    zIndex: 0
+    
   },
   shopBtn: {
     position: 'absolute',
