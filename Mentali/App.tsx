@@ -16,6 +16,8 @@ import OnboardingPage_5 from '@/pages/OnboardingPage_5';
 import NonAnonymousWarningPage from '@/pages/NonAnonymousWarningPage';
 import HomePage from '@/pages/HomePage';
 import WardrobePage from '@/pages/WardrobePage';
+import ShopPage from '@/pages/ShopPage';
+import StatisticPage from '@/pages/StatisticPage';
 import { SocialProvider } from '@/storage/socialStore';
 import { SettingsOverlayProvider } from '@/storage/settingsOverlayStore';
 import { UserProfileProvider, useUserProfile } from '@/storage/userProfileStore';
@@ -82,6 +84,8 @@ type ScreenState =
       k10: WellbeingResult | null;
       streak: StreakState;
     }
+  | { screen: 'shop' }
+  | { screen: 'rewards' }
   | { screen: 'wardrobe'; returnToNav: string };
 
 export default function App() {
@@ -631,11 +635,25 @@ function AppRoot() {
             onOpenChat={(friend, prefill) => openChat(friend.id, prefill)}
             onOpenCheckIn={(mood) => setScreenState({ screen: 'check-in', mood })}
             onOpenWardrobe={() => setScreenState({ screen: 'wardrobe', returnToNav: homeNav })}
+            onOpenShop={() => setScreenState({ screen: 'shop' })}
+            onOpenRewards={() => setScreenState({ screen: 'rewards' })}
           />
+        ) : screenState.screen === 'shop' ? (
+          <ShopPage />
+        ) : screenState.screen === 'rewards' ? (
+          <StatisticPage />
         ) : screenState.screen === 'wardrobe' ? (
           <WardrobePage
             onNavigate={(navItem) => {
               if (navItem === 'shirt-outline') return;
+              if (navItem === 'bag-outline') {
+                setScreenState({ screen: 'shop' });
+                return;
+              }
+              if (navItem === 'trophy-outline') {
+                setScreenState({ screen: 'rewards' });
+                return;
+              }
               setScreenState({ screen: 'home', selectedNav: navItem });
             }}
           />

@@ -51,6 +51,8 @@ type HomePageProps = {
   onOpenChat?: (friend: Friend, prefillMotivation?: boolean) => void;
   onOpenCheckIn?: (mood: MoodOption) => void;
   onOpenWardrobe?: () => void;
+  onOpenShop?: () => void;
+  onOpenRewards?: () => void;
 };
 
 const bronzeTrophy = require('../../assets/images/BronzeTrophy.png') as ImageSourcePropType;
@@ -342,6 +344,8 @@ export default function HomePage({
   onOpenChat,
   onOpenCheckIn,
   onOpenWardrobe,
+  onOpenShop,
+  onOpenRewards,
 }: HomePageProps) {
   const { openSettings, requestLogout } = useSettingsOverlay();
   const { profile, setCurrentMood } = useUserProfile();
@@ -678,6 +682,10 @@ export default function HomePage({
         onSelect={(icon) => {
           if (icon === 'shirt-outline') {
             onOpenWardrobe?.();
+          } else if (icon === 'bag-outline') {
+            onOpenShop?.();
+          } else if (icon === 'trophy-outline') {
+            onOpenRewards?.();
           } else {
             setSelectedNav(icon);
           }
