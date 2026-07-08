@@ -20,6 +20,7 @@ import RankGuide from '@/pages/RankGuide';
 import WardrobePage from '@/pages/WardrobePage';
 import ShopPage from '@/pages/ShopPage';
 import StatisticPage from '@/pages/StatisticPage';
+import ChooseEmoji from '@/pages/ChooseEmoji';
 import { SocialProvider } from '@/storage/socialStore';
 import { SettingsOverlayProvider } from '@/storage/settingsOverlayStore';
 import { UserProfileProvider, useUserProfile } from '@/storage/userProfileStore';
@@ -90,6 +91,7 @@ type ScreenState =
     }
   | { screen: 'shop' }
   | { screen: 'rewards' }
+  | { screen: 'choose-emoji'; dateKey: string }
   | { screen: 'wardrobe'; returnToNav: string };
 
 export default function App() {
@@ -642,6 +644,7 @@ function AppRoot() {
               setHomeNav('trophy-outline');
               setScreenState({ screen: 'leaderboard' });
             }}
+            onOpenStatistics={() => setScreenState({ screen: 'rewards' })}
             onOpenWardrobe={() => setScreenState({ screen: 'wardrobe', returnToNav: homeNav })}
             onOpenShop={() => setScreenState({ screen: 'shop' })}
             onOpenRewards={() => setScreenState({ screen: 'rewards' })}
@@ -649,7 +652,20 @@ function AppRoot() {
         ) : screenState.screen === 'shop' ? (
           <ShopPage />
         ) : screenState.screen === 'rewards' ? (
-          <StatisticPage />
+          <StatisticPage
+            onNavigate={(navItem) => {
+              if (navItem === 'home-outline') {
+                setScreenState({ screen: 'home', selectedNav: 'home-outline' });
+              }
+            }}
+            onOpenEmojiChooser={(dateKey) => setScreenState({ screen: 'choose-emoji', dateKey })}
+          />
+        ) : screenState.screen === 'choose-emoji' ? (
+          <ChooseEmoji
+            dateKey={screenState.dateKey}
+            onDone={() => setScreenState({ screen: 'rewards' })}
+            onClose={() => setScreenState({ screen: 'rewards' })}
+          />
         ) : screenState.screen === 'leaderboard' ? (
           <LeaderboardPage
             onOpenRankGuide={() => setScreenState({ screen: 'rank-guide' })}

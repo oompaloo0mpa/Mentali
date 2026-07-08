@@ -15,7 +15,20 @@ import { moodSources } from '../data/moodAssets';
 import { setMoodForDate } from '../data/moodStore';
 import { getSingaporeTodayKey } from '../data/sgDate';
 
+type ChooseEmojiProps = {
+  dateKey?: string;
+  onDone?: (dateKey: string) => void;
+  onClose?: () => void;
+};
+
 const ringSize = 292;
+const emojiSize = 74;
+
+type EmojiPosition = {
+  top: number;
+  left: number;
+  rotate: string;
+};
 
 function formatDateLabel(dateKey: string) {
   const [yearText, monthText, dayText] = dateKey.split('-');
@@ -41,12 +54,30 @@ const monthNames = [
   'December',
 ];
 
-export default function ChooseEmoji() {
+export default function ChooseEmoji({ dateKey: propDateKey, onDone, onClose }: ChooseEmojiProps) {
   const router = useRouter();
   const params = useLocalSearchParams<{ date?: string }>();
-  const dateKey = params.date ?? getSingaporeTodayKey();
+  const dateKey = propDateKey ?? params.date ?? getSingaporeTodayKey();
   const dateLabel = useMemo(() => formatDateLabel(dateKey), [dateKey]);
   const animations = useRef(moodSources.map(() => new Animated.Value(0))).current;
+  const emojiPositions = useMemo<EmojiPosition[]>(() => {
+    const centerX = (ringSize + 72) / 2;
+    const centerY = (ringSize + 96) / 2;
+    const radius = ringSize / 2 + 6;
+    const startAngle = -90;
+
+    return moodSources.map((_, index) => {
+      const angle = ((startAngle + index * (360 / moodSources.length)) * Math.PI) / 180;
+      const centerOffsetX = Math.cos(angle) * radius;
+      const centerOffsetY = Math.sin(angle) * radius;
+
+      return {
+        left: centerX + centerOffsetX - emojiSize / 2,
+        top: centerY + centerOffsetY - emojiSize / 2,
+        rotate: `${index % 2 === 0 ? -10 : 10}deg`,
+      };
+    });
+  }, []);
 
   useEffect(() => {
     Animated.stagger(
@@ -62,16 +93,13 @@ export default function ChooseEmoji() {
     ).start();
   }, [animations]);
 
-  const positions = [
-    { top: 4, left: 112, rotate: '-18deg' },
-    { top: 120, left: 222, rotate: '14deg' },
-    { top: 232, left: 136, rotate: '10deg' },
-    { top: 232, left: 20, rotate: '-12deg' },
-    { top: 120, left: -46, rotate: '-6deg' },
-  ];
-
   const handleSelect = (moodIndex: number) => {
     setMoodForDate(dateKey, moodIndex);
+    if (onDone) {
+      onDone(dateKey);
+      return;
+    }
+
     router.replace('/StatisticPage');
   };
 
@@ -88,7 +116,7 @@ export default function ChooseEmoji() {
 
           {moodSources.map((source, index) => {
             const animation = animations[index];
-            const position = positions[index];
+            const position = emojiPositions[index];
 
             return (
               <Animated.View
@@ -117,7 +145,14 @@ export default function ChooseEmoji() {
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Close emoji chooser"
-          onPress={() => router.replace('/StatisticPage')}
+          onPress={() => {
+            if (onClose) {
+              onClose();
+              return;
+            }
+
+            router.replace('/StatisticPage');
+          }}
           style={({ pressed }) => [styles.closeButton, pressed && styles.closeButtonPressed]}>
           <Text style={styles.closeButtonText}>X</Text>
         </Pressable>
@@ -179,14 +214,14 @@ const styles = StyleSheet.create({
     position: 'absolute',
   },
   emojiPressable: {
-    width: 74,
-    height: 74,
+    width: emojiSize,
+    height: emojiSize,
     alignItems: 'center',
     justifyContent: 'center',
   },
   emojiImage: {
-    width: 70,
-    height: 70,
+    width: 68,
+    height: 68,
   },
   closeButton: {
     width: 54,

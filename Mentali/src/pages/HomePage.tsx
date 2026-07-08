@@ -51,6 +51,7 @@ type HomePageProps = {
   onOpenChat?: (friend: Friend, prefillMotivation?: boolean) => void;
   onOpenCheckIn?: (mood: MoodOption) => void;
   onOpenLeaderboard?: () => void;
+  onOpenStatistics?: () => void;
   onOpenWardrobe?: () => void;
   onOpenShop?: () => void;
   onOpenRewards?: () => void;
@@ -77,6 +78,7 @@ type MoreMenuPanelProps = {
   onClose: () => void;
   onLogout?: () => void;
   onOpenSettings?: () => void;
+  onOpenStatistics?: () => void;
   topInset: number;
 };
 
@@ -291,7 +293,7 @@ function NotificationPanel({
   );
 }
 
-function MoreMenuPanel({ visible, onClose, onLogout, onOpenSettings, topInset }: MoreMenuPanelProps) {
+function MoreMenuPanel({ visible, onClose, onLogout, onOpenSettings, onOpenStatistics, topInset }: MoreMenuPanelProps) {
   const menuItems = [
     { icon: 'stats-chart-outline' as const, label: 'Statistics', key: 'statistics' as const },
     { icon: 'settings-outline' as const, label: 'Settings', key: 'settings' as const },
@@ -315,7 +317,9 @@ function MoreMenuPanel({ visible, onClose, onLogout, onOpenSettings, topInset }:
                   style={styles.moreMenuItem}
                   onPress={() => {
                     onClose();
-                    if (item.key === 'logout') {
+                    if (item.key === 'statistics') {
+                      onOpenStatistics?.();
+                    } else if (item.key === 'logout') {
                       onLogout?.();
                     } else if (item.key === 'settings') {
                       onOpenSettings?.();
@@ -345,6 +349,7 @@ export default function HomePage({
   onOpenChat,
   onOpenCheckIn,
   onOpenLeaderboard,
+  onOpenStatistics,
   onOpenWardrobe,
   onOpenShop,
   onOpenRewards,
@@ -530,6 +535,7 @@ export default function HomePage({
               onClose={() => setMoreMenuVisible(false)}
               onLogout={requestLogout}
               onOpenSettings={openSettings}
+              onOpenStatistics={onOpenStatistics}
               topInset={insets.top}
             />
 
