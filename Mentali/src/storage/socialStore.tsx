@@ -11,12 +11,14 @@ import {
   fetchChatMessages,
   fetchFriendsView,
   fetchNotifications,
+  isRemoteMediaUri,
   markAllNotificationsRead as markAllNotificationsReadApi,
   markNotificationRead as markNotificationReadApi,
   rejectFriendRequest,
   removeFriendship,
   requestFriendByCode,
   sendChatMessage,
+  uploadChatAttachment,
   type ChatMessageRow,
   type FriendListRow,
   type FriendRequestRow,
@@ -368,7 +370,10 @@ type SocialContextValue = {
   rejectRequest: (id: string) => void;
   /** Manually re-fetch friends + requests from the server (used for pull-to-refresh). */
   refreshFriendsView: () => Promise<void>;
-  sendMessage: (friendId: string, message: Omit<ChatMessage, 'id' | 'sender'> & { sender?: 'me' | 'them' }) => void;
+  sendMessage: (
+    friendId: string,
+    message: Omit<ChatMessage, 'id' | 'sender'> & { sender?: 'me' | 'them' },
+  ) => Promise<void> | void;
   refreshChat: (friendId: string) => Promise<void>;
   markChatRead: (friendId: string) => void;
   togglePin: (friendId: string) => void;
@@ -674,35 +679,48 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
         completeSocialQuests(me)
           .then(() => refreshProfileStats())
           .catch(() => {});
-        sendChatMessage(friendId, {
-          senderUserId: me,
-          text: message.text,
-          imageUri: message.imageUri,
-          fileName: message.fileName,
-          fileUri: message.fileUri,
-        })
-          .then(async (result) => {
-            const [rows, remote] = await Promise.all([
-              fetchChatMessages(friendId, me),
-              fetchFriendsView(me),
-            ]);
-            setState((prev) => {
-              const merged = mergeFriendsFromApi(prev, remote);
-              if (typeof result?.streak === 'number') {
-                merged.friends = merged.friends.map((f) =>
-                  f.id === friendId ? { ...f, streak: result.streak! } : f,
-                );
-              }
-              return {
-                ...merged,
-                chats: {
-                  ...merged.chats,
-                  [friendId]: rows.map((row) => fromApiChatMessage(row, me)),
-                },
-              };
-            });
-          })
-          .catch(() => {});
+        return (async () => {
+          let imageUri = message.imageUri;
+          let fileUri = message.fileUri;
+          const fileName = message.fileName;
+
+          if (imageUri && !isRemoteMediaUri(imageUri)) {
+            imageUri = await uploadChatAttachment(imageUri, `photo-${Date.now()}.jpg`, 'image/jpeg');
+          }
+          if (fileUri && !isRemoteMediaUri(fileUri)) {
+            fileUri = await uploadChatAttachment(
+              fileUri,
+              fileName || `file-${Date.now()}`,
+            );
+          }
+
+          const result = await sendChatMessage(friendId, {
+            senderUserId: me,
+            text: message.text,
+            imageUri,
+            fileName,
+            fileUri,
+          });
+          const [rows, remote] = await Promise.all([
+            fetchChatMessages(friendId, me),
+            fetchFriendsView(me),
+          ]);
+          setState((prev) => {
+            const merged = mergeFriendsFromApi(prev, remote);
+            if (typeof result?.streak === 'number') {
+              merged.friends = merged.friends.map((f) =>
+                f.id === friendId ? { ...f, streak: result.streak! } : f,
+              );
+            }
+            return {
+              ...merged,
+              chats: {
+                ...merged.chats,
+                [friendId]: rows.map((row) => fromApiChatMessage(row, me)),
+              },
+            };
+          });
+        })();
       }
     },
     [profile.userId, refreshProfileStats, update],

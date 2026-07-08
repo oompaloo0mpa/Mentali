@@ -1,5 +1,7 @@
-import { Image, StyleSheet, Text, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { Image, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { resolveMediaUrl } from '@/services/api';
 import { Brand, Radius } from '@/theme/theme';
 import type { ChatMessage } from '@/data/mockData';
 
@@ -14,10 +16,17 @@ type Props = { message: ChatMessage } | CheckInBubbleProps;
 export function ChatBubble(props: Props) {
   const isSocialMessage = 'message' in props;
   const isMe = isSocialMessage ? props.message.sender === 'me' : props.role === 'user';
-  const hasImage = isSocialMessage ? !!props.message.imageUri : false;
+  const imageUri = isSocialMessage ? resolveMediaUrl(props.message.imageUri) : undefined;
+  const fileUri = isSocialMessage ? resolveMediaUrl(props.message.fileUri) : undefined;
+  const hasImage = isSocialMessage ? !!imageUri : false;
   const hasFile = isSocialMessage ? !!props.message.fileName : false;
   const text = isSocialMessage ? props.message.text : props.text;
   const helper = isSocialMessage ? undefined : props.helper;
+
+  const openFile = () => {
+    if (!fileUri) return;
+    void Linking.openURL(fileUri).catch(() => {});
+  };
 
   return (
     <View style={[styles.row, isMe ? styles.rowMe : styles.rowThem]}>
@@ -27,16 +36,22 @@ export function ChatBubble(props: Props) {
           isMe ? styles.bubbleMe : styles.bubbleThem,
           hasImage && styles.bubbleImage,
         ]}>
-        {hasImage && isSocialMessage ? (
-          <Image source={{ uri: props.message.imageUri }} style={styles.image} resizeMode="cover" />
+        {hasImage && imageUri ? (
+          <Image source={{ uri: imageUri }} style={styles.image} resizeMode="cover" />
         ) : null}
         {hasFile && (
-          <View style={styles.fileRow}>
-            <Text style={styles.fileIcon}>📄</Text>
-            <Text style={styles.fileName} numberOfLines={1}>
+          <Pressable
+            onPress={openFile}
+            disabled={!fileUri}
+            style={({ pressed }) => [styles.fileRow, pressed && fileUri && styles.filePressed]}
+            accessibilityRole="button"
+            accessibilityLabel={`Open file ${isSocialMessage ? props.message.fileName : ''}`}>
+            <Ionicons name="document-text-outline" size={22} color={Brand.textOnBubble} />
+            <Text style={styles.fileName} numberOfLines={2}>
               {isSocialMessage ? props.message.fileName : ''}
             </Text>
-          </View>
+            {fileUri ? <Ionicons name="open-outline" size={16} color={Brand.textOnBubble} /> : null}
+          </Pressable>
         )}
         {!!text && (
           <Text style={[styles.text, hasImage && styles.textWithImage]}>{text}</Text>
@@ -67,8 +82,8 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 4,
   },
   image: { width: 200, height: 200, borderRadius: Radius.sm },
-  fileRow: { flexDirection: 'row', alignItems: 'center', gap: 8, maxWidth: 220 },
-  fileIcon: { fontSize: 18, lineHeight: 22 },
+  fileRow: { flexDirection: 'row', alignItems: 'center', gap: 8, maxWidth: 240 },
+  filePressed: { opacity: 0.75 },
   fileName: { flex: 1, color: Brand.textOnBubble, fontSize: 14, fontWeight: '600' },
   text: { color: Brand.textOnBubble, fontSize: 15, lineHeight: 20, fontWeight: '600' },
   textWithImage: { paddingHorizontal: 10, paddingTop: 6, paddingBottom: 2 },

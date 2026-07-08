@@ -2,6 +2,11 @@ require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 const bcrypt = require("bcryptjs");
+const fs = require("node:fs");
+const path = require("node:path");
+const {
+  randomBytes
+} = require("node:crypto");
 const {
   Buffer
 } = require("node:buffer");
@@ -19,9 +24,38 @@ const {
 
 const app = express();
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: "30mb" }));
 
 const PORT = Number(process.env.API_PORT || 4000);
+const UPLOADS_DIR = path.join(__dirname, "uploads");
+if (!fs.existsSync(UPLOADS_DIR)) {
+  fs.mkdirSync(UPLOADS_DIR, {
+    recursive: true
+  });
+}
+
+const MIME_EXTENSION = {
+  "image/jpeg": ".jpg",
+  "image/png": ".png",
+  "image/gif": ".gif",
+  "image/webp": ".webp",
+  "application/pdf": ".pdf",
+  "text/plain": ".txt",
+};
+
+function sanitizeUploadName(name) {
+  return String(name || "attachment").replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 120);
+}
+
+function uploadPublicUrl(req, filename) {
+  const proto = req.headers["x-forwarded-proto"] || req.protocol || "http";
+  const host = req.headers["x-forwarded-host"] || req.get("host");
+  return `${proto}://${host}/api/uploads/${encodeURIComponent(filename)}`;
+}
+
+function isPublicMediaUri(uri) {
+  return typeof uri === "string" && /^https?:\/\//i.test(uri);
+}
 
 function toObjectId(value, field = "id") {
   if (!ObjectId.isValid(value)) {
@@ -1932,6 +1966,16 @@ app.post("/api/chats/:friendshipId/messages", requireAuth, async (req, res, next
         error: "Message content is required"
       });
     }
+    if (imageUri && !isPublicMediaUri(imageUri)) {
+      return res.status(400).json({
+        error: "imageUri must be an uploaded public URL"
+      });
+    }
+    if (fileUri && !isPublicMediaUri(fileUri)) {
+      return res.status(400).json({
+        error: "fileUri must be an uploaded public URL"
+      });
+    }
 
     const {
       friendship,
@@ -2552,6 +2596,50 @@ app.delete("/api/notifications/:userId", requireAuth, async (req, res, next) => 
     const uid = toObjectId(req.params.userId, "userId");
     await db.collection("notifications").deleteMany({ userId: uid });
     res.json({ ok: true });
+  } catch (e) {
+    next(e);
+  }
+});
+
+app.use("/api/uploads", express.static(UPLOADS_DIR, {
+  maxAge: "7d",
+}));
+
+app.post("/api/chats/uploads", requireAuth, async (req, res, next) => {
+  try {
+    const {
+      fileName = "attachment",
+      mimeType = "application/octet-stream",
+      data
+    } = req.body || {};
+    if (!data) {
+      return res.status(400).json({
+        error: "File data is required"
+      });
+    }
+
+    const buffer = Buffer.from(String(data), "base64");
+    const maxBytes = String(mimeType).startsWith("image/") ? 12 * 1024 * 1024 : 25 * 1024 * 1024;
+    if (buffer.length === 0) {
+      return res.status(400).json({
+        error: "File is empty"
+      });
+    }
+    if (buffer.length > maxBytes) {
+      return res.status(413).json({
+        error: "File is too large"
+      });
+    }
+
+    const safeName = sanitizeUploadName(fileName);
+    const ext = path.extname(safeName) || MIME_EXTENSION[mimeType] || "";
+    const storedName = `${Date.now()}-${randomBytes(8).toString("hex")}${ext}`;
+    await fs.promises.writeFile(path.join(UPLOADS_DIR, storedName), buffer);
+
+    res.json({
+      url: uploadPublicUrl(req, storedName),
+      fileName: safeName,
+    });
   } catch (e) {
     next(e);
   }
