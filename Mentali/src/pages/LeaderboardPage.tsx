@@ -15,6 +15,7 @@ import { BottomNav } from '@/components/nav/BottomNav';
 
 type LeaderboardPageProps = {
   onNavigate?: (navItem: string) => void;
+  onOpenRankGuide?: () => void;
 };
 
 type LeaderboardEntry = {
@@ -118,14 +119,20 @@ function buildLeaderboardEntries(): LeaderboardEntry[] {
   return entries;
 }
 
-function HeaderActionButtons({ onAdvanceRank }: { onAdvanceRank: () => void }) {
+function HeaderActionButtons({
+  onAdvanceRank,
+  onOpenRankGuide,
+}: {
+  onAdvanceRank: () => void;
+  onOpenRankGuide?: () => void;
+}) {
   return (
     <View style={styles.headerActions}>
       <Pressable onPress={onAdvanceRank} style={({ pressed }) => [styles.simulateButton, pressed && styles.simulateButtonPressed]}>
         <View style={styles.simulateButtonInner} />
       </Pressable>
 
-      <Pressable style={({ pressed }) => [styles.helpButton, pressed && styles.helpButtonPressed]}>
+      <Pressable onPress={onOpenRankGuide} style={({ pressed }) => [styles.helpButton, pressed && styles.helpButtonPressed]}>
         <Text style={styles.helpButtonText}>?</Text>
       </Pressable>
     </View>
@@ -204,7 +211,7 @@ function DemotionZone() {
   );
 }
 
-export default function LeaderboardPage({ onNavigate }: LeaderboardPageProps) {
+export default function LeaderboardPage({ onNavigate, onOpenRankGuide }: LeaderboardPageProps) {
   const [rankStage, setRankStage] = useState<RankStage>('locked');
   const leaderboardEntries = useMemo(() => buildLeaderboardEntries(), []);
   const promotionEntries = leaderboardEntries.slice(0, 5);
@@ -217,7 +224,10 @@ export default function LeaderboardPage({ onNavigate }: LeaderboardPageProps) {
 
       <View style={styles.header}>
         <Text style={styles.title}>Leaderboard</Text>
-        <HeaderActionButtons onAdvanceRank={() => setRankStage((current) => nextStageMap[current])} />
+        <HeaderActionButtons
+          onAdvanceRank={() => setRankStage((current) => nextStageMap[current])}
+          onOpenRankGuide={onOpenRankGuide}
+        />
       </View>
 
       <TrophyPodium stage={rankStage} />

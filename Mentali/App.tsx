@@ -16,6 +16,7 @@ import OnboardingPage_5 from '@/pages/OnboardingPage_5';
 import NonAnonymousWarningPage from '@/pages/NonAnonymousWarningPage';
 import HomePage from '@/pages/HomePage';
 import LeaderboardPage from '@/pages/LeaderboardPage';
+import RankGuide from '@/pages/RankGuide';
 import WardrobePage from '@/pages/WardrobePage';
 import { SocialProvider } from '@/storage/socialStore';
 import { SettingsOverlayProvider } from '@/storage/settingsOverlayStore';
@@ -61,6 +62,7 @@ type ScreenState =
   | { screen: 'onboarding-5' }
   | { screen: 'home'; selectedNav?: string }
   | { screen: 'leaderboard' }
+  | { screen: 'rank-guide' }
   | { screen: 'chat'; friendId: string; prefill?: boolean; returnToNav: string }
   | { screen: 'streak-guide'; friendId: string; prefill?: boolean; returnToNav: string }
   | {
@@ -435,6 +437,7 @@ function AppRoot() {
           />
         ) : screenState.screen === 'leaderboard' ? (
           <LeaderboardPage
+            onOpenRankGuide={() => setScreenState({ screen: 'rank-guide' })}
             onNavigate={(navItem) => {
               if (navItem === 'trophy-outline') {
                 return;
@@ -448,6 +451,8 @@ function AppRoot() {
               setScreenState({ screen: 'home', selectedNav: navItem });
             }}
           />
+        ) : screenState.screen === 'rank-guide' ? (
+          <RankGuide onClose={() => setScreenState({ screen: 'leaderboard' })} />
         ) : screenState.screen === 'wardrobe' ? (
           <WardrobePage
             onNavigate={(navItem) => {
