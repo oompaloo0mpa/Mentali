@@ -126,6 +126,44 @@ async function getUserPreferences(db, userId) {
   });
 }
 
+async function createNotification(db, userId, { icon, title }) {
+  const uid = toObjectId(userId, "userId");
+  await db.collection("notifications").insertOne({
+    userId: uid,
+    icon,
+    title: String(title).trim(),
+    read: false,
+    createdAt: new Date(),
+  });
+}
+
+function formatNotificationRow(row) {
+  const created = row.createdAt ? new Date(row.createdAt) : new Date();
+  const diffMs = Date.now() - created.getTime();
+  const mins = Math.floor(diffMs / 60000);
+  let time = "Just now";
+  if (mins >= 60 * 48) {
+    const days = Math.floor(mins / (60 * 24));
+    time = days === 1 ? "Yesterday" : `${days} days ago`;
+  } else if (mins >= 60) {
+    const hours = Math.floor(mins / 60);
+    time = hours === 1 ? "1h ago" : `${hours}h ago`;
+  } else if (mins >= 1) {
+    time = `${mins}m ago`;
+  }
+
+  const recent = diffMs < 7 * 24 * 60 * 60 * 1000;
+  return {
+    id: row._id.toString(),
+    icon: row.icon,
+    title: row.title,
+    time,
+    read: !!row.read,
+    recent,
+    createdAt: created.toISOString(),
+  };
+}
+
 function relativeLastSeen(dateValue) {
   const ts = dateValue ? new Date(dateValue).getTime() : Date.now();
   const diffMs = Math.max(0, Date.now() - ts);
@@ -1135,6 +1173,15 @@ app.post("/api/daily-checkins", requireAuth, async (req, res, next) => {
     });
 
     const streak = await applyUserDailyStreak(db, uid, dateValue, isFirstCheckInToday);
+    if (isFirstCheckInToday && streak.current > 0) {
+      await createNotification(db, uid, {
+        icon: "flame",
+        title:
+          streak.current === 1 ?
+          "You started a new check-in streak" :
+          `Your streak is now ${streak.current} days`,
+      });
+    }
     res.status(201).json({
       ok: true,
       streak
@@ -1451,6 +1498,14 @@ app.post("/api/friends/request-by-code", requireAuth, async (req, res, next) => 
 
     const prefs = await getUserPreferences(db, target._id);
     const isFriend = await areFriends(db, from, target._id);
+    if (prefs?.allowFriendRequests !== false) {
+      const fromUser = await db.collection("users").findOne({ _id: from });
+      const senderName = fromUser?.displayName || fromUser?.username || "Someone";
+      await createNotification(db, target._id, {
+        icon: "person-add",
+        title: `${senderName} sent you a friend request`,
+      });
+    }
     res.json({
       ok: true,
       user: publicUserView(target, prefs, {
@@ -1530,6 +1585,14 @@ app.post("/api/friends/:id/accept", requireAuth, async (req, res, next) => {
         acceptedAt: new Date(),
         blockedAt: null
       }
+    });
+    const accepter = await db.collection("users").findOne({
+      _id: toObjectId(req.authUserId, "userId")
+    });
+    const accepterName = accepter?.displayName || accepter?.username || "A friend";
+    await createNotification(db, row.requestedBy, {
+      icon: "person-add",
+      title: `${accepterName} accepted your friend request`,
     });
     res.json({
       ok: true
@@ -2060,6 +2123,10 @@ app.post("/api/user-quests/:id/complete", requireAuth, async (req, res, next) =>
           updatedAt: new Date()
         }
       });
+      await createNotification(db, userQuest.userId, {
+        icon: "trophy",
+        title: `Quest complete! +${reward} points`,
+      });
     }
     res.json({
       ok: true,
@@ -2407,6 +2474,65 @@ app.put("/api/preferences/:userId", requireAuth, async (req, res, next) => {
     res.json({
       data
     });
+  } catch (e) {
+    next(e);
+  }
+});
+
+app.get("/api/notifications/:userId", requireAuth, async (req, res, next) => {
+  try {
+    if (!assertSelf(req, res, req.params.userId)) return;
+    const { db } = await connectMongo();
+    const uid = toObjectId(req.params.userId, "userId");
+    const rows = await db.collection("notifications").find({ userId: uid })
+      .sort({ createdAt: -1 })
+      .limit(50)
+      .toArray();
+    res.json({ data: rows.map(formatNotificationRow) });
+  } catch (e) {
+    next(e);
+  }
+});
+
+app.patch("/api/notifications/:notificationId/read", requireAuth, async (req, res, next) => {
+  try {
+    const { db } = await connectMongo();
+    const notificationId = toObjectId(req.params.notificationId);
+    const row = await db.collection("notifications").findOne({ _id: notificationId });
+    if (!row) return res.status(404).json({ error: "Notification not found" });
+    if (!assertSelf(req, res, row.userId)) return;
+    await db.collection("notifications").updateOne(
+      { _id: notificationId },
+      { $set: { read: true } },
+    );
+    res.json({ ok: true });
+  } catch (e) {
+    next(e);
+  }
+});
+
+app.patch("/api/notifications/:userId/read-all", requireAuth, async (req, res, next) => {
+  try {
+    if (!assertSelf(req, res, req.params.userId)) return;
+    const { db } = await connectMongo();
+    const uid = toObjectId(req.params.userId, "userId");
+    await db.collection("notifications").updateMany(
+      { userId: uid, read: false },
+      { $set: { read: true } },
+    );
+    res.json({ ok: true });
+  } catch (e) {
+    next(e);
+  }
+});
+
+app.delete("/api/notifications/:userId", requireAuth, async (req, res, next) => {
+  try {
+    if (!assertSelf(req, res, req.params.userId)) return;
+    const { db } = await connectMongo();
+    const uid = toObjectId(req.params.userId, "userId");
+    await db.collection("notifications").deleteMany({ userId: uid });
+    res.json({ ok: true });
   } catch (e) {
     next(e);
   }

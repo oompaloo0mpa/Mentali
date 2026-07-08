@@ -45,6 +45,7 @@ import {
   verifyResetCode,
   fetchUserProfile,
 } from '@/services/api';
+import { completeCheckInQuests } from '@/services/dailyQuestProgress';
 import { mapDailyCheckInDocs } from '@/services/wellbeingHistory';
 import {
   addHistoryRecord,
@@ -96,9 +97,18 @@ export default function App() {
 }
 
 function AppRoot() {
-  const { applyAuthUser, clearProfile, completeOnboarding, profile, saveDisplayName, setAnonymousMode } =
-    useUserProfile();
+  const {
+    applyAuthUser,
+    clearProfile,
+    completeOnboarding,
+    profile,
+    hydrated,
+    saveDisplayName,
+    setAnonymousMode,
+    refreshProfileStats,
+  } = useUserProfile();
   const [screenState, setScreenState] = useState<ScreenState>({ screen: 'welcome' });
+  const [authBootstrapped, setAuthBootstrapped] = useState(false);
   const [loginMode, setLoginMode] = useState<'phone' | 'email'>('email');
   const [recoveryMode, setRecoveryMode] = useState<'phone' | 'email'>('email');
   const [recoveryValue, setRecoveryValue] = useState('');
@@ -154,6 +164,61 @@ function AppRoot() {
     }
   }, []);
 
+  const needsOnboarding = (user: { onboardingCompleted?: boolean } | null | undefined, isNewUser = false) =>
+    isNewUser || user?.onboardingCompleted === false;
+
+  useEffect(() => {
+    if (!hydrated || authBootstrapped) return;
+
+    let active = true;
+    (async () => {
+      try {
+        const token = await loadAuthToken();
+        const userId = profile.userId;
+        if (!token || !userId) return;
+
+        const user = await fetchUserProfile(userId);
+        if (!active || !user) return;
+
+        await applyAuthUser(user, token);
+        setCurrentUserId(userId);
+        syncUserFromServer(userId).catch(() => {});
+        syncWellbeingHistory(userId).catch(() => {});
+
+        if (needsOnboarding(user)) {
+          setScreenState({ screen: 'onboarding-1' });
+        } else {
+          setScreenState({ screen: 'home', selectedNav: homeNav });
+        }
+      } catch {
+        await clearProfile().catch(() => {});
+        setCurrentUserId(null);
+        setScreenState({ screen: 'welcome' });
+      } finally {
+        if (active) setAuthBootstrapped(true);
+      }
+    })();
+
+    return () => {
+      active = false;
+    };
+  }, [
+    hydrated,
+    authBootstrapped,
+    profile.userId,
+    applyAuthUser,
+    clearProfile,
+    homeNav,
+    syncUserFromServer,
+    syncWellbeingHistory,
+  ]);
+
+  useEffect(() => {
+    if (hydrated && !profile.userId) {
+      setAuthBootstrapped(true);
+    }
+  }, [hydrated, profile.userId]);
+
   useEffect(() => {
     if (!currentUserId) return;
     syncWellbeingHistory(currentUserId).catch(() => {});
@@ -176,11 +241,13 @@ function AppRoot() {
     phq4: WellbeingResult,
     k10: WellbeingResult | null,
   ) => {
-    if (!currentUserId) return null;
+    if (!currentUserId && !profile.userId) return null;
+    const userId = currentUserId ?? profile.userId;
+    if (!userId) return null;
     const checkInDate = new Date().toISOString().slice(0, 10);
 
     return saveDailyCheckIn({
-      userId: currentUserId,
+      userId,
       moodId: selectedMood.id,
       moodEmoji: selectedMood.emoji,
       moodScore: selectedMood.value,
@@ -232,6 +299,12 @@ function AppRoot() {
           };
           setStreak(serverStreak);
           saveStreak(serverStreak).catch(() => {});
+        }
+        const userId = currentUserId ?? profile.userId;
+        if (userId) {
+          completeCheckInQuests(userId)
+            .then(() => refreshProfileStats())
+            .catch(() => {});
         }
       })
       .catch(() => {
@@ -296,9 +369,6 @@ function AppRoot() {
   const handleAuthSuccess = () => {
     setScreenState({ screen: 'home', selectedNav: homeNav });
   };
-
-  const needsOnboarding = (user: { onboardingCompleted?: boolean } | null | undefined, isNewUser = false) =>
-    isNewUser || user?.onboardingCompleted === false;
 
   const handleOnboardingComplete = async () => {
     try {
@@ -440,6 +510,10 @@ function AppRoot() {
     }),
     [handleLogout, homeNav],
   );
+
+  if (!authBootstrapped) {
+    return null;
+  }
 
   return (
     <SettingsOverlayProvider actions={settingsActions}>

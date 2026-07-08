@@ -7,8 +7,12 @@ import {
   acceptFriendRequest,
   blockFriendship,
   bootstrapFriendsIfEmpty,
+  clearNotifications as clearNotificationsApi,
   fetchChatMessages,
   fetchFriendsView,
+  fetchNotifications,
+  markAllNotificationsRead as markAllNotificationsReadApi,
+  markNotificationRead as markNotificationReadApi,
   rejectFriendRequest,
   removeFriendship,
   requestFriendByCode,
@@ -16,17 +20,17 @@ import {
   type ChatMessageRow,
   type FriendListRow,
   type FriendRequestRow,
+  type NotificationRow,
 } from '@/services/api';
+import { completeSocialQuests } from '@/services/dailyQuestProgress';
 
 import {
-  CURRENT_USER,
   DAILY_QUESTS,
   findDirectoryUser,
   FRIENDS,
   INCOMING_REQUESTS,
   INITIAL_CHATS,
   MILESTONES,
-  NOTIFICATIONS,
   seedGreeting,
   type AppNotification,
   type ChatMessage,
@@ -36,8 +40,19 @@ import {
 } from '@/data/mockData';
 import { useUserProfile } from '@/storage/userProfileStore';
 
-const STORAGE_KEY = 'mentali.social.v6';
-const LEGACY_STORAGE_KEYS = ['mentali.social.v5', 'mentali.social.v4'];
+const STORAGE_KEY = 'mentali.social.v7';
+const LEGACY_STORAGE_KEYS = ['mentali.social.v6', 'mentali.social.v5', 'mentali.social.v4'];
+
+function mapNotificationRows(rows: NotificationRow[]): AppNotification[] {
+  return rows.map((row) => ({
+    id: row.id,
+    icon: row.icon,
+    title: row.title,
+    time: row.time,
+    read: row.read,
+    recent: row.recent,
+  }));
+}
 
 /** Friends added within this many days show under the "New" filter. */
 export const NEW_FRIEND_DAYS = 7;
@@ -59,9 +74,6 @@ type SocialState = {
   notifications: AppNotification[];
   quests: Quest[];
   questDate: string;
-  gems: number;
-  diamonds: number;
-  fireStreak: number;
   /** Highest milestone already celebrated per friend, so a celebration only shows once. */
   celebrated: Record<string, number>;
 };
@@ -111,12 +123,9 @@ function initialState(): SocialState {
     friends,
     requests: normalizeIncomingRequests(friends, INCOMING_REQUESTS),
     chats: Object.fromEntries(Object.entries(INITIAL_CHATS).map(([id, msgs]) => [id, msgs.map((m) => ({ ...m }))])),
-    notifications: NOTIFICATIONS.map((n) => ({ ...n })),
+    notifications: [],
     quests: freshQuests(),
     questDate: todayKey(),
-    gems: CURRENT_USER.gems,
-    diamonds: CURRENT_USER.diamonds,
-    fireStreak: CURRENT_USER.fireStreak,
     celebrated: {},
   };
 }
@@ -168,7 +177,7 @@ function hydrateSocialState(parsed: Partial<SocialState>): SocialState {
     quests: questDateStale ? freshQuests() : (parsed.quests ?? base.quests),
     questDate: questDateStale ? todayKey() : (parsed.questDate ?? base.questDate),
     chats: parsed.chats ?? base.chats,
-    notifications: parsed.notifications ?? base.notifications,
+    notifications: parsed.notifications ?? [],
   };
 }
 
@@ -348,9 +357,6 @@ type SocialContextValue = {
   requests: FriendRequest[];
   notifications: AppNotification[];
   quests: Quest[];
-  gems: number;
-  diamonds: number;
-  fireStreak: number;
   unreadNotifications: number;
   pendingMilestone: { friend: Friend; milestone: number } | null;
   chatFor: (friendId: string) => ChatMessage[];
@@ -378,7 +384,7 @@ type SocialContextValue = {
 const SocialContext = createContext<SocialContextValue | null>(null);
 
 export function SocialProvider({ children }: { children: React.ReactNode }) {
-  const { profile } = useUserProfile();
+  const { profile, refreshProfileStats } = useUserProfile();
   const [state, setState] = useState<SocialState>(initialState);
   const [hydrated, setHydrated] = useState(false);
 
@@ -431,6 +437,24 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
     };
   }, [hydrated, profile.userId]);
 
+  const refreshNotifications = useCallback(async () => {
+    if (!profile.userId) return;
+    try {
+      const rows = await fetchNotifications(profile.userId);
+      setState((prev) => ({ ...prev, notifications: mapNotificationRows(rows) }));
+    } catch {
+      // Keep existing notifications when offline.
+    }
+  }, [profile.userId]);
+
+  useEffect(() => {
+    if (!hydrated || !profile.userId) {
+      setState((prev) => ({ ...prev, notifications: [] }));
+      return;
+    }
+    void refreshNotifications();
+  }, [hydrated, profile.userId, profile.points, refreshNotifications]);
+
   // Poll every 30 s so new friend requests and accepted friendships appear on both sides
   // without requiring the user to restart the app.
   useEffect(() => {
@@ -472,26 +496,10 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
 
       if (profile.userId) {
         requestFriendByCode(profile.userId, normalized)
-          .then(async (result) => {
+          .then(async () => {
             const remote = await fetchFriendsView(profile.userId!);
             setState((prev) => mergeFriendsFromApi(prev, remote));
-
-            if (result?.user?.displayName) {
-              update((prev) => ({
-                ...prev,
-                notifications: [
-                  {
-                    id: uid('n'),
-                    icon: 'person-add',
-                    title: `Friend request sent to ${result.user.displayName}`,
-                    time: 'Just now',
-                    read: false,
-                    recent: true,
-                  },
-                  ...prev.notifications,
-                ],
-              }));
-            }
+            await refreshNotifications();
           })
           .catch(() => {});
         return { ok: true, message: 'Friend request sent.' };
@@ -542,7 +550,7 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
 
       return { ok: true, message: `Added ${addedName} as a friend.` };
     },
-    [profile.friendCode, profile.userId, update],
+    [profile.friendCode, profile.userId, refreshNotifications, update],
   );
 
   const acceptRequest = useCallback(
@@ -576,6 +584,7 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
           .then(async () => {
             const remote = await fetchFriendsView(profile.userId!);
             setState((prev) => mergeFriendsFromApi(prev, remote));
+            await refreshNotifications();
           })
           .catch(() => {});
         return;
@@ -602,7 +611,7 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
         };
       });
     },
-    [profile.userId, update],
+    [profile.userId, refreshNotifications, update],
   );
 
   const rejectRequest = useCallback(
@@ -648,22 +657,21 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
           };
         });
 
-        let gained = 0;
         next.quests = prev.quests.map((q) => {
           if (q.progress >= q.goal) return q;
-          // "Reach out to 2 friends" only counts the first message to a friend each day.
           if (q.id === 'q-reach-out' && alreadyMessagedToday) return q;
           const progress = Math.min(q.goal, q.progress + 1);
           const justFinished = progress >= q.goal && !q.rewarded;
-          if (justFinished) gained += q.rewardGems;
           return { ...q, progress, rewarded: q.rewarded || justFinished };
         });
-        if (gained > 0) next.gems = prev.gems + gained;
 
         return next;
       });
 
       if (me && friend?.userId && (message.sender ?? 'me') === 'me') {
+        completeSocialQuests(me)
+          .then(() => refreshProfileStats())
+          .catch(() => {});
         sendChatMessage(friendId, {
           senderUserId: me,
           text: message.text,
@@ -695,7 +703,7 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
           .catch(() => {});
       }
     },
-    [profile.userId, update],
+    [profile.userId, refreshProfileStats, update],
   );
 
   const refreshFriendsView = useCallback<SocialContextValue['refreshFriendsView']>(async () => {
@@ -803,20 +811,29 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
   );
 
   const markNotificationRead = useCallback(
-    (id: string) =>
+    (id: string) => {
       update((prev) => ({
         ...prev,
         notifications: prev.notifications.map((n) => (n.id === id ? { ...n, read: true } : n)),
-      })),
+      }));
+      markNotificationReadApi(id).catch(() => {});
+    },
     [update],
   );
 
-  const markAllNotificationsRead = useCallback(
-    () => update((prev) => ({ ...prev, notifications: prev.notifications.map((n) => ({ ...n, read: true })) })),
-    [update],
-  );
+  const markAllNotificationsRead = useCallback(() => {
+    update((prev) => ({ ...prev, notifications: prev.notifications.map((n) => ({ ...n, read: true })) }));
+    if (profile.userId) {
+      markAllNotificationsReadApi(profile.userId).catch(() => {});
+    }
+  }, [profile.userId, update]);
 
-  const clearNotifications = useCallback(() => update((prev) => ({ ...prev, notifications: [] })), [update]);
+  const clearNotifications = useCallback(() => {
+    update((prev) => ({ ...prev, notifications: [] }));
+    if (profile.userId) {
+      clearNotificationsApi(profile.userId).catch(() => {});
+    }
+  }, [profile.userId, update]);
 
   const pendingMilestone = useMemo(() => {
     for (const friend of state.friends) {
@@ -858,9 +875,6 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
       requests: state.requests,
       notifications: state.notifications,
       quests: state.quests,
-      gems: state.gems,
-      diamonds: state.diamonds,
-      fireStreak: state.fireStreak,
       unreadNotifications,
       pendingMilestone,
       chatFor,
