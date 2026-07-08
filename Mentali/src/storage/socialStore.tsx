@@ -8,12 +8,15 @@ import {
   blockFriendship,
   bootstrapFriendsIfEmpty,
   clearNotifications as clearNotificationsApi,
+  deleteChatMessage as deleteChatMessageApi,
+  editChatMessage as editChatMessageApi,
   fetchChatMessages,
   fetchFriendsView,
   fetchNotifications,
   isRemoteMediaUri,
   markAllNotificationsRead as markAllNotificationsReadApi,
   markNotificationRead as markNotificationReadApi,
+  pinChatMessage as pinChatMessageApi,
   rejectFriendRequest,
   removeFriendship,
   requestFriendByCode,
@@ -282,6 +285,17 @@ function fromApiChatMessage(row: ChatMessageRow, viewerUserId: string): ChatMess
     fileName: row.fileName,
     fileUri: row.fileUri,
     sender: row.senderUserId === viewerUserId ? 'me' : 'them',
+    createdAt: row.createdAt,
+    replyToId: row.replyToMessageId ?? undefined,
+    replyToText: row.replyToText ?? undefined,
+    replyToSender: row.replyToSenderUserId
+      ? row.replyToSenderUserId === viewerUserId
+        ? 'me'
+        : 'them'
+      : undefined,
+    pinned: !!row.pinned,
+    editedAt: row.editedAt ?? null,
+    deletedAt: row.deletedAt ?? null,
   };
 }
 
@@ -374,6 +388,9 @@ type SocialContextValue = {
     friendId: string,
     message: Omit<ChatMessage, 'id' | 'sender'> & { sender?: 'me' | 'them' },
   ) => Promise<void> | void;
+  editMessage: (friendId: string, messageId: string, text: string) => Promise<void>;
+  deleteMessage: (friendId: string, messageId: string) => Promise<void>;
+  pinMessage: (friendId: string, messageId: string, pinned: boolean) => Promise<void>;
   refreshChat: (friendId: string) => Promise<void>;
   markChatRead: (friendId: string) => void;
   togglePin: (friendId: string) => void;
@@ -638,8 +655,17 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
       const friend = stateRef.current.friends.find((f) => f.id === friendId);
       update((prev) => {
         const sender = message.sender ?? 'me';
-        const msg: ChatMessage = { ...message, id: uid('m'), sender };
         const thread = prev.chats[friendId] ?? seedGreeting();
+        const reply = message.replyToId ? thread.find((m) => m.id === message.replyToId) : null;
+        const msg: ChatMessage = {
+          ...message,
+          id: uid('m'),
+          sender,
+          createdAt: new Date().toISOString(),
+          pinned: false,
+          replyToText: reply?.text || reply?.fileName || undefined,
+          replyToSender: reply?.sender,
+        };
         const next: SocialState = {
           ...prev,
           chats: { ...prev.chats, [friendId]: [...thread, msg] },
@@ -700,6 +726,7 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
             imageUri,
             fileName,
             fileUri,
+            replyToMessageId: message.replyToId,
           });
           const [rows, remote] = await Promise.all([
             fetchChatMessages(friendId, me),
@@ -724,6 +751,65 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
       }
     },
     [profile.userId, refreshProfileStats, update],
+  );
+
+  const editMessage = useCallback<SocialContextValue['editMessage']>(
+    async (friendId, messageId, text) => {
+      const me = profile.userId;
+      if (!me) return;
+      const trimmed = text.trim();
+      if (!trimmed) throw new Error('Message cannot be empty');
+      setState((prev) => ({
+        ...prev,
+        chats: {
+          ...prev.chats,
+          [friendId]: (prev.chats[friendId] ?? []).map((m) =>
+            m.id === messageId ? { ...m, text: trimmed, editedAt: new Date().toISOString() } : m,
+          ),
+        },
+      }));
+      await editChatMessageApi(friendId, messageId, { senderUserId: me, text: trimmed });
+      await refreshChat(friendId);
+    },
+    [profile.userId, refreshChat],
+  );
+
+  const deleteMessage = useCallback<SocialContextValue['deleteMessage']>(
+    async (friendId, messageId) => {
+      const me = profile.userId;
+      if (!me) return;
+      setState((prev) => ({
+        ...prev,
+        chats: {
+          ...prev.chats,
+          [friendId]: (prev.chats[friendId] ?? []).map((m) =>
+            m.id === messageId
+              ? { ...m, text: '', imageUri: undefined, fileName: undefined, fileUri: undefined, deletedAt: new Date().toISOString() }
+              : m,
+          ),
+        },
+      }));
+      await deleteChatMessageApi(friendId, messageId, { senderUserId: me });
+      await refreshChat(friendId);
+    },
+    [profile.userId, refreshChat],
+  );
+
+  const pinMessage = useCallback<SocialContextValue['pinMessage']>(
+    async (friendId, messageId, pinned) => {
+      const me = profile.userId;
+      if (!me) return;
+      setState((prev) => ({
+        ...prev,
+        chats: {
+          ...prev.chats,
+          [friendId]: (prev.chats[friendId] ?? []).map((m) => (m.id === messageId ? { ...m, pinned } : m)),
+        },
+      }));
+      await pinChatMessageApi(friendId, messageId, { senderUserId: me, pinned });
+      await refreshChat(friendId);
+    },
+    [profile.userId, refreshChat],
   );
 
   const refreshFriendsView = useCallback<SocialContextValue['refreshFriendsView']>(async () => {
@@ -904,6 +990,9 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
       rejectRequest,
       refreshFriendsView,
       sendMessage,
+      editMessage,
+      deleteMessage,
+      pinMessage,
       refreshChat,
       markChatRead,
       togglePin,
@@ -929,6 +1018,9 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
       rejectRequest,
       refreshFriendsView,
       sendMessage,
+      editMessage,
+      deleteMessage,
+      pinMessage,
       refreshChat,
       markChatRead,
       togglePin,

@@ -11,7 +11,11 @@ type CheckInBubbleProps = {
   helper?: string;
 };
 
-type Props = { message: ChatMessage } | CheckInBubbleProps;
+type SocialProps = {
+  message: ChatMessage;
+  onLongPress?: (message: ChatMessage) => void;
+};
+type Props = SocialProps | CheckInBubbleProps;
 
 export function ChatBubble(props: Props) {
   const isSocialMessage = 'message' in props;
@@ -21,26 +25,53 @@ export function ChatBubble(props: Props) {
   const fileUri = isSocialMessage ? resolveMediaUrl(props.message.fileUri) : undefined;
   const hasImage = !!rawImageUri;
   const hasFile = isSocialMessage ? !!props.message.fileName : false;
-  const text = isSocialMessage ? props.message.text : props.text;
+  const text = isSocialMessage && !props.message.deletedAt ? props.message.text : props.text;
   const helper = isSocialMessage ? undefined : props.helper;
+  const isDeleted = isSocialMessage ? !!props.message.deletedAt : false;
+  const replyLabel = isSocialMessage
+    ? props.message.replyToSender === 'me'
+      ? 'Replying to you'
+      : props.message.replyToSender === 'them'
+        ? 'Replying to friend'
+        : null
+    : null;
 
   const openFile = () => {
     if (!fileUri) return;
     void Linking.openURL(fileUri).catch(() => {});
   };
 
-  return (
+  const bubble = (
     <View style={[styles.row, isMe ? styles.rowMe : styles.rowThem]}>
-      <View
+      <Pressable
+        onLongPress={isSocialMessage ? () => props.onLongPress?.(props.message) : undefined}
+        delayLongPress={280}
         style={[
           styles.bubble,
           isMe ? styles.bubbleMe : styles.bubbleThem,
-          hasImage && styles.bubbleImage,
+          hasImage && !isDeleted && styles.bubbleImage,
         ]}>
-        {hasImage && imageUri ? (
+        {isSocialMessage && props.message.pinned ? (
+          <View style={styles.metaRow}>
+            <Ionicons name="pin" size={12} color={Brand.textOnBubble} />
+            <Text style={styles.metaText}>Pinned</Text>
+          </View>
+        ) : null}
+        {replyLabel && !!props.message.replyToText ? (
+          <View style={styles.replyBox}>
+            <Text style={styles.replyLabel}>{replyLabel}</Text>
+            <Text style={styles.replyText} numberOfLines={1}>
+              {props.message.replyToText}
+            </Text>
+          </View>
+        ) : null}
+        {isDeleted ? (
+          <Text style={styles.deletedText}>Message deleted</Text>
+        ) : null}
+        {!isDeleted && hasImage && imageUri ? (
           <Image source={{ uri: imageUri }} style={styles.image} resizeMode="cover" />
         ) : null}
-        {hasFile && (
+        {!isDeleted && hasFile && (
           <Pressable
             onPress={openFile}
             disabled={!fileUri}
@@ -54,13 +85,16 @@ export function ChatBubble(props: Props) {
             {fileUri ? <Ionicons name="open-outline" size={16} color={Brand.textOnBubble} /> : null}
           </Pressable>
         )}
-        {!!text && (
+        {!isDeleted && !!text && (
           <Text style={[styles.text, hasImage && styles.textWithImage]}>{text}</Text>
         )}
+        {isSocialMessage && props.message.editedAt && !isDeleted ? <Text style={styles.metaText}>Edited</Text> : null}
         {helper ? <Text style={styles.helper}>{helper}</Text> : null}
-      </View>
+      </Pressable>
     </View>
   );
+
+  return bubble;
 }
 
 const styles = StyleSheet.create({
@@ -88,5 +122,11 @@ const styles = StyleSheet.create({
   fileName: { flex: 1, color: Brand.textOnBubble, fontSize: 14, fontWeight: '600' },
   text: { color: Brand.textOnBubble, fontSize: 15, lineHeight: 20, fontWeight: '600' },
   textWithImage: { paddingHorizontal: 10, paddingTop: 6, paddingBottom: 2 },
+  deletedText: { color: Brand.textOnBubble, fontSize: 14, fontStyle: 'italic', opacity: 0.9 },
+  metaRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 4 },
+  metaText: { color: Brand.textOnBubble, fontSize: 11, opacity: 0.85, marginTop: 4 },
+  replyBox: { borderLeftWidth: 2, borderLeftColor: 'rgba(255,255,255,0.5)', paddingLeft: 8, marginBottom: 6 },
+  replyLabel: { color: Brand.textOnBubble, fontSize: 11, opacity: 0.9 },
+  replyText: { color: Brand.textOnBubble, fontSize: 12, opacity: 0.9 },
   helper: { color: Brand.textOnBubble, fontSize: 12, lineHeight: 17, opacity: 0.82, marginTop: 4 },
 });
