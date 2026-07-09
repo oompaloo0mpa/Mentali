@@ -4,7 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import { CURRENT_USER } from '@/data/mockData';
 import type { ColorThemeId } from '@/data/colorThemes';
 import { getDisplayNameChangeAvailability } from '@/logic/displayName';
-import { completeMoodQuests } from '@/services/dailyQuestProgress';
+import { completeMoodQuests, completeThemeChangeQuests } from '@/services/dailyQuestProgress';
 import { fetchUserPreferences, fetchUserProfile, updateUserPreferences, updateUserProfile } from '@/services/api';
 import { clearAuthToken, saveAuthToken } from '@/storage/authStorage';
 
@@ -436,8 +436,11 @@ export function UserProfileProvider({ children }: { children: React.ReactNode })
     });
     if (userId) {
       updateUserPreferences(userId, { theme }).catch(() => {});
+      completeThemeChangeQuests(userId)
+        .then(() => refreshProfileStats())
+        .catch(() => {});
     }
-  }, []);
+  }, [refreshProfileStats]);
 
   const clearProfile = useCallback(async () => {
     setProfile(DEFAULT_PROFILE);

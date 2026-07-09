@@ -245,6 +245,7 @@ const collectionConfigs = [
           description: STR,
           rewardPoints: NUM,
           category: { enum: ["social", "checkin", "reflection"] },
+          trackKey: { bsonType: ["string", "null"] },
           active: BOOL,
           createdAt: DATE,
           updatedAt: DATE,
@@ -576,8 +577,10 @@ async function seedReferenceData(db) {
     );
   }
 
-  // Daily quest catalog
+  // Daily quest catalog — only trackable quests with a trackKey
+  const catalogTitles = [];
   for (const quest of DAILY_QUEST_CATALOG) {
+    catalogTitles.push(quest.title);
     await db.collection("quests").updateOne(
       { title: quest.title },
       {
@@ -591,6 +594,11 @@ async function seedReferenceData(db) {
       { upsert: true }
     );
   }
+
+  await db.collection("quests").updateMany(
+    { title: { $nin: catalogTitles } },
+    { $set: { active: false, trackKey: "legacy.inactive", updatedAt: now } }
+  );
 
   const shopSeeds = [
     {

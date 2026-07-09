@@ -38,6 +38,7 @@ import {
   clearNotifications as clearNotificationsApi,
   type NotificationRow,
 } from '@/services/api';
+import { completeNotificationReadQuests } from '@/services/dailyQuestProgress';
 import type { Friend } from '@/data/mockData';
 import type { MoodOption } from '@/logic/checkin';
 import { useUserProfile, type WardrobeSelection } from '@/storage/userProfileStore';
@@ -453,6 +454,9 @@ export default function HomePage({
     );
     if (profile.userId) {
       markNotificationReadApi(id).catch(() => {});
+      completeNotificationReadQuests(profile.userId)
+        .then(() => refreshDailyQuests())
+        .catch(() => {});
     }
   };
 
@@ -491,7 +495,14 @@ export default function HomePage({
               <View style={styles.actionGroup}>
                 <Pressable
                   accessibilityLabel={`Notifications, ${unreadCount} unread`}
-                  onPress={() => setNotificationsVisible(true)}
+                  onPress={() => {
+                    setNotificationsVisible(true);
+                    if (profile.userId) {
+                      completeNotificationReadQuests(profile.userId)
+                        .then(() => refreshDailyQuests())
+                        .catch(() => {});
+                    }
+                  }}
                   style={styles.notificationButton}
                 >
                   <Ionicons name="notifications-outline" size={20} color="#fff" />

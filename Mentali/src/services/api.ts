@@ -384,6 +384,7 @@ export type DailyQuestRow = {
   description: string;
   rewardPoints: number;
   category: "social" | "checkin" | "reflection";
+  trackKey?: string | null;
   completed: boolean;
   completedAt?: string | null;
 };

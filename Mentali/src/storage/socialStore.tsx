@@ -27,7 +27,7 @@ import {
   type FriendRequestRow,
   type NotificationRow,
 } from '@/services/api';
-import { completeSocialQuests } from '@/services/dailyQuestProgress';
+import { completeSocialFriendAcceptQuests, completeSocialFriendAddQuests, completeSocialMessageQuests } from '@/services/dailyQuestProgress';
 
 import {
   DAILY_QUESTS,
@@ -524,6 +524,9 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
             const remote = await fetchFriendsView(profile.userId!);
             setState((prev) => mergeFriendsFromApi(prev, remote));
             await refreshNotifications();
+            completeSocialFriendAddQuests(profile.userId!)
+              .then(() => refreshProfileStats())
+              .catch(() => {});
           })
           .catch(() => {});
         return { ok: true, message: 'Friend request sent.' };
@@ -609,6 +612,9 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
             const remote = await fetchFriendsView(profile.userId!);
             setState((prev) => mergeFriendsFromApi(prev, remote));
             await refreshNotifications();
+            completeSocialFriendAcceptQuests(profile.userId!)
+              .then(() => refreshProfileStats())
+              .catch(() => {});
           })
           .catch(() => {});
         return;
@@ -702,7 +708,10 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
       });
 
       if (me && friend?.userId && (message.sender ?? 'me') === 'me') {
-        completeSocialQuests(me)
+        completeSocialMessageQuests(me, {
+          reply: !!message.replyToId,
+          streakAtRisk: friend ? isMessagingStreakAtRisk(friend) : false,
+        })
           .then(() => refreshProfileStats())
           .catch(() => {});
         return (async () => {

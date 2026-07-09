@@ -47,7 +47,7 @@ import {
   verifyResetCode,
   fetchUserProfile,
 } from '@/services/api';
-import { completeCheckInQuests } from '@/services/dailyQuestProgress';
+import { completeCheckInStreakQuests, completeCheckInSummaryQuests, completeDailyQuestsByTrackKey, completeReflectionCheckInAnswerQuests, completeReflectionCheckInChatQuests, completeWardrobeVisitQuests } from '@/services/dailyQuestProgress';
 import { mapDailyCheckInDocs } from '@/services/wellbeingHistory';
 import {
   addHistoryRecord,
@@ -237,6 +237,24 @@ function AppRoot() {
     return () => clearInterval(timer);
   }, [currentUserId, syncUserFromServer]);
 
+  useEffect(() => {
+    if (screenState.screen !== 'summary') return;
+    const userId = currentUserId ?? profile.userId;
+    if (!userId) return;
+    completeCheckInSummaryQuests(userId)
+      .then(() => refreshProfileStats())
+      .catch(() => {});
+  }, [screenState.screen, currentUserId, profile.userId, refreshProfileStats]);
+
+  useEffect(() => {
+    if (screenState.screen !== 'wardrobe') return;
+    const userId = currentUserId ?? profile.userId;
+    if (!userId) return;
+    completeWardrobeVisitQuests(userId)
+      .then(() => refreshProfileStats())
+      .catch(() => {});
+  }, [screenState.screen, currentUserId, profile.userId, refreshProfileStats]);
+
   const activeCheckInPlan = useMemo(() => {
     if (screenState.screen !== 'check-in') return null;
     const mood = screenState.mood ?? MOOD_OPTIONS[2];
@@ -314,7 +332,11 @@ function AppRoot() {
         }
         const userId = currentUserId ?? profile.userId;
         if (userId) {
-          completeCheckInQuests(userId)
+          const questKeys: string[] = ['checkin.complete'];
+          if (answers.some((a) => !a.skipped)) {
+            questKeys.push('reflection.checkin_answer');
+          }
+          completeDailyQuestsByTrackKey(userId, questKeys)
             .then(() => refreshProfileStats())
             .catch(() => {});
         }
@@ -357,6 +379,13 @@ function AppRoot() {
     newStreak.lastCheckInDate = today;
     setStreak(newStreak);
     saveStreak(newStreak).catch(() => {});
+
+    const userId = currentUserId ?? profile.userId;
+    if (userId && newStreak.current > 1) {
+      completeCheckInStreakQuests(userId)
+        .then(() => refreshProfileStats())
+        .catch(() => {});
+    }
 
     const updatedProfile = updateProfileAfterCheckIn(
       checkInProfile,
@@ -683,6 +712,13 @@ function AppRoot() {
             completeLabel="See my summary"
             onBack={() => setScreenState({ screen: 'home', selectedNav: homeNav })}
             onComplete={(answers, mood) => handleCheckInComplete(answers, mood)}
+            onUserMessage={() => {
+              const userId = currentUserId ?? profile.userId;
+              if (!userId) return;
+              completeReflectionCheckInChatQuests(userId)
+                .then(() => refreshProfileStats())
+                .catch(() => {});
+            }}
           />
         ) : screenState.screen === 'summary' ? (
           <SummaryScreen
