@@ -117,15 +117,15 @@ function QuestCard({ item }: { item: QuestItem }) {
   return (
     <View style={[styles.questCard, completed ? styles.questCardCompleted : styles.questCardPending]}>
       <View style={styles.questTextWrap}>
-        <Text numberOfLines={1} style={[styles.questTitle, completed && styles.questTitleCompleted]}>
+        <Text numberOfLines={1} style={styles.questTitle}>
           {item.title}
         </Text>
-        <Text numberOfLines={1} style={[styles.questSubtitle, completed && styles.questSubtitleCompleted]}>
+        <Text numberOfLines={1} style={styles.questSubtitle}>
           {item.subtitle}
         </Text>
       </View>
       <View style={styles.pointsPill}>
-        <Text style={[styles.pointsText, completed && styles.pointsTextCompleted]}>{rewardText}</Text>
+        <Text style={styles.pointsText}>{rewardText}</Text>
         <Image source={diamondIcon} resizeMode="contain" style={styles.pointsIcon} />
       </View>
     </View>
@@ -1306,11 +1306,11 @@ const styles = StyleSheet.create({
   },
   questCardPending: {
     backgroundColor: '#FFFFFF',
-    borderColor: '#E8E8E8',
+    borderColor: '#F2D5F0',
   },
   questCardCompleted: {
-    backgroundColor: '#C86BFE',
-    borderColor: '#9B3FD9',
+    backgroundColor: '#F7C7F3',
+    borderColor: '#FF4DEA',
   },
   questTextWrap: {
     flex: 1,
@@ -1322,16 +1322,10 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     marginBottom: 1,
   },
-  questTitleCompleted: {
-    color: '#FFFFFF',
-  },
   questSubtitle: {
     color: '#6E6E6E',
     fontSize: 10,
     fontWeight: '700',
-  },
-  questSubtitleCompleted: {
-    color: 'rgba(255,255,255,0.88)',
   },
   pointsPill: {
     minWidth: 0,
@@ -1350,9 +1344,6 @@ const styles = StyleSheet.create({
     color: '#8F2A86',
     fontSize: 11,
     fontWeight: '800',
-  },
-  pointsTextCompleted: {
-    color: '#FFFFFF',
   },
   pointsIcon: {
     width: 15,
