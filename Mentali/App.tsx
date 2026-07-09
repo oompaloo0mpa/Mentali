@@ -770,7 +770,8 @@ function AppRoot() {
                 return;
               }
               if (navItem === 'trophy-outline') {
-                setScreenState({ screen: 'rewards' });
+                setHomeNav(navItem);
+                setScreenState({ screen: 'leaderboard' });
                 return;
               }
               setScreenState({ screen: 'home', selectedNav: navItem });
@@ -818,7 +819,8 @@ function AppRoot() {
                 return;
               }
               if (navItem === 'trophy-outline') {
-                setScreenState({ screen: 'rewards' });
+                setHomeNav(navItem);
+                setScreenState({ screen: 'leaderboard' });
                 return;
               }
               setScreenState({ screen: 'home', selectedNav: navItem });

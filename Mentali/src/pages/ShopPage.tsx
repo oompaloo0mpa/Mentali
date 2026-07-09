@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { useRouter } from 'expo-router';
 import {
   Dimensions,
   Image,
@@ -179,6 +180,7 @@ function FeaturedCard({
 }
 
 export default function ShopPage({ onNavigate }: Props) {
+  const router = useRouter();
   const { profile, refreshProfileStats } = useUserProfile();
   const [catalog, setCatalog] = useState<ShopCatalogRow[]>([]);
   const [ownedItemIds, setOwnedItemIds] = useState<string[]>([]);
@@ -289,6 +291,11 @@ export default function ShopPage({ onNavigate }: Props) {
       return;
     }
 
+    if (navItem === 'trophy-outline' && !onNavigate) {
+      router.replace('/LeaderboardPage');
+      return;
+    }
+
     onNavigate?.(navItem);
   };
 
@@ -348,7 +355,7 @@ export default function ShopPage({ onNavigate }: Props) {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
       <View style={styles.screen}>
         {screenMode === 'shop' ? (
           <>
@@ -583,7 +590,7 @@ export default function ShopPage({ onNavigate }: Props) {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#6b6b6b',
+    backgroundColor: '#2d2d2d',
   },
   screen: {
     flex: 1,
