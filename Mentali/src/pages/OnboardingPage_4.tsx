@@ -80,7 +80,7 @@ export default function OnboardingPage_4({ onContinue, onBack }: OnboardingPage4
           </View>
 
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Choose your mentali's style</Text>
+            <Text style={styles.sectionTitle}>Choose your mentali&apos;s style</Text>
             <View style={styles.cardShadow}>
               <View style={styles.styleCard}>
                 <View style={styles.hanger}>
