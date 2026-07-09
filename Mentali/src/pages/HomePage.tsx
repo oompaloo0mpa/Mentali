@@ -38,6 +38,7 @@ import {
   clearNotifications as clearNotificationsApi,
   type NotificationRow,
 } from '@/services/api';
+import { completeNotificationReadQuests } from '@/services/dailyQuestProgress';
 import type { Friend } from '@/data/mockData';
 import type { MoodOption } from '@/logic/checkin';
 import { useUserProfile, type WardrobeSelection } from '@/storage/userProfileStore';
@@ -50,6 +51,8 @@ type HomePageProps = {
   userTier?: string;
   onOpenChat?: (friend: Friend, prefillMotivation?: boolean) => void;
   onOpenCheckIn?: (mood: MoodOption) => void;
+  onOpenLeaderboard?: () => void;
+  onOpenStatistics?: () => void;
   onOpenWardrobe?: () => void;
   onOpenShop?: () => void;
   onOpenRewards?: () => void;
@@ -76,6 +79,7 @@ type MoreMenuPanelProps = {
   onClose: () => void;
   onLogout?: () => void;
   onOpenSettings?: () => void;
+  onOpenStatistics?: () => void;
   topInset: number;
 };
 
@@ -111,9 +115,10 @@ function MoodButton({ mood, selected, onPress }: MoodButtonProps) {
 
 function QuestCard({ item }: { item: QuestItem }) {
   const rewardText = item.points.replace(/\s*pts$/i, '');
+  const completed = !!item.completed;
 
   return (
-    <View style={[styles.questCard, item.active ? styles.questCardActive : styles.questCardInactive]}>
+    <View style={[styles.questCard, completed ? styles.questCardCompleted : styles.questCardPending]}>
       <View style={styles.questTextWrap}>
         <Text numberOfLines={1} style={styles.questTitle}>
           {item.title}
@@ -290,7 +295,7 @@ function NotificationPanel({
   );
 }
 
-function MoreMenuPanel({ visible, onClose, onLogout, onOpenSettings, topInset }: MoreMenuPanelProps) {
+function MoreMenuPanel({ visible, onClose, onLogout, onOpenSettings, onOpenStatistics, topInset }: MoreMenuPanelProps) {
   const menuItems = [
     { icon: 'stats-chart-outline' as const, label: 'Statistics', key: 'statistics' as const },
     { icon: 'settings-outline' as const, label: 'Settings', key: 'settings' as const },
@@ -314,7 +319,9 @@ function MoreMenuPanel({ visible, onClose, onLogout, onOpenSettings, topInset }:
                   style={styles.moreMenuItem}
                   onPress={() => {
                     onClose();
-                    if (item.key === 'logout') {
+                    if (item.key === 'statistics') {
+                      onOpenStatistics?.();
+                    } else if (item.key === 'logout') {
                       onLogout?.();
                     } else if (item.key === 'settings') {
                       onOpenSettings?.();
@@ -343,12 +350,14 @@ export default function HomePage({
   userTier = 'Bronze',
   onOpenChat,
   onOpenCheckIn,
+  onOpenLeaderboard,
+  onOpenStatistics,
   onOpenWardrobe,
   onOpenShop,
   onOpenRewards,
 }: HomePageProps) {
   const { openSettings, requestLogout } = useSettingsOverlay();
-  const { profile, setCurrentMood } = useUserProfile();
+  const { profile, setCurrentMood, questRevision, syncAfterQuestRewards } = useUserProfile();
   const [selectedNav, setSelectedNav] = useState(initialSelectedNav);
   const [notificationsVisible, setNotificationsVisible] = useState(false);
   const [moreMenuVisible, setMoreMenuVisible] = useState(false);
@@ -398,7 +407,7 @@ export default function HomePage({
     return () => {
       active = false;
     };
-  }, [profile.userId, profile.points]);
+  }, [profile.userId, profile.points, questRevision]);
 
   useEffect(() => {
     if (!profile.userId) {
@@ -453,6 +462,9 @@ export default function HomePage({
     );
     if (profile.userId) {
       markNotificationReadApi(id).catch(() => {});
+      completeNotificationReadQuests(profile.userId)
+        .then((awarded) => syncAfterQuestRewards(awarded))
+        .catch(() => {});
     }
   };
 
@@ -491,7 +503,14 @@ export default function HomePage({
               <View style={styles.actionGroup}>
                 <Pressable
                   accessibilityLabel={`Notifications, ${unreadCount} unread`}
-                  onPress={() => setNotificationsVisible(true)}
+                  onPress={() => {
+                    setNotificationsVisible(true);
+                    if (profile.userId) {
+                      completeNotificationReadQuests(profile.userId)
+                        .then((awarded) => syncAfterQuestRewards(awarded))
+                        .catch(() => {});
+                    }
+                  }}
                   style={styles.notificationButton}
                 >
                   <Ionicons name="notifications-outline" size={20} color="#fff" />
@@ -528,6 +547,7 @@ export default function HomePage({
               onClose={() => setMoreMenuVisible(false)}
               onLogout={requestLogout}
               onOpenSettings={openSettings}
+              onOpenStatistics={onOpenStatistics}
               topInset={insets.top}
             />
 
@@ -680,7 +700,9 @@ export default function HomePage({
       <BottomNav
         activeIcon={selectedNav}
         onSelect={(icon) => {
-          if (icon === 'shirt-outline') {
+          if (icon === 'trophy-outline') {
+            onOpenLeaderboard?.();
+          } else if (icon === 'shirt-outline') {
             onOpenWardrobe?.();
           } else if (icon === 'bag-outline') {
             onOpenShop?.();
@@ -1281,9 +1303,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     borderWidth: 2,
-    borderColor: '#FF4DEA',
     borderRadius: 12,
-    backgroundColor: '#F7C7F3',
     paddingHorizontal: 12,
     paddingVertical: 8,
     marginBottom: 6,
@@ -1294,12 +1314,13 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 1 },
     elevation: 1,
   },
-  questCardInactive: {
-    backgroundColor: '#fff',
+  questCardPending: {
+    backgroundColor: '#FFFFFF',
     borderColor: '#F2D5F0',
   },
-  questCardActive: {
+  questCardCompleted: {
     backgroundColor: '#F7C7F3',
+    borderColor: '#FF4DEA',
   },
   questTextWrap: {
     flex: 1,

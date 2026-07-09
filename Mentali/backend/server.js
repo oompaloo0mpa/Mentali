@@ -1353,6 +1353,7 @@ async function dailyQuestsWithDetails(db, uid, replaceExisting = false) {
       description: quest ?.description ?? "",
       rewardPoints: Number(quest ?.rewardPoints ?? 0),
       category: quest ?.category ?? "checkin",
+      trackKey: quest ?.trackKey ?? null,
       completed: !!row.completed,
       completedAt: row.completedAt ?? null,
     };

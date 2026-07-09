@@ -15,9 +15,12 @@ import OnboardingPage_4 from '@/pages/OnboardingPage_4';
 import OnboardingPage_5 from '@/pages/OnboardingPage_5';
 import NonAnonymousWarningPage from '@/pages/NonAnonymousWarningPage';
 import HomePage from '@/pages/HomePage';
+import LeaderboardPage from '@/pages/LeaderboardPage';
+import RankGuide from '@/pages/RankGuide';
 import WardrobePage from '@/pages/WardrobePage';
 import ShopPage from '@/pages/ShopPage';
 import StatisticPage from '@/pages/StatisticPage';
+import ChooseEmoji from '@/pages/ChooseEmoji';
 import { SocialProvider } from '@/storage/socialStore';
 import { SettingsOverlayProvider } from '@/storage/settingsOverlayStore';
 import { UserProfileProvider, useUserProfile } from '@/storage/userProfileStore';
@@ -47,7 +50,7 @@ import {
   verifyResetCode,
   fetchUserProfile,
 } from '@/services/api';
-import { completeCheckInQuests } from '@/services/dailyQuestProgress';
+import { completeCheckInStreakQuests, completeCheckInSummaryQuests, completeDailyQuestsByTrackKey, completeReflectionCheckInAnswerQuests, completeReflectionCheckInChatQuests, completeWardrobeVisitQuests } from '@/services/dailyQuestProgress';
 import { mapDailyCheckInDocs } from '@/services/wellbeingHistory';
 import {
   addHistoryRecord,
@@ -125,6 +128,8 @@ type ScreenState =
   | { screen: 'onboarding-4' }
   | { screen: 'onboarding-5' }
   | { screen: 'home'; selectedNav?: string }
+  | { screen: 'leaderboard' }
+  | { screen: 'rank-guide' }
   | { screen: 'chat'; friendId: string; prefill?: boolean; returnToNav: string }
   | { screen: 'streak-guide'; friendId: string; prefill?: boolean; returnToNav: string }
   | {
@@ -140,6 +145,7 @@ type ScreenState =
     }
   | { screen: 'shop' }
   | { screen: 'rewards' }
+  | { screen: 'choose-emoji'; dateKey: string }
   | { screen: 'wardrobe'; returnToNav: string };
 
 export default function App() {
@@ -163,7 +169,7 @@ function AppRoot() {
     hydrated,
     saveDisplayName,
     setAnonymousMode,
-    refreshProfileStats,
+    syncAfterQuestRewards,
   } = useUserProfile();
   const [screenState, setScreenState] = useState<ScreenState>({ screen: 'welcome' });
   const [authBootstrapped, setAuthBootstrapped] = useState(false);
@@ -291,6 +297,24 @@ function AppRoot() {
     return () => clearInterval(timer);
   }, [currentUserId, syncUserFromServer]);
 
+  useEffect(() => {
+    if (screenState.screen !== 'summary') return;
+    const userId = currentUserId ?? profile.userId;
+    if (!userId) return;
+    completeCheckInSummaryQuests(userId)
+      .then((awarded) => syncAfterQuestRewards(awarded))
+      .catch(() => {});
+  }, [screenState.screen, currentUserId, profile.userId, syncAfterQuestRewards]);
+
+  useEffect(() => {
+    if (screenState.screen !== 'wardrobe') return;
+    const userId = currentUserId ?? profile.userId;
+    if (!userId) return;
+    completeWardrobeVisitQuests(userId)
+      .then((awarded) => syncAfterQuestRewards(awarded))
+      .catch(() => {});
+  }, [screenState.screen, currentUserId, profile.userId, syncAfterQuestRewards]);
+
   const activeCheckInPlan = useMemo(() => {
     if (screenState.screen !== 'check-in') return null;
     const mood = screenState.mood ?? MOOD_OPTIONS[2];
@@ -368,8 +392,12 @@ function AppRoot() {
         }
         const userId = currentUserId ?? profile.userId;
         if (userId) {
-          completeCheckInQuests(userId)
-            .then(() => refreshProfileStats())
+          const questKeys: string[] = ['checkin.complete'];
+          if (answers.some((a) => !a.skipped)) {
+            questKeys.push('reflection.checkin_answer');
+          }
+          completeDailyQuestsByTrackKey(userId, questKeys)
+            .then((awarded) => syncAfterQuestRewards(awarded))
             .catch(() => {});
         }
       })
@@ -411,6 +439,13 @@ function AppRoot() {
     newStreak.lastCheckInDate = today;
     setStreak(newStreak);
     saveStreak(newStreak).catch(() => {});
+
+    const userId = currentUserId ?? profile.userId;
+    if (userId && newStreak.current > 1) {
+      completeCheckInStreakQuests(userId)
+        .then((awarded) => syncAfterQuestRewards(awarded))
+        .catch(() => {});
+    }
 
     const updatedProfile = updateProfileAfterCheckIn(
       checkInProfile,
@@ -717,6 +752,11 @@ function AppRoot() {
             userTier={profile.currentTier}
             onOpenChat={(friend, prefill) => openChat(friend.id, prefill)}
             onOpenCheckIn={(mood) => setScreenState({ screen: 'check-in', mood })}
+            onOpenLeaderboard={() => {
+              setHomeNav('trophy-outline');
+              setScreenState({ screen: 'leaderboard' });
+            }}
+            onOpenStatistics={() => setScreenState({ screen: 'rewards' })}
             onOpenWardrobe={() => setScreenState({ screen: 'wardrobe', returnToNav: homeNav })}
             onOpenShop={() => setScreenState({ screen: 'shop' })}
             onOpenRewards={() => setScreenState({ screen: 'rewards' })}
@@ -737,7 +777,38 @@ function AppRoot() {
             }}
           />
         ) : screenState.screen === 'rewards' ? (
-          <StatisticPage />
+          <StatisticPage
+            onNavigate={(navItem) => {
+              if (navItem === 'home-outline') {
+                setScreenState({ screen: 'home', selectedNav: 'home-outline' });
+              }
+            }}
+            onOpenEmojiChooser={(dateKey) => setScreenState({ screen: 'choose-emoji', dateKey })}
+          />
+        ) : screenState.screen === 'choose-emoji' ? (
+          <ChooseEmoji
+            dateKey={screenState.dateKey}
+            onDone={() => setScreenState({ screen: 'rewards' })}
+            onClose={() => setScreenState({ screen: 'rewards' })}
+          />
+        ) : screenState.screen === 'leaderboard' ? (
+          <LeaderboardPage
+            onOpenRankGuide={() => setScreenState({ screen: 'rank-guide' })}
+            onNavigate={(navItem) => {
+              if (navItem === 'trophy-outline') {
+                return;
+              }
+              if (navItem === 'shirt-outline') {
+                setHomeNav(navItem);
+                setScreenState({ screen: 'wardrobe', returnToNav: navItem });
+                return;
+              }
+              setHomeNav(navItem);
+              setScreenState({ screen: 'home', selectedNav: navItem });
+            }}
+          />
+        ) : screenState.screen === 'rank-guide' ? (
+          <RankGuide onClose={() => setScreenState({ screen: 'leaderboard' })} />
         ) : screenState.screen === 'wardrobe' ? (
           <WardrobePage
             onNavigate={(navItem) => {
@@ -771,6 +842,13 @@ function AppRoot() {
             completeLabel="See my summary"
             onBack={() => setScreenState({ screen: 'home', selectedNav: homeNav })}
             onComplete={(answers, mood) => handleCheckInComplete(answers, mood)}
+            onUserMessage={() => {
+              const userId = currentUserId ?? profile.userId;
+              if (!userId) return;
+              completeReflectionCheckInChatQuests(userId)
+                .then((awarded) => syncAfterQuestRewards(awarded))
+                .catch(() => {});
+            }}
           />
         ) : screenState.screen === 'summary' ? (
           <SummaryScreen

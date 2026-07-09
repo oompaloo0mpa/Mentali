@@ -4,7 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import { CURRENT_USER } from '@/data/mockData';
 import type { ColorThemeId } from '@/data/colorThemes';
 import { getDisplayNameChangeAvailability } from '@/logic/displayName';
-import { completeMoodQuests } from '@/services/dailyQuestProgress';
+import { completeMoodQuests, completeThemeChangeQuests } from '@/services/dailyQuestProgress';
 import { fetchUserPreferences, fetchUserProfile, updateUserPreferences, updateUserProfile } from '@/services/api';
 import { clearAuthToken, saveAuthToken } from '@/storage/authStorage';
 
@@ -96,6 +96,8 @@ type UserProfileContextValue = {
   setColorTheme: (theme: ColorThemeId) => void;
   completeOnboarding: (payload: { displayName?: string; anonymousMode: boolean }) => Promise<void>;
   refreshProfileStats: () => Promise<void>;
+  syncAfterQuestRewards: (awarded: number) => Promise<void>;
+  questRevision: number;
   applyAuthUser: (user: {
     _id?: string;
     id?: string;
@@ -169,6 +171,7 @@ function prefsToApi(key: PreferenceKey, value: boolean): Record<string, boolean>
 export function UserProfileProvider({ children }: { children: React.ReactNode }) {
   const [profile, setProfile] = useState<UserProfile>(DEFAULT_PROFILE);
   const [hydrated, setHydrated] = useState(false);
+  const [questRevision, setQuestRevision] = useState(0);
 
   useEffect(() => {
     let active = true;
@@ -378,6 +381,15 @@ export function UserProfileProvider({ children }: { children: React.ReactNode })
     }));
   }, []);
 
+  const syncAfterQuestRewards = useCallback(
+    async (awarded: number) => {
+      if (awarded <= 0) return;
+      await refreshProfileStats();
+      setQuestRevision((value) => value + 1);
+    },
+    [refreshProfileStats],
+  );
+
   const setCurrentMood = useCallback((mood: { id: string; emoji: string }) => {
     let userId: string | null = null;
     setProfile((prev) => {
@@ -390,10 +402,10 @@ export function UserProfileProvider({ children }: { children: React.ReactNode })
         currentMoodEmoji: mood.emoji,
       }).catch(() => {});
       completeMoodQuests(userId)
-        .then(() => refreshProfileStats())
+        .then((awarded) => syncAfterQuestRewards(awarded))
         .catch(() => {});
     }
-  }, [refreshProfileStats]);
+  }, [syncAfterQuestRewards]);
 
   const setWardrobeItem = useCallback((slot: WardrobeSlot, itemId: WardrobeSelection[WardrobeSlot]) => {
     setProfile((prev) => ({
@@ -437,8 +449,11 @@ export function UserProfileProvider({ children }: { children: React.ReactNode })
     });
     if (userId) {
       updateUserPreferences(userId, { theme }).catch(() => {});
+      completeThemeChangeQuests(userId)
+        .then((awarded) => syncAfterQuestRewards(awarded))
+        .catch(() => {});
     }
-  }, []);
+  }, [syncAfterQuestRewards]);
 
   const clearProfile = useCallback(async () => {
     setProfile(DEFAULT_PROFILE);
@@ -465,6 +480,8 @@ export function UserProfileProvider({ children }: { children: React.ReactNode })
       setColorTheme,
       completeOnboarding,
       refreshProfileStats,
+      syncAfterQuestRewards,
+      questRevision,
       applyAuthUser,
       clearProfile,
     }),
@@ -484,6 +501,8 @@ export function UserProfileProvider({ children }: { children: React.ReactNode })
       setColorTheme,
       completeOnboarding,
       refreshProfileStats,
+      syncAfterQuestRewards,
+      questRevision,
       applyAuthUser,
       clearProfile,
     ],

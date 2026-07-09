@@ -27,6 +27,7 @@ interface Props {
   completeLabel: string;
   onBack: () => void;
   onComplete: (answers: RecordedAnswer[], mood: MoodOption) => void;
+  onUserMessage?: (text: string) => void;
 }
 
 export function CheckInChatScreen({
@@ -37,6 +38,7 @@ export function CheckInChatScreen({
   completeLabel,
   onBack,
   onComplete,
+  onUserMessage,
 }: Props) {
   const chat = useCheckInChat(initialMood, questions, sessionPlan);
   const scrollRef = useRef<ScrollView>(null);
@@ -105,7 +107,10 @@ export function CheckInChatScreen({
         ) : null}
 
         <ChatInput
-          onSend={chat.sendMessage}
+          onSend={(text) => {
+            chat.sendMessage(text);
+            if (text.trim()) onUserMessage?.(text);
+          }}
           disabled={!canType}
           placeholder={
             canType
