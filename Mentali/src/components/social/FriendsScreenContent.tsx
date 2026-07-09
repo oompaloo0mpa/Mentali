@@ -67,7 +67,7 @@ export function FriendsScreenContent({
     clearNotifications,
     dismissMilestone,
   } = useSocial();
-  const { profile } = useUserProfile();
+  const { profile, syncAfterQuestRewards } = useUserProfile();
   const { openSettings, requestLogout } = useSettingsOverlay();
 
   const [search, setSearch] = useState('');
@@ -130,7 +130,9 @@ export function FriendsScreenContent({
 
   const openChat = (friend: Friend) => {
     if (profile.userId) {
-      completeSocialChatOpenQuests(profile.userId).catch(() => {});
+      completeSocialChatOpenQuests(profile.userId)
+        .then((awarded) => syncAfterQuestRewards(awarded))
+        .catch(() => {});
     }
     onOpenChat?.(friend);
   };

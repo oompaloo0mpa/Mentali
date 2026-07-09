@@ -112,19 +112,20 @@ function MoodButton({ mood, selected, onPress }: MoodButtonProps) {
 
 function QuestCard({ item }: { item: QuestItem }) {
   const rewardText = item.points.replace(/\s*pts$/i, '');
+  const completed = !!item.completed;
 
   return (
-    <View style={[styles.questCard, item.active ? styles.questCardActive : styles.questCardInactive]}>
+    <View style={[styles.questCard, completed ? styles.questCardCompleted : styles.questCardPending]}>
       <View style={styles.questTextWrap}>
-        <Text numberOfLines={1} style={styles.questTitle}>
+        <Text numberOfLines={1} style={[styles.questTitle, completed && styles.questTitleCompleted]}>
           {item.title}
         </Text>
-        <Text numberOfLines={1} style={styles.questSubtitle}>
+        <Text numberOfLines={1} style={[styles.questSubtitle, completed && styles.questSubtitleCompleted]}>
           {item.subtitle}
         </Text>
       </View>
       <View style={styles.pointsPill}>
-        <Text style={styles.pointsText}>{rewardText}</Text>
+        <Text style={[styles.pointsText, completed && styles.pointsTextCompleted]}>{rewardText}</Text>
         <Image source={diamondIcon} resizeMode="contain" style={styles.pointsIcon} />
       </View>
     </View>
@@ -349,7 +350,7 @@ export default function HomePage({
   onOpenRewards,
 }: HomePageProps) {
   const { openSettings, requestLogout } = useSettingsOverlay();
-  const { profile, setCurrentMood } = useUserProfile();
+  const { profile, setCurrentMood, questRevision, syncAfterQuestRewards } = useUserProfile();
   const [selectedNav, setSelectedNav] = useState(initialSelectedNav);
   const [notificationsVisible, setNotificationsVisible] = useState(false);
   const [moreMenuVisible, setMoreMenuVisible] = useState(false);
@@ -399,7 +400,7 @@ export default function HomePage({
     return () => {
       active = false;
     };
-  }, [profile.userId, profile.points]);
+  }, [profile.userId, profile.points, questRevision]);
 
   useEffect(() => {
     if (!profile.userId) {
@@ -455,7 +456,7 @@ export default function HomePage({
     if (profile.userId) {
       markNotificationReadApi(id).catch(() => {});
       completeNotificationReadQuests(profile.userId)
-        .then(() => refreshDailyQuests())
+        .then((awarded) => syncAfterQuestRewards(awarded))
         .catch(() => {});
     }
   };
@@ -499,7 +500,7 @@ export default function HomePage({
                     setNotificationsVisible(true);
                     if (profile.userId) {
                       completeNotificationReadQuests(profile.userId)
-                        .then(() => refreshDailyQuests())
+                        .then((awarded) => syncAfterQuestRewards(awarded))
                         .catch(() => {});
                     }
                   }}
@@ -1292,9 +1293,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     borderWidth: 2,
-    borderColor: '#FF4DEA',
     borderRadius: 12,
-    backgroundColor: '#F7C7F3',
     paddingHorizontal: 12,
     paddingVertical: 8,
     marginBottom: 6,
@@ -1305,12 +1304,13 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 1 },
     elevation: 1,
   },
-  questCardInactive: {
-    backgroundColor: '#fff',
-    borderColor: '#F2D5F0',
+  questCardPending: {
+    backgroundColor: '#FFFFFF',
+    borderColor: '#E8E8E8',
   },
-  questCardActive: {
-    backgroundColor: '#F7C7F3',
+  questCardCompleted: {
+    backgroundColor: '#C86BFE',
+    borderColor: '#9B3FD9',
   },
   questTextWrap: {
     flex: 1,
@@ -1322,10 +1322,16 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     marginBottom: 1,
   },
+  questTitleCompleted: {
+    color: '#FFFFFF',
+  },
   questSubtitle: {
     color: '#6E6E6E',
     fontSize: 10,
     fontWeight: '700',
+  },
+  questSubtitleCompleted: {
+    color: 'rgba(255,255,255,0.88)',
   },
   pointsPill: {
     minWidth: 0,
@@ -1344,6 +1350,9 @@ const styles = StyleSheet.create({
     color: '#8F2A86',
     fontSize: 11,
     fontWeight: '800',
+  },
+  pointsTextCompleted: {
+    color: '#FFFFFF',
   },
   pointsIcon: {
     width: 15,

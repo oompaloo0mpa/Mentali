@@ -408,7 +408,7 @@ type SocialContextValue = {
 const SocialContext = createContext<SocialContextValue | null>(null);
 
 export function SocialProvider({ children }: { children: React.ReactNode }) {
-  const { profile, refreshProfileStats } = useUserProfile();
+  const { profile, syncAfterQuestRewards } = useUserProfile();
   const [state, setState] = useState<SocialState>(initialState);
   const [hydrated, setHydrated] = useState(false);
 
@@ -525,7 +525,7 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
             setState((prev) => mergeFriendsFromApi(prev, remote));
             await refreshNotifications();
             completeSocialFriendAddQuests(profile.userId!)
-              .then(() => refreshProfileStats())
+              .then((awarded) => syncAfterQuestRewards(awarded))
               .catch(() => {});
           })
           .catch(() => {});
@@ -613,7 +613,7 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
             setState((prev) => mergeFriendsFromApi(prev, remote));
             await refreshNotifications();
             completeSocialFriendAcceptQuests(profile.userId!)
-              .then(() => refreshProfileStats())
+              .then((awarded) => syncAfterQuestRewards(awarded))
               .catch(() => {});
           })
           .catch(() => {});
@@ -712,7 +712,7 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
           reply: !!message.replyToId,
           streakAtRisk: friend ? isMessagingStreakAtRisk(friend) : false,
         })
-          .then(() => refreshProfileStats())
+          .then((awarded) => syncAfterQuestRewards(awarded))
           .catch(() => {});
         return (async () => {
           let imageUri = message.imageUri;
@@ -759,7 +759,7 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
         })();
       }
     },
-    [profile.userId, refreshProfileStats, update],
+    [profile.userId, syncAfterQuestRewards, update],
   );
 
   const editMessage = useCallback<SocialContextValue['editMessage']>(

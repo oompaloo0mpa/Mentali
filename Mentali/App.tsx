@@ -109,7 +109,7 @@ function AppRoot() {
     hydrated,
     saveDisplayName,
     setAnonymousMode,
-    refreshProfileStats,
+    syncAfterQuestRewards,
   } = useUserProfile();
   const [screenState, setScreenState] = useState<ScreenState>({ screen: 'welcome' });
   const [authBootstrapped, setAuthBootstrapped] = useState(false);
@@ -242,18 +242,18 @@ function AppRoot() {
     const userId = currentUserId ?? profile.userId;
     if (!userId) return;
     completeCheckInSummaryQuests(userId)
-      .then(() => refreshProfileStats())
+      .then((awarded) => syncAfterQuestRewards(awarded))
       .catch(() => {});
-  }, [screenState.screen, currentUserId, profile.userId, refreshProfileStats]);
+  }, [screenState.screen, currentUserId, profile.userId, syncAfterQuestRewards]);
 
   useEffect(() => {
     if (screenState.screen !== 'wardrobe') return;
     const userId = currentUserId ?? profile.userId;
     if (!userId) return;
     completeWardrobeVisitQuests(userId)
-      .then(() => refreshProfileStats())
+      .then((awarded) => syncAfterQuestRewards(awarded))
       .catch(() => {});
-  }, [screenState.screen, currentUserId, profile.userId, refreshProfileStats]);
+  }, [screenState.screen, currentUserId, profile.userId, syncAfterQuestRewards]);
 
   const activeCheckInPlan = useMemo(() => {
     if (screenState.screen !== 'check-in') return null;
@@ -337,7 +337,7 @@ function AppRoot() {
             questKeys.push('reflection.checkin_answer');
           }
           completeDailyQuestsByTrackKey(userId, questKeys)
-            .then(() => refreshProfileStats())
+            .then((awarded) => syncAfterQuestRewards(awarded))
             .catch(() => {});
         }
       })
@@ -383,7 +383,7 @@ function AppRoot() {
     const userId = currentUserId ?? profile.userId;
     if (userId && newStreak.current > 1) {
       completeCheckInStreakQuests(userId)
-        .then(() => refreshProfileStats())
+        .then((awarded) => syncAfterQuestRewards(awarded))
         .catch(() => {});
     }
 
@@ -716,7 +716,7 @@ function AppRoot() {
               const userId = currentUserId ?? profile.userId;
               if (!userId) return;
               completeReflectionCheckInChatQuests(userId)
-                .then(() => refreshProfileStats())
+                .then((awarded) => syncAfterQuestRewards(awarded))
                 .catch(() => {});
             }}
           />
