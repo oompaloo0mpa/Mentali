@@ -318,7 +318,6 @@ export function FriendChatScreenContent({ friendId, prefill, onBack, onOpenStrea
               <FlameIcon streak={friend.streak} size={20} />
               {renderHeaderStreak(friend.streak)}
             </Pressable>
-            </Pressable>
           )}
           {friend && <Image source={friendMoodImage(friend)} resizeMode="contain" style={styles.headerMoodImage} />}
         </View>
