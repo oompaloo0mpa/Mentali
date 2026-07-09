@@ -3,13 +3,13 @@ import {
   Image,
   ImageSourcePropType,
   Pressable,
-  SafeAreaView,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useRouter } from 'expo-router';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { DEFAULT_TODAY_MOOD_INDEX, getMoodForDate, useMoodForDate } from '../data/moodStore';
 import { moodSources } from '../data/moodAssets';
 import { getSingaporeTodayKey, getSingaporeTodayParts, isDateOnOrBeforeSingaporeToday, isMonthInFutureSingapore } from '../data/sgDate';
@@ -69,10 +69,16 @@ function buildCalendar(year: number, monthIndex: number): Array<MoodCell | null>
   return calendar;
 }
 
-export default function StatisticPage() {
+type StatisticPageProps = {
+  onNavigate?: (navItem: string) => void;
+  onOpenEmojiChooser?: (dateKey: string) => void;
+};
+
+export default function StatisticPage({ onNavigate, onOpenEmojiChooser }: StatisticPageProps) {
   const router = useRouter();
   const todayKey = getSingaporeTodayKey();
   const singaporeToday = getSingaporeTodayParts();
+  const minYear = 2024;
   const [year, setYear] = useState(Number(todayKey.slice(0, 4)));
   const [monthIndex, setMonthIndex] = useState(Number(todayKey.slice(5, 7)) - 1);
   const [monthDropdownOpen, setMonthDropdownOpen] = useState(false);
@@ -90,6 +96,11 @@ export default function StatisticPage() {
   const todayMoodIndex = useMoodForDate(todayKey) ?? DEFAULT_TODAY_MOOD_INDEX;
 
   const openChooser = (dateKey: string) => {
+    if (onOpenEmojiChooser) {
+      onOpenEmojiChooser(dateKey);
+      return;
+    }
+
     router.push({ pathname: '/ChooseEmoji', params: { date: dateKey } });
   };
 
@@ -108,15 +119,55 @@ export default function StatisticPage() {
     setYearDropdownOpen(false);
   };
 
+  const goToPreviousMonth = () => {
+    if (year === minYear && monthIndex === 0) {
+      return;
+    }
+
+    if (monthIndex === 0) {
+      setYear(year - 1);
+      setMonthIndex(11);
+      return;
+    }
+
+    setMonthIndex(monthIndex - 1);
+  };
+
+  const goToNextMonth = () => {
+    const nextMonth = monthIndex === 11 ? 0 : monthIndex + 1;
+    const nextYear = monthIndex === 11 ? year + 1 : year;
+
+    if (isMonthInFutureSingapore(nextYear, nextMonth)) {
+      return;
+    }
+
+    setYear(nextYear);
+    setMonthIndex(nextMonth);
+  };
+
+  const isAtMinimumMonth = year === minYear && monthIndex === 0;
+  const nextMonth = monthIndex === 11 ? 0 : monthIndex + 1;
+  const nextYear = monthIndex === 11 ? year + 1 : year;
+  const isAtFutureMonth = isMonthInFutureSingapore(nextYear, nextMonth);
+
+  const returnHome = () => {
+    if (onNavigate) {
+      onNavigate('home-outline');
+      return;
+    }
+
+    router.replace('/HomePage');
+  };
+
   return (
-    <SafeAreaView style={styles.screen}>
+    <SafeAreaView style={styles.screen} edges={['top', 'left', 'right']}>
       <StatusBar style="light" />
 
       <View style={styles.page}>
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Back"
-          onPress={() => {}}
+          onPress={returnHome}
           style={({ pressed }) => [styles.backButton, pressed && styles.backButtonPressed]}>
           <Text style={styles.backButtonText}>Back</Text>
         </Pressable>
@@ -190,7 +241,31 @@ export default function StatisticPage() {
 
         <View style={styles.calendarCard}>
           <View style={styles.calendarTopRow}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Previous month"
+              onPress={goToPreviousMonth}
+              style={({ pressed }) => [
+                styles.calendarNavButton,
+                isAtMinimumMonth && styles.calendarNavButtonDisabled,
+                pressed && styles.calendarNavButtonPressed,
+              ]}>
+              <Text style={styles.calendarNavText}>{'<'}</Text>
+            </Pressable>
+
             <Text style={styles.calendarMonthLabel}>{monthNames[monthIndex]}</Text>
+
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Next month"
+              onPress={goToNextMonth}
+              style={({ pressed }) => [
+                styles.calendarNavButton,
+                isAtFutureMonth && styles.calendarNavButtonDisabled,
+                pressed && styles.calendarNavButtonPressed,
+              ]}>
+              <Text style={styles.calendarNavText}>{'>'}</Text>
+            </Pressable>
           </View>
 
           <View style={styles.weekRow}>
@@ -207,17 +282,17 @@ export default function StatisticPage() {
                 return <View key={`blank-${index}`} style={styles.gridCell} />;
               }
 
-              const selectable = isDateOnOrBeforeSingaporeToday(year, monthIndex, cell.day);
+              const editable = cell.dateKey === todayKey;
               const content = (
                 <>
                   {typeof cell.moodIndex === 'number' ? (
                     <Image source={moodSources[cell.moodIndex]} style={styles.gridEmojiImage} resizeMode="contain" />
                   ) : null}
-                  <Text style={styles.gridDay}>{cell.day}</Text>
+                  {typeof cell.moodIndex !== 'number' ? <Text style={styles.gridDay}>{cell.day}</Text> : null}
                 </>
               );
 
-              if (!selectable) {
+              if (!editable) {
                 return (
                   <View key={cell.dateKey} style={[styles.gridCell, styles.gridCellDisabled]}>
                     {content}
@@ -257,6 +332,7 @@ export default function StatisticPage() {
           </View>
         </View>
       </View>
+
     </SafeAreaView>
   );
 }
@@ -404,10 +480,34 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginBottom: 8,
   },
+  calendarNavButton: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#f3d1d4',
+    borderWidth: 1.5,
+    borderColor: '#d0b0b0',
+  },
+  calendarNavButtonDisabled: {
+    opacity: 0.4,
+  },
+  calendarNavButtonPressed: {
+    opacity: 0.8,
+    transform: [{ scale: 0.96 }],
+  },
+  calendarNavText: {
+    color: '#a06f6c',
+    fontSize: 14,
+    fontWeight: '900',
+    lineHeight: 16,
+  },
   calendarMonthLabel: {
     color: '#a06f6c',
     fontSize: 16,
     fontWeight: '800',
+    marginHorizontal: 12,
   },
   weekRow: {
     flexDirection: 'row',

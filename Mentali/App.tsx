@@ -15,9 +15,12 @@ import OnboardingPage_4 from '@/pages/OnboardingPage_4';
 import OnboardingPage_5 from '@/pages/OnboardingPage_5';
 import NonAnonymousWarningPage from '@/pages/NonAnonymousWarningPage';
 import HomePage from '@/pages/HomePage';
+import LeaderboardPage from '@/pages/LeaderboardPage';
+import RankGuide from '@/pages/RankGuide';
 import WardrobePage from '@/pages/WardrobePage';
 import ShopPage from '@/pages/ShopPage';
 import StatisticPage from '@/pages/StatisticPage';
+import ChooseEmoji from '@/pages/ChooseEmoji';
 import { SocialProvider } from '@/storage/socialStore';
 import { SettingsOverlayProvider } from '@/storage/settingsOverlayStore';
 import { UserProfileProvider, useUserProfile } from '@/storage/userProfileStore';
@@ -71,6 +74,8 @@ type ScreenState =
   | { screen: 'onboarding-4' }
   | { screen: 'onboarding-5' }
   | { screen: 'home'; selectedNav?: string }
+  | { screen: 'leaderboard' }
+  | { screen: 'rank-guide' }
   | { screen: 'chat'; friendId: string; prefill?: boolean; returnToNav: string }
   | { screen: 'streak-guide'; friendId: string; prefill?: boolean; returnToNav: string }
   | {
@@ -86,6 +91,7 @@ type ScreenState =
     }
   | { screen: 'shop' }
   | { screen: 'rewards' }
+  | { screen: 'choose-emoji'; dateKey: string }
   | { screen: 'wardrobe'; returnToNav: string };
 
 export default function App() {
@@ -671,6 +677,11 @@ function AppRoot() {
             userTier={profile.currentTier}
             onOpenChat={(friend, prefill) => openChat(friend.id, prefill)}
             onOpenCheckIn={(mood) => setScreenState({ screen: 'check-in', mood })}
+            onOpenLeaderboard={() => {
+              setHomeNav('trophy-outline');
+              setScreenState({ screen: 'leaderboard' });
+            }}
+            onOpenStatistics={() => setScreenState({ screen: 'rewards' })}
             onOpenWardrobe={() => setScreenState({ screen: 'wardrobe', returnToNav: homeNav })}
             onOpenShop={() => setScreenState({ screen: 'shop' })}
             onOpenRewards={() => setScreenState({ screen: 'rewards' })}
@@ -678,7 +689,38 @@ function AppRoot() {
         ) : screenState.screen === 'shop' ? (
           <ShopPage />
         ) : screenState.screen === 'rewards' ? (
-          <StatisticPage />
+          <StatisticPage
+            onNavigate={(navItem) => {
+              if (navItem === 'home-outline') {
+                setScreenState({ screen: 'home', selectedNav: 'home-outline' });
+              }
+            }}
+            onOpenEmojiChooser={(dateKey) => setScreenState({ screen: 'choose-emoji', dateKey })}
+          />
+        ) : screenState.screen === 'choose-emoji' ? (
+          <ChooseEmoji
+            dateKey={screenState.dateKey}
+            onDone={() => setScreenState({ screen: 'rewards' })}
+            onClose={() => setScreenState({ screen: 'rewards' })}
+          />
+        ) : screenState.screen === 'leaderboard' ? (
+          <LeaderboardPage
+            onOpenRankGuide={() => setScreenState({ screen: 'rank-guide' })}
+            onNavigate={(navItem) => {
+              if (navItem === 'trophy-outline') {
+                return;
+              }
+              if (navItem === 'shirt-outline') {
+                setHomeNav(navItem);
+                setScreenState({ screen: 'wardrobe', returnToNav: navItem });
+                return;
+              }
+              setHomeNav(navItem);
+              setScreenState({ screen: 'home', selectedNav: navItem });
+            }}
+          />
+        ) : screenState.screen === 'rank-guide' ? (
+          <RankGuide onClose={() => setScreenState({ screen: 'leaderboard' })} />
         ) : screenState.screen === 'wardrobe' ? (
           <WardrobePage
             onNavigate={(navItem) => {
