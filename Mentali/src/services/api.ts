@@ -1,4 +1,3 @@
-import Constants from "expo-constants";
 import { Platform } from "react-native";
 import { EncodingType, readAsStringAsync } from "expo-file-system/legacy";
 
@@ -8,28 +7,18 @@ import { getAuthToken, loadAuthToken } from "@/storage/authStorage";
 function resolveApiBaseUrl(): string {
   const configured = (process.env.EXPO_PUBLIC_API_BASE_URL ?? "").trim();
 
-  if (configured && !configured.includes("localhost")) {
+  if (configured) {
+    if (Platform.OS === "android" && configured.includes("localhost")) {
+      return configured.replace("localhost", "10.0.2.2");
+    }
     return configured;
   }
 
-  const hostUri =
-    (Constants.expoConfig as { hostUri?: string } | null)?.hostUri ??
-    (
-      Constants as unknown as {
-        manifest2?: { extra?: { expoClient?: { hostUri?: string } } };
-      }
-    ).manifest2?.extra?.expoClient?.hostUri;
-
-  const host = hostUri?.split(":")[0];
-  if (host) {
-    return `http://${host}:4000/api`;
+  if (Platform.OS === "android") {
+    return "http://10.0.2.2:4000/api";
   }
 
-  if (Platform.OS === "android" && configured.includes("localhost")) {
-    return configured.replace("localhost", "10.0.2.2");
-  }
-
-  return configured || "http://localhost:4000/api";
+  return "http://localhost:4000/api";
 }
 
 const API_BASE_URL = resolveApiBaseUrl();
@@ -410,9 +399,48 @@ export async function fetchUserQuests(userId: string) {
   return result?.data ?? [];
 }
 
-export async function fetchShopItems() {
+export type ShopCatalogRow = {
+  _id: string;
+  clientKey?: string;
+  name: string;
+  description?: string;
+  itemType: 'single' | 'bundle';
+  category: 'cosmetic' | 'theme' | 'reward' | 'bundle';
+  price: number;
+  rarity: 'common' | 'rare' | 'epic' | 'limited';
+  imageUrl?: string;
+  cosmeticType?: 'top' | 'hat' | 'accessory' | 'shoes' | 'consumables' | 'theme' | null;
+  active: boolean;
+};
+
+export type ShopInventoryRow = {
+  _id: string;
+  userId: string;
+  itemId: string;
+  obtainedFrom: 'onboarding' | 'shop' | 'reward';
+  acquiredAt: string;
+};
+
+export async function fetchShopItems(): Promise<ShopCatalogRow[]> {
   const result = await apiRequest("/shop/items");
-  return result?.data ?? [];
+  return (result?.data ?? []) as ShopCatalogRow[];
+}
+
+export async function fetchShopInventory(userId: string): Promise<ShopInventoryRow[]> {
+  const result = await apiRequest(`/shop/inventory/${userId}`);
+  return (result?.data ?? []) as ShopInventoryRow[];
+}
+
+export async function purchaseShopItem(payload: {
+  userId: string;
+  itemId?: string;
+  clientKey?: string;
+  obtainedFrom?: 'onboarding' | 'shop' | 'reward';
+}): Promise<{ ok: boolean; alreadyOwned?: boolean; pointsSpent?: number }> {
+  return apiRequest('/shop/purchase', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
 }
 
 export async function lookupUserByFriendCode(code: string, viewerId?: string | null) {

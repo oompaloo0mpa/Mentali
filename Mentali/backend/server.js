@@ -2333,6 +2333,8 @@ app.get("/api/shop/items", async (_req, res, next) => {
     } = await connectMongo();
     const data = await db.collection("shopItems").find({
       active: true
+    }).sort({
+      createdAt: 1
     }).toArray();
     res.json({
       data
@@ -2350,18 +2352,28 @@ app.post("/api/shop/purchase", requireAuth, async (req, res, next) => {
     const {
       userId,
       itemId,
+      clientKey,
       obtainedFrom = "shop"
     } = req.body || {};
     if (!assertSelf(req, res, userId)) return;
     const uid = toObjectId(req.authUserId, "userId");
-    const iid = toObjectId(itemId, "itemId");
-    const item = await db.collection("shopItems").findOne({
-      _id: iid,
-      active: true
-    });
+    let item = null;
+    if (itemId) {
+      const iid = toObjectId(itemId, "itemId");
+      item = await db.collection("shopItems").findOne({
+        _id: iid,
+        active: true
+      });
+    } else if (clientKey) {
+      item = await db.collection("shopItems").findOne({
+        clientKey: String(clientKey),
+        active: true
+      });
+    }
     if (!item) return res.status(404).json({
       error: "Item not found"
     });
+    const iid = item._id;
 
     const user = await db.collection("users").findOne({
       _id: uid

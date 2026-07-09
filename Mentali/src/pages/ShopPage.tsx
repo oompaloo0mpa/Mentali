@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   Dimensions,
   Image,
@@ -6,13 +6,17 @@ import {
   NativeScrollEvent,
   NativeSyntheticEvent,
   Pressable,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { SafeAreaView } from 'react-native-safe-area-context';
+
+import { BottomNav } from '@/components/nav/BottomNav';
+import { WardrobeScreenContent } from '@/components/wardrobe/WardrobeScreenContent';
+import { fetchShopInventory, fetchShopItems, purchaseShopItem, type ShopCatalogRow } from '@/services/api';
+import { useUserProfile } from '@/storage/userProfileStore';
 
 type ShopItemId =
   | 'sonic-shoes'
@@ -24,8 +28,7 @@ type ShopItemId =
   | 'brainfreeze';
 
 type Category = 'Hair' | 'Hats' | 'Face' | 'Color' | 'Shoes';
-type ScreenMode = 'shop' | 'preview';
-type NavKey = 'home' | 'social' | 'leaderboard' | 'shop' | 'preview';
+type ScreenMode = 'shop' | 'wardrobe' | 'preview';
 
 type ShopItem = {
   id: ShopItemId;
@@ -33,6 +36,10 @@ type ShopItem = {
   price: number;
   category: Category;
   section: 'cosmetics' | 'items';
+  remoteId?: string | null;
+  description?: string;
+  available?: boolean;
+  owned?: boolean;
 };
 
 const windowWidth = Dimensions.get('window').width;
@@ -43,11 +50,6 @@ const shopImages = {
   featuredRibbon: require('../../assets/images/shop/Featured.png'),
   featuredBanner: require('../../assets/images/shop/LimitedSetGodzilla.png'),
   mascot: require('../../assets/images/shop/Mascot.png'),
-  nav: {
-    home: require('../../assets/images/shop/Home.png'),
-    social: require('../../assets/images/shop/Social.png'),
-    preview: require('../../assets/images/shop/Preview.png'),
-  },
   items: {
     brainfreeze: require('../../assets/images/shop/Brainfreeze.png'),
     'sonic-shoes': require('../../assets/images/shop/SonicShoes.png'),
@@ -57,6 +59,10 @@ const shopImages = {
     glasses: require('../../assets/images/shop/Glasses.png'),
     'royal-crown': require('../../assets/images/shop/RoyalCrown.png'),
   } as Partial<Record<ShopItemId, number>>,
+};
+
+type Props = {
+  onNavigate?: (navItem: string) => void;
 };
 
 const cosmetics: ShopItem[] = [
@@ -71,6 +77,7 @@ const cosmetics: ShopItem[] = [
 const items: ShopItem[] = [
   { id: 'brainfreeze', name: 'Brainfreeze', price: 200, category: 'Color', section: 'items' },
 ];
+const baseShopItems = [...cosmetics, ...items];
 
 const categories: Category[] = ['Hair', 'Hats', 'Face', 'Color', 'Shoes'];
 
@@ -112,49 +119,6 @@ function PriceTag({ value, large = false }: { value: number; large?: boolean }) 
   );
 }
 
-function NavIcon({ name, active }: { name: NavKey; active: boolean }) {
-  const color = active ? '#141018' : '#1e1523';
-
-  if (name === 'home') {
-    return (
-      <Image source={shopImages.nav.home} style={styles.bottomNavImage} resizeMode="contain" />
-    );
-  }
-
-  if (name === 'social') {
-    return (
-      <Image
-        source={shopImages.nav.social}
-        style={styles.bottomNavImage}
-        resizeMode="contain"
-      />
-    );
-  }
-
-  if (name === 'leaderboard') {
-    return (
-      <View style={styles.iconBox}>
-        <View style={[styles.rankBarShort, { backgroundColor: color }]} />
-        <View style={[styles.rankBarTall, { backgroundColor: color }]} />
-        <View style={[styles.rankBarMid, { backgroundColor: color }]} />
-      </View>
-    );
-  }
-
-  if (name === 'shop') {
-    return (
-      <View style={[styles.shopIconWrap, active && styles.shopIconWrapActive]}>
-        <View style={[styles.bagHandle, { borderColor: color }]} />
-        <View style={[styles.bagBody, { borderColor: color }]}>
-          <View style={[styles.bagPocket, { borderColor: color }]} />
-        </View>
-      </View>
-    );
-  }
-
-  return <Image source={shopImages.nav.preview} style={styles.bottomNavImage} resizeMode="contain" />;
-}
-
 function ItemTile({
   item,
   selected,
@@ -170,6 +134,8 @@ function ItemTile({
         <Image source={shopImages.items[item.id]} style={styles.itemImage} resizeMode="contain" />
       </View>
       <Text style={styles.itemName}>{item.name}</Text>
+      {item.owned ? <Text style={styles.itemMetaOwned}>Owned</Text> : null}
+      {item.available === false ? <Text style={styles.itemMetaUnavailable}>Unavailable</Text> : null}
       <PriceTag value={item.price} />
     </Pressable>
   );
@@ -212,23 +178,82 @@ function FeaturedCard({
   );
 }
 
-export default function ShopPage() {
-  const router = useRouter();
-  const [coins, setCoins] = useState(500);
-  const [selectedItem, setSelectedItem] = useState<ShopItem>(cosmetics[0]);
+export default function ShopPage({ onNavigate }: Props) {
+  const { profile, refreshProfileStats } = useUserProfile();
+  const [catalog, setCatalog] = useState<ShopCatalogRow[]>([]);
+  const [ownedItemIds, setOwnedItemIds] = useState<string[]>([]);
+  const [selectedItemId, setSelectedItemId] = useState<ShopItemId>('sonic-shoes');
   const [screenMode, setScreenMode] = useState<ScreenMode>('shop');
   const [confirmVisible, setConfirmVisible] = useState(false);
   const [successVisible, setSuccessVisible] = useState(false);
-  const [lastPurchaseSucceeded, setLastPurchaseSucceeded] = useState(true);
+  const [purchaseMessage, setPurchaseMessage] = useState('');
+  const [shopError, setShopError] = useState<string | null>(null);
+  const [catalogLoaded, setCatalogLoaded] = useState(false);
+  const [buying, setBuying] = useState(false);
   const [bannerIndex, setBannerIndex] = useState(0);
   const bannerScrollRef = useRef<ScrollView | null>(null);
 
-  const activeNav = useMemo<NavKey>(() => {
-    return screenMode === 'preview' ? 'preview' : 'shop';
-  }, [screenMode]);
-
+  const mergedItems = baseShopItems.map((item) => {
+    const remote = catalog.find((entry) => entry.clientKey === item.id);
+    return {
+      ...item,
+      name: remote?.name ?? item.name,
+      price: Number(remote?.price ?? item.price),
+      description: remote?.description ?? '',
+      remoteId: remote?._id ?? null,
+      available: !!remote,
+      owned: remote ? ownedItemIds.includes(remote._id) : false,
+    };
+  });
+  const selectedItem = mergedItems.find((item) => item.id === selectedItemId) ?? mergedItems[0]!;
+  const cosmeticItems = mergedItems.filter((item) => item.section === 'cosmetics');
+  const consumableItems = mergedItems.filter((item) => item.section === 'items');
   const selectedCategory = selectedItem.category;
-  const previewItems = [...cosmetics, ...items].filter((item) => item.category === selectedCategory);
+  const previewItems = mergedItems.filter((item) => item.category === selectedCategory);
+
+  useEffect(() => {
+    let active = true;
+
+    fetchShopItems()
+      .then((rows) => {
+        if (!active) return;
+        setCatalog(rows);
+        setShopError(null);
+      })
+      .catch((error) => {
+        if (!active) return;
+        setShopError(error instanceof Error ? error.message : 'Could not load shop items.');
+      })
+      .finally(() => {
+        if (active) setCatalogLoaded(true);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!profile.userId) {
+      setOwnedItemIds([]);
+      return;
+    }
+
+    let active = true;
+    fetchShopInventory(profile.userId)
+      .then((rows) => {
+        if (!active) return;
+        setOwnedItemIds(rows.map((row) => row.itemId));
+      })
+      .catch(() => {
+        if (!active) return;
+        setOwnedItemIds([]);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [profile.userId]);
 
   const onBannerScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
     const offsetX = event.nativeEvent.contentOffset.x;
@@ -239,7 +264,7 @@ export default function ShopPage() {
   };
 
   const openConfirm = (item: ShopItem) => {
-    setSelectedItem(item);
+    setSelectedItemId(item.id);
     setSuccessVisible(false);
     setConfirmVisible(true);
   };
@@ -253,22 +278,72 @@ export default function ShopPage() {
     setScreenMode('preview');
   };
 
-  const handleBuy = () => {
+  const handleNavSelect = (navItem: string) => {
+    if (navItem === 'bag-outline') {
+      setScreenMode('shop');
+      return;
+    }
+
+    if (navItem === 'shirt-outline') {
+      setScreenMode('wardrobe');
+      return;
+    }
+
+    onNavigate?.(navItem);
+  };
+
+  const handleBuy = async () => {
     setConfirmVisible(false);
-    if (coins >= selectedItem.price) {
-      setCoins((current) => current - selectedItem.price);
-      setLastPurchaseSucceeded(true);
+
+    if (!profile.userId) {
+      setPurchaseMessage('Sign in to buy items.');
       setSuccessVisible(true);
       return;
     }
-    setLastPurchaseSucceeded(false);
-    setSuccessVisible(true);
+
+    if (!selectedItem.available) {
+      setPurchaseMessage('This item is not linked in the database yet.');
+      setSuccessVisible(true);
+      return;
+    }
+
+    if (selectedItem.owned) {
+      setPurchaseMessage('You already own this item.');
+      setSuccessVisible(true);
+      return;
+    }
+
+    try {
+      setBuying(true);
+      const result = await purchaseShopItem({
+        userId: profile.userId,
+        itemId: selectedItem.remoteId ?? undefined,
+        clientKey: selectedItem.id,
+      });
+
+      if (result.alreadyOwned) {
+        setPurchaseMessage('You already own this item.');
+      } else {
+        setPurchaseMessage('Item bought successfully, enjoy!');
+      }
+
+      const [inventoryRows] = await Promise.all([
+        fetchShopInventory(profile.userId),
+        refreshProfileStats(),
+      ]);
+      setOwnedItemIds(inventoryRows.map((row) => row.itemId));
+    } catch (error) {
+      setPurchaseMessage(error instanceof Error ? error.message : 'Purchase failed.');
+    } finally {
+      setBuying(false);
+      setSuccessVisible(true);
+    }
   };
 
   const changeCategory = (category: Category) => {
-    const match = cosmetics.find((item) => item.category === category);
+    const match = cosmeticItems.find((item) => item.category === category);
     if (match) {
-      setSelectedItem(match);
+      setSelectedItemId(match.id);
     }
   };
 
@@ -280,8 +355,11 @@ export default function ShopPage() {
             <ScrollView contentContainerStyle={styles.shopContent} showsVerticalScrollIndicator={false}>
               <View style={styles.currencyRow}>
                 <Image source={shopImages.coins} style={styles.coinImage} resizeMode="contain" />
-                <Text style={styles.currencyText}>{coins}</Text>
+                <Text style={styles.currencyText}>{profile.points}</Text>
               </View>
+
+              {shopError ? <Text style={styles.shopStatusText}>{shopError}</Text> : null}
+              {!catalogLoaded ? <Text style={styles.shopStatusText}>Loading shop items...</Text> : null}
 
               <Image
                 source={shopImages.featuredRibbon}
@@ -319,7 +397,7 @@ export default function ShopPage() {
               </View>
 
               <View style={styles.itemGrid}>
-                {cosmetics.map((item) => (
+                {cosmeticItems.map((item) => (
                   <ItemTile
                     key={item.id}
                     item={item}
@@ -334,7 +412,7 @@ export default function ShopPage() {
               </View>
 
               <View style={styles.itemsGrid}>
-                {items.map((item) => (
+                {consumableItems.map((item) => (
                   <ItemTile
                     key={item.id}
                     item={item}
@@ -345,26 +423,12 @@ export default function ShopPage() {
               </View>
             </ScrollView>
 
-            <View style={styles.bottomBar}>
-              {(['home', 'social', 'leaderboard', 'shop', 'preview'] as NavKey[]).map((key) => (
-                <Pressable
-                  key={key}
-                  onPress={() => {
-                    if (key === 'leaderboard') {
-                      router.replace('/RewardsPage');
-                      return;
-                    }
-                    if (key === 'preview') {
-                      setScreenMode('preview');
-                    } else if (key === 'shop') {
-                      setScreenMode('shop');
-                    }
-                  }}
-                  style={styles.navButton}>
-                  <NavIcon name={key} active={activeNav === key || key === 'leaderboard'} />
-                </Pressable>
-              ))}
-            </View>
+            <BottomNav activeIcon="bag-outline" onSelect={handleNavSelect} />
+          </>
+        ) : screenMode === 'wardrobe' ? (
+          <>
+            <WardrobeScreenContent onOpenShop={() => setScreenMode('shop')} />
+            <BottomNav activeIcon="shirt-outline" onSelect={handleNavSelect} />
           </>
         ) : (
           <>
@@ -438,7 +502,7 @@ export default function ShopPage() {
               {previewItems.slice(0, 1).map((item) => (
                 <Pressable
                   key={item.id}
-                  onPress={() => setSelectedItem(item)}
+                  onPress={() => setSelectedItemId(item.id)}
                   style={styles.previewInventoryCard}>
                   <Image
                     source={shopImages.items[item.id]}
@@ -459,7 +523,13 @@ export default function ShopPage() {
               <Text style={styles.modalBackText}>{'<'}</Text>
             </Pressable>
 
-            <Text style={styles.modalTitle}>Are you sure you want to buy this?</Text>
+            <Text style={styles.modalTitle}>
+              {selectedItem.owned
+                ? 'You already own this item.'
+                : selectedItem.available === false
+                  ? 'This item is not linked in the database yet.'
+                  : 'Are you sure you want to buy this?'}
+            </Text>
 
             <View style={styles.modalItemCard}>
               <Image
@@ -479,8 +549,17 @@ export default function ShopPage() {
               <Pressable onPress={handlePreview} style={[styles.actionButton, styles.actionPreview]}>
                 <Text style={[styles.actionText, styles.actionPreviewText]}>Preview</Text>
               </Pressable>
-              <Pressable onPress={handleBuy} style={[styles.actionButton, styles.actionBuy]}>
-                <Text style={[styles.actionText, styles.actionBuyText]}>Buy</Text>
+              <Pressable
+                disabled={buying || selectedItem.owned || selectedItem.available === false}
+                onPress={handleBuy}
+                style={[
+                  styles.actionButton,
+                  styles.actionBuy,
+                  (buying || selectedItem.owned || selectedItem.available === false) && styles.actionButtonDisabled,
+                ]}>
+                <Text style={[styles.actionText, styles.actionBuyText]}>
+                  {buying ? 'Buying...' : selectedItem.owned ? 'Owned' : 'Buy'}
+                </Text>
               </Pressable>
             </View>
           </View>
@@ -490,11 +569,7 @@ export default function ShopPage() {
       <Modal transparent animationType="fade" visible={successVisible} onRequestClose={() => setSuccessVisible(false)}>
         <View style={styles.modalBackdrop}>
           <View style={styles.successModal}>
-            <Text style={styles.successText}>
-              {lastPurchaseSucceeded
-                ? 'Item bought successfully, enjoy!'
-                : 'Not enough gems for this item.'}
-            </Text>
+            <Text style={styles.successText}>{purchaseMessage}</Text>
             <Pressable onPress={() => setSuccessVisible(false)} style={styles.successCloseButton}>
               <Text style={styles.successCloseText}>Close</Text>
             </Pressable>
@@ -538,6 +613,12 @@ const styles = StyleSheet.create({
     width: '100%',
     height: 86,
     marginBottom: 8,
+  },
+  shopStatusText: {
+    color: '#f4d7f2',
+    fontSize: 13,
+    fontWeight: '700',
+    marginBottom: 12,
   },
   bannerViewport: {
     marginTop: -6,
@@ -700,7 +781,21 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     textAlign: 'center',
     marginTop: 8,
-    minHeight: 38,
+    minHeight: 20,
+  },
+  itemMetaOwned: {
+    color: '#90ff56',
+    fontSize: 12,
+    fontWeight: '800',
+    marginTop: 4,
+    marginBottom: 2,
+  },
+  itemMetaUnavailable: {
+    color: '#f6a5c0',
+    fontSize: 12,
+    fontWeight: '800',
+    marginTop: 4,
+    marginBottom: 2,
   },
   priceRow: {
     flexDirection: 'row',
@@ -722,84 +817,6 @@ const styles = StyleSheet.create({
   },
   priceTextLarge: {
     fontSize: 18,
-  },
-  bottomBar: {
-    height: 54,
-    backgroundColor: '#db39d8',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-around',
-  },
-  navButton: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  iconBox: {
-    width: 34,
-    height: 34,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  bottomNavImage: {
-    width: 24,
-    height: 24,
-    tintColor: '#1e1523',
-  },
-  rankBarShort: {
-    width: 6,
-    height: 15,
-    position: 'absolute',
-    left: 6,
-    bottom: 7,
-  },
-  rankBarTall: {
-    width: 6,
-    height: 22,
-    position: 'absolute',
-    left: 14,
-    bottom: 7,
-  },
-  rankBarMid: {
-    width: 6,
-    height: 18,
-    position: 'absolute',
-    right: 6,
-    bottom: 7,
-  },
-  shopIconWrap: {
-    width: 36,
-    height: 36,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  shopIconWrapActive: {
-    backgroundColor: '#ffe8ff',
-  },
-  bagHandle: {
-    width: 12,
-    height: 7,
-    borderWidth: 2,
-    borderBottomWidth: 0,
-    borderTopLeftRadius: 7,
-    borderTopRightRadius: 7,
-    marginBottom: -1,
-  },
-  bagBody: {
-    width: 15,
-    height: 14,
-    borderWidth: 2,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  bagPocket: {
-    width: 6,
-    height: 5,
-    borderWidth: 2,
-    borderTopLeftRadius: 4,
-    borderTopRightRadius: 4,
-    borderBottomWidth: 0,
   },
   previewTop: {
     paddingHorizontal: 22,
@@ -989,6 +1006,9 @@ const styles = StyleSheet.create({
   actionText: {
     fontSize: 16,
     fontWeight: '800',
+  },
+  actionButtonDisabled: {
+    opacity: 0.55,
   },
   actionNoText: {
     color: '#ff544d',

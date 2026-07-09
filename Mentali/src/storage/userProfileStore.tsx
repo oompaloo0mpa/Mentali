@@ -210,6 +210,7 @@ export function UserProfileProvider({ children }: { children: React.ReactNode })
         friendCode?: string;
         points?: number;
         currentTier?: string;
+        longestStreak?: number;
       },
       token?: string | null,
     ) => {

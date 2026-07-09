@@ -55,6 +55,60 @@ import {
   saveTodaySnapshot,
 } from '@/storage/checkInStorage';
 import type { SocialAuthResult } from '@/hooks/useSocialAuth';
+import { CURRENT_USER } from '@/data/mockData';
+
+type OfflineDemoAccount = {
+  userId: string;
+  username: string;
+  displayName: string;
+  friendCode: string;
+  points: number;
+  currentTier: string;
+  longestStreak: number;
+};
+
+const OFFLINE_DEMO_PASSWORD = 'SeedUser123!';
+
+const OFFLINE_DEMO_ACCOUNTS: Record<string, OfflineDemoAccount> = {
+  'alex.seed@mentali.dev': {
+    userId: 'offline-alex-seed',
+    username: 'alex_seed',
+    displayName: 'Alex',
+    friendCode: 'ALX7K2',
+    points: 0,
+    currentTier: 'Bronze',
+    longestStreak: 142,
+  },
+  'josh.seed@mentali.dev': {
+    userId: 'offline-josh-seed',
+    username: 'josh_seed',
+    displayName: 'Josh',
+    friendCode: 'JSH4M9',
+    points: 0,
+    currentTier: 'Bronze',
+    longestStreak: 350,
+  },
+  'maya.seed@mentali.dev': {
+    userId: 'offline-maya-seed',
+    username: 'maya_seed',
+    displayName: 'Maya',
+    friendCode: 'MAYA3X',
+    points: 0,
+    currentTier: 'Bronze',
+    longestStreak: 33,
+  },
+};
+
+function isNetworkError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  return /Network request failed|fetch failed|Failed to fetch/i.test(error.message);
+}
+
+function getOfflineDemoAccount(identifier: string, password: string): OfflineDemoAccount | null {
+  if (password !== OFFLINE_DEMO_PASSWORD) return null;
+  const normalized = identifier.trim().toLowerCase();
+  return OFFLINE_DEMO_ACCOUNTS[normalized] ?? null;
+}
 
 type ScreenState =
   | { screen: 'welcome' }
@@ -456,6 +510,27 @@ function AppRoot() {
       }
       handleAuthSuccess();
     } catch (error) {
+      const offlineDemoAccount =
+        payload.mode === 'email' ? getOfflineDemoAccount(payload.identifier, payload.password) : null;
+
+      if (offlineDemoAccount && isNetworkError(error)) {
+        const offlineUser = {
+          _id: offlineDemoAccount.userId,
+          username: offlineDemoAccount.username,
+          displayName: offlineDemoAccount.displayName,
+          friendCode: offlineDemoAccount.friendCode,
+          points: offlineDemoAccount.points,
+          currentTier: offlineDemoAccount.currentTier,
+          longestStreak: offlineDemoAccount.longestStreak,
+          onboardingCompleted: true,
+        };
+
+        setCurrentUserId(offlineDemoAccount.userId);
+        await applyAuthUser(offlineUser, null);
+        handleAuthSuccess();
+        return;
+      }
+
       Alert.alert('Login failed', error instanceof Error ? error.message : 'Unable to login.');
     }
   };
@@ -647,7 +722,20 @@ function AppRoot() {
             onOpenRewards={() => setScreenState({ screen: 'rewards' })}
           />
         ) : screenState.screen === 'shop' ? (
-          <ShopPage />
+          <ShopPage
+            onNavigate={(navItem) => {
+              if (navItem === 'bag-outline') return;
+              if (navItem === 'shirt-outline') {
+                setScreenState({ screen: 'wardrobe', returnToNav: homeNav });
+                return;
+              }
+              if (navItem === 'trophy-outline') {
+                setScreenState({ screen: 'rewards' });
+                return;
+              }
+              setScreenState({ screen: 'home', selectedNav: navItem });
+            }}
+          />
         ) : screenState.screen === 'rewards' ? (
           <StatisticPage />
         ) : screenState.screen === 'wardrobe' ? (

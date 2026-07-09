@@ -753,6 +753,25 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
     [profile.userId, refreshProfileStats, update],
   );
 
+  const refreshChat = useCallback<SocialContextValue['refreshChat']>(
+    async (friendId: string) => {
+      const me = profile.userId;
+      const friend = stateRef.current.friends.find((f) => f.id === friendId);
+      if (!me || !friend?.userId) return;
+
+      try {
+        const rows = await fetchChatMessages(friendId, me);
+        setState((prev) => ({
+          ...prev,
+          chats: { ...prev.chats, [friendId]: rows.map((row) => fromApiChatMessage(row, me)) },
+        }));
+      } catch {
+        // Keep local chat fallback while offline.
+      }
+    },
+    [profile.userId],
+  );
+
   const editMessage = useCallback<SocialContextValue['editMessage']>(
     async (friendId, messageId, text) => {
       const me = profile.userId;
@@ -821,25 +840,6 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
       // Keep existing state when offline.
     }
   }, [profile.userId]);
-
-  const refreshChat = useCallback<SocialContextValue['refreshChat']>(
-    async (friendId: string) => {
-      const me = profile.userId;
-      const friend = stateRef.current.friends.find((f) => f.id === friendId);
-      if (!me || !friend?.userId) return;
-
-      try {
-        const rows = await fetchChatMessages(friendId, me);
-        setState((prev) => ({
-          ...prev,
-          chats: { ...prev.chats, [friendId]: rows.map((row) => fromApiChatMessage(row, me)) },
-        }));
-      } catch {
-        // Keep local chat fallback while offline.
-      }
-    },
-    [profile.userId],
-  );
 
   const markChatRead = useCallback(
     (friendId: string) =>
