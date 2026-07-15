@@ -235,6 +235,12 @@ export default function ShopPage({ onNavigate }: Props) {
     };
   }, []);
 
+  // Pull the latest currency balance from the database whenever the shop opens,
+  // so the diamond count is always live rather than a stale/cached value.
+  useEffect(() => {
+    refreshProfileStats().catch(() => {});
+  }, [refreshProfileStats]);
+
   useEffect(() => {
     if (!profile.userId) {
       setOwnedItemIds([]);

@@ -153,7 +153,7 @@ export function reflectionLine(
     high: 'Please look at the support options below. You do not have to go through this alone.',
   };
 
-  return `You came in feeling ${mood.label.toLowerCase()}${focus}. ${suggestion[level]}`;
+  return `From our chat, today reads as feeling ${mood.label.toLowerCase()}${focus}. ${suggestion[level]}`;
 }
 
 /** Plain-language label for a 0-6 sub-score. */

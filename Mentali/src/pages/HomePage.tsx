@@ -1,4 +1,4 @@
-import { useEffect, useState, type ComponentProps } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Alert,
   Modal,
@@ -178,18 +178,6 @@ function confirmMoodSelection(mood: MoodItem, onConfirm: () => void) {
 }
 function MascotArt({ wardrobe }: { wardrobe: WardrobeSelection }) {
   return <WardrobeMascotPreview wardrobe={wardrobe} size={126} preset="home" />;
-}
-
-function NavPlaceholder({ title, icon }: { title: string; icon: ComponentProps<typeof Ionicons>['name'] }) {
-  return (
-    <View style={styles.placeholderScreen}>
-      <View style={styles.placeholderCard}>
-        <Ionicons name={icon} size={44} color="#FF5DE7" />
-        <Text style={styles.placeholderTitle}>{title}</Text>
-        <Text style={styles.placeholderSubtitle}>Placeholder screen for testing the navigation bar.</Text>
-      </View>
-    </View>
-  );
 }
 
 function NotificationPanel({
@@ -374,7 +362,6 @@ export default function HomePage({
     { ...stats[2], value: String(profile.longestStreak) },
   ];
   const unreadCount = notifications.filter((notification) => !notification.read).length;
-  const isHomeSelected = selectedNav === 'home-outline';
   const selectedMood = Math.max(
     0,
     moods.findIndex((m) => m.id === profile.currentMoodId),
@@ -444,14 +431,6 @@ export default function HomePage({
     } finally {
       setRefreshingQuests(false);
     }
-  };
-
-  const navLabels: Record<string, { title: string; icon: ComponentProps<typeof Ionicons>['name'] }> = {
-    'home-outline': { title: 'Home', icon: 'home-outline' },
-    'people-outline': { title: 'Friends', icon: 'people-outline' },
-    'trophy-outline': { title: 'Rewards', icon: 'trophy-outline' },
-    'bag-outline': { title: 'Shop', icon: 'bag-outline' },
-    'shirt-outline': { title: 'Wardrobe', icon: 'shirt-outline' },
   };
 
   const markNotificationRead = (id: string) => {
@@ -551,7 +530,17 @@ export default function HomePage({
               topInset={insets.top}
             />
 
-        {isHomeSelected ? (
+        {selectedNav === 'people-outline' ? (
+          <FriendsScreenContent
+            showHeader={false}
+            checkInStreak={checkInStreak}
+            userPoints={userPoints}
+            longestStreak={profile.longestStreak}
+            onOpenChat={(friend) => onOpenChat?.(friend)}
+          />
+        ) : selectedNav === 'shirt-outline' ? (
+          <WardrobeScreenContent onOpenShop={() => onOpenShop?.()} />
+        ) : (
           <>
             <View style={styles.heroRow}>
               <View style={styles.quoteBubble}>
@@ -677,23 +666,6 @@ export default function HomePage({
               </View>
             </View>
           </>
-        ) : selectedNav === 'people-outline' ? (
-          <FriendsScreenContent
-            showHeader={false}
-            checkInStreak={checkInStreak}
-            userPoints={userPoints}
-            longestStreak={profile.longestStreak}
-            onOpenChat={(friend) => onOpenChat?.(friend)}
-          />
-        ) : selectedNav === 'shirt-outline' ? (
-          <WardrobeScreenContent
-            onOpenShop={() => {
-              setSelectedNav('bag-outline');
-              onSelectedNavChange?.('bag-outline');
-            }}
-          />
-        ) : (
-          <NavPlaceholder title={navLabels[selectedNav].title} icon={navLabels[selectedNav].icon} />
         )}
       </ScrollView>
 
@@ -1533,34 +1505,5 @@ const styles = StyleSheet.create({
   ctaArrowImage: {
     width: 16,
     height: 16,
-  },
-  placeholderScreen: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  placeholderCard: {
-    width: '100%',
-    borderRadius: 18,
-    borderWidth: 2,
-    borderColor: '#FF6DEB',
-    backgroundColor: '#231F21',
-    paddingVertical: 28,
-    paddingHorizontal: 20,
-    alignItems: 'center',
-  },
-  placeholderTitle: {
-    color: '#fff',
-    fontSize: 26,
-    fontWeight: '800',
-    marginTop: 14,
-    marginBottom: 8,
-  },
-  placeholderSubtitle: {
-    color: '#D2C6CC',
-    fontSize: 14,
-    fontWeight: '600',
-    textAlign: 'center',
-    lineHeight: 18,
   },
 });

@@ -28,7 +28,7 @@ import { FriendChatScreenContent } from '@/components/chat/FriendChatScreenConte
 import { StreakGuideScreenContent } from '@/components/chat/StreakGuideScreenContent';
 import { CheckInChatScreen } from '@/pages/CheckInChatScreen';
 import { SummaryScreen } from '@/pages/SummaryScreen';
-import { MOOD_OPTIONS, MOODS } from '@/data/moods';
+import { MOOD_OPTIONS, MOODS, moodById } from '@/data/moods';
 import { scorePhq4, scoreK10 } from '@/logic/wellbeing';
 import {
   EMPTY_PROFILE,
@@ -105,6 +105,47 @@ const OFFLINE_DEMO_ACCOUNTS: Record<string, OfflineDemoAccount> = {
 function isNetworkError(error: unknown): boolean {
   if (!(error instanceof Error)) return false;
   return /Network request failed|fetch failed|Failed to fetch/i.test(error.message);
+}
+
+const OUTCOME_MOOD_BY_BAND: Record<string, string> = {
+  calm: 'good',
+  mild: 'okay',
+  moderate: 'low',
+  high: 'rough',
+};
+
+/**
+ * The summary mood should reflect what the user actually shared in the chat,
+ * not the mood they happened to have selected beforehand. We average the
+ * distress across the answers they gave and map that positivity onto a mood.
+ */
+function deriveSummaryMood(
+  answers: RecordedAnswer[],
+  phq4: WellbeingResult,
+  k10: WellbeingResult | null,
+  picked: MoodOption,
+): MoodOption {
+  const answered = answers.filter((a) => !a.skipped);
+
+  if (answered.length > 0) {
+    const distress = answered.map((a) =>
+      a.scale === 'k10' ? (a.value - 1) / 4 : a.value / 3,
+    );
+    const avgDistress = distress.reduce((sum, n) => sum + n, 0) / distress.length;
+    const positivity = 1 - avgDistress;
+
+    let id = 'okay';
+    if (positivity >= 0.8) id = 'great';
+    else if (positivity >= 0.6) id = 'good';
+    else if (positivity >= 0.4) id = 'okay';
+    else if (positivity >= 0.2) id = 'low';
+    else id = 'rough';
+
+    return moodById(id) ?? picked;
+  }
+
+  const level = (k10 ?? phq4).band.level;
+  return moodById(OUTCOME_MOOD_BY_BAND[level] ?? 'okay') ?? picked;
 }
 
 function getOfflineDemoAccount(identifier: string, password: string): OfflineDemoAccount | null {
@@ -460,7 +501,7 @@ function AppRoot() {
 
     setScreenState({
       screen: 'summary',
-      mood: selectedMood,
+      mood: deriveSummaryMood(answers, phq4, k10, selectedMood),
       phq4,
       k10,
       streak: newStreak,
@@ -802,6 +843,10 @@ function AppRoot() {
               if (navItem === 'shirt-outline') {
                 setHomeNav(navItem);
                 setScreenState({ screen: 'wardrobe', returnToNav: navItem });
+                return;
+              }
+              if (navItem === 'bag-outline') {
+                setScreenState({ screen: 'shop' });
                 return;
               }
               setHomeNav(navItem);

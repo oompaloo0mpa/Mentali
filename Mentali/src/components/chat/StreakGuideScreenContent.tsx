@@ -1,9 +1,13 @@
 import { Ionicons } from '@expo/vector-icons';
+import { Image } from 'expo-image';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { FlameIcon } from '@/components/chat/FlameIcon';
 import { Brand, Radius, Spacing } from '@/theme/theme';
+
+// The 500+ tier is the rainbow streak pet creature, not the plain rainbow flame.
+const rainbowPet = require('../../../assets/images/streak/rainbow_pet.png');
 
 const TIERS = [
   { streak: 150, label: '100 - 249' },
@@ -34,7 +38,11 @@ export function StreakGuideScreenContent({ onClose }: Props) {
           {TIERS.map((tier, i) => (
             <View key={tier.label} style={styles.tierRow}>
               <View style={styles.tier}>
-                <FlameIcon streak={tier.streak} size={44} />
+                {tier.streak >= 500 ? (
+                  <Image source={rainbowPet} style={styles.tierPet} contentFit="contain" />
+                ) : (
+                  <FlameIcon streak={tier.streak} size={44} />
+                )}
                 <Text style={styles.tierLabel}>{tier.label}</Text>
               </View>
               {i < TIERS.length - 1 && (
@@ -71,6 +79,7 @@ const styles = StyleSheet.create({
   tiers: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'center' },
   tierRow: { flexDirection: 'row', alignItems: 'center' },
   tier: { alignItems: 'center', gap: 6, width: 78 },
+  tierPet: { width: 44, height: 44 },
   tierLabel: { color: Brand.text, fontSize: 12, fontWeight: '700' },
   tierArrow: { marginTop: 14 },
   closeBtn: {

@@ -34,9 +34,7 @@ import {
   findDirectoryUser,
   FRIENDS,
   INCOMING_REQUESTS,
-  INITIAL_CHATS,
   MILESTONES,
-  seedGreeting,
   type AppNotification,
   type ChatMessage,
   type Friend,
@@ -45,8 +43,8 @@ import {
 } from '@/data/mockData';
 import { useUserProfile } from '@/storage/userProfileStore';
 
-const STORAGE_KEY = 'mentali.social.v7';
-const LEGACY_STORAGE_KEYS = ['mentali.social.v6', 'mentali.social.v5', 'mentali.social.v4'];
+const STORAGE_KEY = 'mentali.social.v8';
+const LEGACY_STORAGE_KEYS = ['mentali.social.v7', 'mentali.social.v6', 'mentali.social.v5', 'mentali.social.v4'];
 
 function mapNotificationRows(rows: NotificationRow[]): AppNotification[] {
   return rows.map((row) => ({
@@ -127,7 +125,9 @@ function initialState(): SocialState {
   return {
     friends,
     requests: normalizeIncomingRequests(friends, INCOMING_REQUESTS),
-    chats: Object.fromEntries(Object.entries(INITIAL_CHATS).map(([id, msgs]) => [id, msgs.map((m) => ({ ...m }))])),
+    // Start chats empty; real threads load from the server. Seeding placeholder
+    // messages here caused them to flash on open and then vanish once the fetch resolved.
+    chats: {},
     notifications: [],
     quests: freshQuests(),
     questDate: todayKey(),
@@ -195,6 +195,9 @@ async function loadPersistedSocialState(): Promise<SocialState | null> {
     const state = hydrateSocialState(parsed);
 
     if (key !== STORAGE_KEY) {
+      // Migrating from an older version: drop cached chat threads so previously
+      // seeded greeting messages don't linger. Real threads reload from the server.
+      state.chats = {};
       await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(state));
       await AsyncStorage.removeItem(key).catch(() => {});
     }
@@ -256,24 +259,19 @@ function fromApiRequest(row: FriendRequestRow): FriendRequest {
 
 /**
  * Merge a fresh friends list from the server into the current state, preserving
- * existing chat threads and seeding a greeting for any friendship that has no chat yet.
+ * existing chat threads. Chat contents are populated by `refreshChat`; we no longer
+ * seed a placeholder greeting, which previously flashed on open before the fetch resolved.
  */
 function mergeFriendsFromApi(
   prev: SocialState,
   remote: { friends: FriendListRow[]; requests: FriendRequestRow[] },
 ): SocialState {
   const newFriends = remote.friends.map(fromApiFriend);
-  const newChats = { ...prev.chats };
-  for (const f of newFriends) {
-    if (!newChats[f.id]) {
-      newChats[f.id] = seedGreeting();
-    }
-  }
   return {
     ...prev,
     friends: newFriends,
     requests: remote.requests.map(fromApiRequest),
-    chats: newChats,
+    chats: { ...prev.chats },
   };
 }
 
@@ -560,7 +558,7 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
         return {
           ...prev,
           friends: [...prev.friends, friend],
-          chats: { ...prev.chats, [id]: seedGreeting() },
+          chats: { ...prev.chats, [id]: [] },
           notifications: [
             {
               id: uid('n'),
@@ -603,7 +601,7 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
             ...prev,
             requests: prev.requests.filter((r) => r.id !== id),
             friends: [...prev.friends, friend],
-            chats: { ...prev.chats, [id]: prev.chats[id] ?? seedGreeting() },
+            chats: { ...prev.chats, [id]: prev.chats[id] ?? [] },
           };
         });
         // Confirm with the server and sync authoritative state (moods, streaks, etc.).
@@ -637,7 +635,7 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
           ...prev,
           requests: prev.requests.filter((r) => r.id !== id),
           friends: [...prev.friends, friend],
-          chats: { ...prev.chats, [friendId]: seedGreeting() },
+          chats: { ...prev.chats, [friendId]: [] },
         };
       });
     },
@@ -661,7 +659,7 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
       const friend = stateRef.current.friends.find((f) => f.id === friendId);
       update((prev) => {
         const sender = message.sender ?? 'me';
-        const thread = prev.chats[friendId] ?? seedGreeting();
+        const thread = prev.chats[friendId] ?? [];
         const reply = message.replyToId ? thread.find((m) => m.id === message.replyToId) : null;
         const msg: ChatMessage = {
           ...message,
