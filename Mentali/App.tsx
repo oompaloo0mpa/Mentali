@@ -673,6 +673,10 @@ function AppRoot() {
               if (navItem === 'trophy-outline') {
                 return;
               }
+              if (navItem === 'bag-outline') {
+                setScreenState({ screen: 'shop' });
+                return;
+              }
               if (navItem === 'shirt-outline') {
                 setHomeNav(navItem);
                 setScreenState({ screen: 'wardrobe', returnToNav: navItem });
@@ -693,7 +697,8 @@ function AppRoot() {
                 return;
               }
               if (navItem === 'trophy-outline') {
-                setScreenState({ screen: 'rewards' });
+                setHomeNav(navItem);
+                setScreenState({ screen: 'leaderboard' });
                 return;
               }
               setScreenState({ screen: 'home', selectedNav: navItem });

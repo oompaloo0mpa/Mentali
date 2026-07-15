@@ -9,6 +9,7 @@ import {
   View,
   type ImageSourcePropType,
 } from 'react-native';
+import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { BottomNav } from '@/components/nav/BottomNav';
@@ -212,6 +213,7 @@ function DemotionZone() {
 }
 
 export default function LeaderboardPage({ onNavigate, onOpenRankGuide }: LeaderboardPageProps) {
+  const router = useRouter();
   const [rankStage, setRankStage] = useState<RankStage>('locked');
   const leaderboardEntries = useMemo(() => buildLeaderboardEntries(), []);
   const promotionEntries = leaderboardEntries.slice(0, 5);
@@ -253,7 +255,17 @@ export default function LeaderboardPage({ onNavigate, onOpenRankGuide }: Leaderb
           if (icon === 'trophy-outline') {
             return;
           }
-          onNavigate?.(icon);
+          if (onNavigate) {
+            onNavigate(icon);
+            return;
+          }
+          if (icon === 'bag-outline') {
+            router.replace('/ShopPage');
+            return;
+          }
+          if (icon === 'home-outline') {
+            router.replace('/');
+          }
         }}
       />
     </SafeAreaView>
