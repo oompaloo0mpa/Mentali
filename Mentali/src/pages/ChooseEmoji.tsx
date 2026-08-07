@@ -14,6 +14,8 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { moodSources } from '../data/moodAssets';
 import { setMoodForDate } from '../data/moodStore';
 import { getSingaporeTodayKey } from '../data/sgDate';
+import { moodFromHomeIndex } from '../data/moods';
+import { useUserProfile } from '../storage/userProfileStore';
 
 type ChooseEmojiProps = {
   dateKey?: string;
@@ -59,6 +61,9 @@ export default function ChooseEmoji({ dateKey: propDateKey, onDone, onClose }: C
   const params = useLocalSearchParams<{ date?: string }>();
   const dateKey = propDateKey ?? params.date ?? getSingaporeTodayKey();
   const dateLabel = useMemo(() => formatDateLabel(dateKey), [dateKey]);
+  const { setCurrentMood } = useUserProfile();
+  const todayKey = getSingaporeTodayKey();
+  const isSelectingToday = dateKey === todayKey;
   const animations = useRef(moodSources.map(() => new Animated.Value(0))).current;
   const emojiPositions = useMemo<EmojiPosition[]>(() => {
     const centerX = (ringSize + 72) / 2;
@@ -95,6 +100,11 @@ export default function ChooseEmoji({ dateKey: propDateKey, onDone, onClose }: C
 
   const handleSelect = (moodIndex: number) => {
     setMoodForDate(dateKey, moodIndex);
+    // If selecting today's mood, also update the user profile
+    if (isSelectingToday) {
+      const moodOption = moodFromHomeIndex(moodIndex);
+      setCurrentMood({ id: moodOption.id, emoji: moodOption.emoji });
+    }
     if (onDone) {
       onDone(dateKey);
       return;

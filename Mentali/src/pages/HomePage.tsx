@@ -42,6 +42,8 @@ import { completeNotificationReadQuests } from '@/services/dailyQuestProgress';
 import type { Friend } from '@/data/mockData';
 import type { MoodOption } from '@/logic/checkin';
 import { useUserProfile, type WardrobeSelection } from '@/storage/userProfileStore';
+import { setMoodForDate } from '@/data/moodStore';
+import { getSingaporeTodayKey } from '@/data/sgDate';
 
 type HomePageProps = {
   initialSelectedNav?: string;
@@ -561,6 +563,8 @@ export default function HomePage({
                     confirmMoodSelection(mood, () => {
                       const picked = moodById(mood.id) ?? moodFromHomeIndex(index);
                       setCurrentMood({ id: picked.id, emoji: picked.emoji });
+                      // Also save to calendar for today
+                      setMoodForDate(getSingaporeTodayKey(), index);
                     })
                   }
                 />

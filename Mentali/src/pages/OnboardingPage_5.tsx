@@ -12,6 +12,8 @@ import { useRouter } from 'expo-router';
 import OnboardingProgressDots from '../components/OnboardingProgressDots';
 import { useUserProfile } from '@/storage/userProfileStore';
 import { MOOD_OPTIONS } from '@/data/moods';
+import { setMoodForDate } from '@/data/moodStore';
+import { getSingaporeTodayKey } from '@/data/sgDate';
 
 const emojiImages = [
   require('../components/Emoji 1.png'),
@@ -65,6 +67,8 @@ export default function OnboardingPage_5({ onContinue, onBack }: OnboardingPage5
     // showing its default and the selection appears to be ignored.
     const picked = MOOD_OPTIONS[selectedMood] ?? MOOD_OPTIONS[0];
     setCurrentMood({ id: picked.id, emoji: picked.emoji });
+    // Also save to calendar for today so it syncs to Statistics and ChooseEmoji pages
+    setMoodForDate(getSingaporeTodayKey(), selectedMood);
 
     if (onContinue) {
       onContinue();

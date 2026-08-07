@@ -13,6 +13,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { DEFAULT_TODAY_MOOD_INDEX, getMoodForDate, useMoodForDate } from '../data/moodStore';
 import { moodSources } from '../data/moodAssets';
 import { getSingaporeTodayKey, getSingaporeTodayParts, isDateOnOrBeforeSingaporeToday, isMonthInFutureSingapore } from '../data/sgDate';
+import { useUserProfile } from '@/storage/userProfileStore';
 
 const streakSource: ImageSourcePropType = require('../components/Streak logo.png');
 const brainFreezeSource: ImageSourcePropType = require('../components/BrainFreeze.png');
@@ -76,6 +77,7 @@ type StatisticPageProps = {
 
 export default function StatisticPage({ onNavigate, onOpenEmojiChooser }: StatisticPageProps) {
   const router = useRouter();
+  const { profile } = useUserProfile();
   const todayKey = getSingaporeTodayKey();
   const singaporeToday = getSingaporeTodayParts();
   const minYear = 2024;
@@ -319,7 +321,7 @@ export default function StatisticPage({ onNavigate, onOpenEmojiChooser }: Statis
             <Text style={styles.statLabel}>Current Streak</Text>
             <View style={styles.statValueRow}>
               <Image source={streakSource} style={styles.statIcon} resizeMode="contain" />
-              <Text style={styles.statValue}>67</Text>
+              <Text style={styles.statValue}>{profile.longestStreak}</Text>
             </View>
           </View>
 
@@ -327,7 +329,7 @@ export default function StatisticPage({ onNavigate, onOpenEmojiChooser }: Statis
             <Text style={styles.statLabel}>Brainfreezes used</Text>
             <View style={styles.statValueRow}>
               <Image source={brainFreezeSource} style={styles.statIcon} resizeMode="contain" />
-              <Text style={styles.statValue}>2</Text>
+              <Text style={styles.statValue}>0</Text>
             </View>
           </View>
         </View>
