@@ -68,8 +68,6 @@ const K10_SUBTLE: Record<string, string> = {
   k10_10: 'Have you been hard on yourself lately?',
 };
 
-const SHORT_ACKS = ['Got it.', 'Yeah.', 'Okay.', 'Thanks for sharing that.', 'Mm, I get that.'];
-
 const OPEN_CURIOSITY = [
   "What's been taking up most of your headspace lately?",
   'Tell me a bit more about what that has been like for you.',
@@ -105,7 +103,18 @@ const THEME_KEYWORDS: Record<string, RegExp> = {
 const INTENSITY_HIGH = /\b(a lot|all the time|constantly|every day|always|very much|really|so much|nonstop|can't cope)\b/i;
 const INTENSITY_MID = /\b(often|most days|frequently|quite a bit|pretty|fair bit|sometimes|some days)\b/i;
 const INTENSITY_LOW = /\b(a little|occasionally|once in a while|not much|barely|rarely|bit)\b/i;
-const INTENSITY_NONE = /\b(not at all|not really|never|nope|fine|good|great|okay|ok|alright|managing|better)\b/i;
+const INTENSITY_NONE = /\b(not at all|not really|never|nope|none|no problem|no issues)\b/i;
+
+/** Words that signal the person is doing well — treated as low distress. */
+const POSITIVE_SENTIMENT =
+  /\b(fine|good|great|okay|ok|alright|all right|managing|better|best|happy|glad|calm|relaxed|relaxing|peaceful|content|grateful|thankful|productive|motivated|energ\w*|excited|exciting|fun|wonderful|amazing|awesome|hopeful|proud|confident|refreshed|rested|positive|chill|nice|lovely|enjoy\w*|smil\w*|joy\w*)\b/i;
+const NEGATION_NEARBY =
+  /\b(not|never|no|hardly|barely|isn't|isnt|wasn't|wasnt|aren't|arent|don't|dont|didn't|didnt|can't|cant|couldn't|couldnt|won't|wont|wouldn't|wouldnt)\b/i;
+
+/** True when the reply reads as genuinely positive (and is not negated). */
+function hasPositiveSentiment(text: string): boolean {
+  return POSITIVE_SENTIMENT.test(text) && !NEGATION_NEARBY.test(text);
+}
 
 const DONE_PHRASES = /\b(that's all|thats all|i'm done|im done|enough|skip|move on|no more|stop|finish|summary)\b/i;
 const SKIP_PHRASES = /\b(prefer not|rather not|don't want to|dont want to|pass|not now|maybe later)\b/i;
@@ -219,15 +228,16 @@ function moodOpener(mood: MoodOption, deeper: boolean, sessionOpener?: string | 
 
 function reflectUserText(text: string): string {
   const t = text.toLowerCase();
+  // Reflect the strongest theme in what they said. Distress topics are checked
+  // before positivity so a mixed message ("work is rough but...") is met with care.
+  if (/\b(sad|down|low|depress|hopeless|cry|crying|miserable)\b/.test(t)) return 'Thank you for trusting me with that.';
+  if (/\b(stress|overwhelm|anxious|worry|worried|panic)\b/.test(t)) return 'That sounds like a lot to carry.';
+  if (/\b(tired|exhaust|sleep|insomnia|can't sleep|cant sleep|drained)\b/.test(t)) return 'Being worn out makes everything feel heavier.';
   if (/\b(work|job|school|exam|deadline|boss)\b/.test(t)) return 'Work pressure can really sit with you.';
   if (/\b(family|friend|partner|relationship|lonely|alone)\b/.test(t)) return 'Relationships and connection matter so much.';
-  if (/\b(tired|exhaust|sleep|insomnia|can't sleep|cant sleep)\b/.test(t)) return 'Being worn out makes everything feel heavier.';
-  if (/\b(stress|overwhelm|anxious|worry|panic)\b/.test(t)) return 'That sounds like a lot to carry.';
-  if (/\b(good|great|fine|okay|ok|alright|better|happy)\b/.test(t)) return 'Good to hear some of that.';
-  if (/\b(sad|down|low|depress|hopeless)\b/.test(t)) return 'Thank you for trusting me with that.';
-  if (text.length > 80) return 'Thanks for putting that into words.';
+  if (hasPositiveSentiment(t)) return "That's really good to hear.";
   if (text.trim().length < 8) return '';
-  return SHORT_ACKS[text.length % SHORT_ACKS.length];
+  return 'Thanks for sharing that with me.';
 }
 
 function conversationalMessage(parts: Array<string | null | undefined>): string {
@@ -317,7 +327,9 @@ function recordAnswerForQuestion(
     dimension: question.dimension,
     value: intensity.value,
     label: intensity.label,
-    confidence: Math.max(intensity.confidence, 0.85),
+    // Enough to count the item as covered, but low enough that a clearer signal
+    // later (or a keyword match) can still override it.
+    confidence: Math.max(intensity.confidence, 0.7),
     evidence: text.slice(0, 120),
     source,
   };
@@ -335,7 +347,8 @@ function inferIntensity(text: string, scale: ScaleKind): { value: number; label:
       ? { value: 1, label: 'None of the time', confidence: 0.9 }
       : { value: 0, label: 'Not really', confidence: 0.9 };
   }
-  if (INTENSITY_NONE.test(text)) {
+  // Positive/settled language, or an explicit "not at all", reads as low distress.
+  if (INTENSITY_NONE.test(text) || hasPositiveSentiment(text)) {
     return scale === 'k10'
       ? { value: 1, label: 'None of the time', confidence: 0.75 }
       : { value: 0, label: 'Not really', confidence: 0.75 };
@@ -355,8 +368,10 @@ function inferIntensity(text: string, scale: ScaleKind): { value: number; label:
       ? { value: 2, label: 'A little', confidence: 0.65 }
       : { value: 1, label: 'A little', confidence: 0.65 };
   }
+  // No clear signal: lean mild rather than moderate so vague or neutral replies
+  // do not quietly inflate the wellbeing score.
   return scale === 'k10'
-    ? { value: 3, label: 'Some of the time', confidence: 0.45 }
+    ? { value: 2, label: 'A little', confidence: 0.45 }
     : { value: 1, label: 'A little', confidence: 0.45 };
 }
 

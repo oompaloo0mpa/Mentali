@@ -198,6 +198,12 @@ const collectionConfigs = [
           imageUri: { bsonType: ["string", "null"] },
           fileName: { bsonType: ["string", "null"] },
           fileUri: { bsonType: ["string", "null"] },
+          replyToMessageId: { bsonType: ["objectId", "null"] },
+          replyToText: { bsonType: ["string", "null"] },
+          replyToSenderUserId: { bsonType: ["objectId", "null"] },
+          pinned: { bsonType: ["bool", "null"] },
+          editedAt: { bsonType: ["date", "null"] },
+          deletedAt: { bsonType: ["date", "null"] },
           createdAt: DATE,
         },
       },
@@ -239,6 +245,7 @@ const collectionConfigs = [
           description: STR,
           rewardPoints: NUM,
           category: { enum: ["social", "checkin", "reflection"] },
+          trackKey: { bsonType: ["string", "null"] },
           active: BOOL,
           createdAt: DATE,
           updatedAt: DATE,
@@ -289,6 +296,7 @@ const collectionConfigs = [
         ],
         properties: {
           _id: OID,
+          clientKey: { bsonType: "string" },
           name: STR,
           description: STR,
           itemType: { enum: ["single", "bundle"] },
@@ -317,7 +325,10 @@ const collectionConfigs = [
         },
       },
     },
-    indexes: [{ key: { active: 1, category: 1, itemType: 1 }, options: {} }],
+    indexes: [
+      { key: { active: 1, category: 1, itemType: 1 }, options: {} },
+      { key: { clientKey: 1 }, options: { sparse: true, unique: true } },
+    ],
   },
   {
     name: "userInventory",
@@ -570,8 +581,10 @@ async function seedReferenceData(db) {
     );
   }
 
-  // Daily quest catalog
+  // Daily quest catalog — only trackable quests with a trackKey
+  const catalogTitles = [];
   for (const quest of DAILY_QUEST_CATALOG) {
+    catalogTitles.push(quest.title);
     await db.collection("quests").updateOne(
       { title: quest.title },
       {
@@ -586,35 +599,91 @@ async function seedReferenceData(db) {
     );
   }
 
+  await db.collection("quests").updateMany(
+    { title: { $nin: catalogTitles } },
+    { $set: { active: false, trackKey: "legacy.inactive", updatedAt: now } }
+  );
+
   const shopSeeds = [
     {
-      name: "Pastel Beanie",
-      description: "A cozy beanie for your streak pet.",
+      clientKey: "sonic-shoes",
+      name: "Sonic Shoes",
+      description: "Fast shoes for your mascot.",
       itemType: "single",
       category: "cosmetic",
-      price: 25,
+      price: 45,
+      rarity: "common",
+      imageUrl: "",
+      cosmeticType: "shoes",
+      active: true,
+    },
+    {
+      clientKey: "tung-buddy",
+      name: "Tung Buddy",
+      description: "A buddy companion cosmetic.",
+      itemType: "single",
+      category: "cosmetic",
+      price: 80,
+      rarity: "rare",
+      imageUrl: "",
+      cosmeticType: "accessory",
+      active: true,
+    },
+    {
+      clientKey: "cap",
+      name: "Cap",
+      description: "A classic cap cosmetic.",
+      itemType: "single",
+      category: "cosmetic",
+      price: 45,
       rarity: "common",
       imageUrl: "",
       cosmeticType: "hat",
       active: true,
     },
     {
-      name: "Calm Hoodie",
-      description: "Soft hoodie cosmetic.",
+      clientKey: "cute-cap",
+      name: "Cute Cap",
+      description: "A cute cap cosmetic.",
       itemType: "single",
       category: "cosmetic",
-      price: 40,
-      rarity: "rare",
+      price: 45,
+      rarity: "common",
       imageUrl: "",
-      cosmeticType: "top",
+      cosmeticType: "hat",
       active: true,
     },
     {
-      name: "Blossom Theme",
-      description: "Unlock the blossom color theme.",
+      clientKey: "glasses",
+      name: "Glasses",
+      description: "A glasses accessory cosmetic.",
+      itemType: "single",
+      category: "cosmetic",
+      price: 80,
+      rarity: "rare",
+      imageUrl: "",
+      cosmeticType: "accessory",
+      active: true,
+    },
+    {
+      clientKey: "royal-crown",
+      name: "Royal Crown",
+      description: "A rare crown cosmetic.",
+      itemType: "single",
+      category: "cosmetic",
+      price: 1000,
+      rarity: "limited",
+      imageUrl: "",
+      cosmeticType: "hat",
+      active: true,
+    },
+    {
+      clientKey: "brainfreeze",
+      name: "Brainfreeze",
+      description: "A special color-theme style unlock.",
       itemType: "single",
       category: "theme",
-      price: 60,
+      price: 200,
       rarity: "epic",
       imageUrl: "",
       cosmeticType: "theme",
@@ -623,7 +692,7 @@ async function seedReferenceData(db) {
   ];
   for (const item of shopSeeds) {
     await db.collection("shopItems").updateOne(
-      { name: item.name },
+      { clientKey: item.clientKey },
       {
         $set: { ...item, updatedAt: now },
         $setOnInsert: { createdAt: now },

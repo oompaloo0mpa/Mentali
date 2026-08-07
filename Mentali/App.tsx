@@ -28,7 +28,7 @@ import { FriendChatScreenContent } from '@/components/chat/FriendChatScreenConte
 import { StreakGuideScreenContent } from '@/components/chat/StreakGuideScreenContent';
 import { CheckInChatScreen } from '@/pages/CheckInChatScreen';
 import { SummaryScreen } from '@/pages/SummaryScreen';
-import { MOOD_OPTIONS, MOODS } from '@/data/moods';
+import { MOOD_OPTIONS, MOODS, moodById } from '@/data/moods';
 import { scorePhq4, scoreK10 } from '@/logic/wellbeing';
 import {
   EMPTY_PROFILE,
@@ -50,7 +50,7 @@ import {
   verifyResetCode,
   fetchUserProfile,
 } from '@/services/api';
-import { completeCheckInQuests } from '@/services/dailyQuestProgress';
+import { completeCheckInStreakQuests, completeCheckInSummaryQuests, completeDailyQuestsByTrackKey, completeReflectionCheckInAnswerQuests, completeReflectionCheckInChatQuests, completeWardrobeVisitQuests } from '@/services/dailyQuestProgress';
 import { mapDailyCheckInDocs } from '@/services/wellbeingHistory';
 import {
   addHistoryRecord,
@@ -58,6 +58,101 @@ import {
   saveTodaySnapshot,
 } from '@/storage/checkInStorage';
 import type { SocialAuthResult } from '@/hooks/useSocialAuth';
+import { CURRENT_USER } from '@/data/mockData';
+
+type OfflineDemoAccount = {
+  userId: string;
+  username: string;
+  displayName: string;
+  friendCode: string;
+  points: number;
+  currentTier: string;
+  longestStreak: number;
+};
+
+const OFFLINE_DEMO_PASSWORD = 'SeedUser123!';
+
+const OFFLINE_DEMO_ACCOUNTS: Record<string, OfflineDemoAccount> = {
+  'alex.seed@mentali.dev': {
+    userId: 'offline-alex-seed',
+    username: 'alex_seed',
+    displayName: 'Alex',
+    friendCode: 'ALX7K2',
+    points: 0,
+    currentTier: 'Bronze',
+    longestStreak: 142,
+  },
+  'josh.seed@mentali.dev': {
+    userId: 'offline-josh-seed',
+    username: 'josh_seed',
+    displayName: 'Josh',
+    friendCode: 'JSH4M9',
+    points: 0,
+    currentTier: 'Bronze',
+    longestStreak: 350,
+  },
+  'maya.seed@mentali.dev': {
+    userId: 'offline-maya-seed',
+    username: 'maya_seed',
+    displayName: 'Maya',
+    friendCode: 'MAYA3X',
+    points: 0,
+    currentTier: 'Bronze',
+    longestStreak: 33,
+  },
+};
+
+function isNetworkError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  return /Network request failed|fetch failed|Failed to fetch/i.test(error.message);
+}
+
+const OUTCOME_MOOD_BY_BAND: Record<string, string> = {
+  calm: 'good',
+  mild: 'okay',
+  moderate: 'low',
+  high: 'rough',
+};
+
+/**
+ * The summary mood should reflect what the user actually shared in the chat,
+ * not the mood they happened to have selected beforehand. We average the
+ * distress across the answers they gave and map that positivity onto a mood.
+ */
+function deriveSummaryMood(
+  answers: RecordedAnswer[],
+  phq4: WellbeingResult,
+  k10: WellbeingResult | null,
+  picked: MoodOption,
+): MoodOption {
+  const answered = answers.filter((a) => !a.skipped);
+
+  if (answered.length > 0) {
+    const distress = answered.map((a) =>
+      a.scale === 'k10' ? (a.value - 1) / 4 : a.value / 3,
+    );
+    const avgDistress = distress.reduce((sum, n) => sum + n, 0) / distress.length;
+    const positivity = 1 - avgDistress;
+
+    let id = 'okay';
+    if (positivity >= 0.8) id = 'great';
+    else if (positivity >= 0.6) id = 'good';
+    else if (positivity >= 0.4) id = 'okay';
+    else if (positivity >= 0.2) id = 'low';
+    else id = 'rough';
+
+    return moodById(id) ?? picked;
+  }
+
+  const level = (k10 ?? phq4).band.level;
+  return moodById(OUTCOME_MOOD_BY_BAND[level] ?? 'okay') ?? picked;
+}
+
+function getOfflineDemoAccount(identifier: string, password: string): OfflineDemoAccount | null {
+  if (password !== OFFLINE_DEMO_PASSWORD) return null;
+  const normalized = identifier.trim().toLowerCase();
+  return OFFLINE_DEMO_ACCOUNTS[normalized] ?? null;
+}
 
 type ScreenState =
   | { screen: 'welcome' }
@@ -115,7 +210,7 @@ function AppRoot() {
     hydrated,
     saveDisplayName,
     setAnonymousMode,
-    refreshProfileStats,
+    syncAfterQuestRewards,
   } = useUserProfile();
   const [screenState, setScreenState] = useState<ScreenState>({ screen: 'welcome' });
   const [authBootstrapped, setAuthBootstrapped] = useState(false);
@@ -235,6 +330,32 @@ function AppRoot() {
     syncUserFromServer(currentUserId).catch(() => {});
   }, [currentUserId, syncWellbeingHistory, syncUserFromServer]);
 
+  useEffect(() => {
+    if (!currentUserId) return;
+    const timer = setInterval(() => {
+      syncUserFromServer(currentUserId).catch(() => {});
+    }, 8000);
+    return () => clearInterval(timer);
+  }, [currentUserId, syncUserFromServer]);
+
+  useEffect(() => {
+    if (screenState.screen !== 'summary') return;
+    const userId = currentUserId ?? profile.userId;
+    if (!userId) return;
+    completeCheckInSummaryQuests(userId)
+      .then((awarded) => syncAfterQuestRewards(awarded))
+      .catch(() => {});
+  }, [screenState.screen, currentUserId, profile.userId, syncAfterQuestRewards]);
+
+  useEffect(() => {
+    if (screenState.screen !== 'wardrobe') return;
+    const userId = currentUserId ?? profile.userId;
+    if (!userId) return;
+    completeWardrobeVisitQuests(userId)
+      .then((awarded) => syncAfterQuestRewards(awarded))
+      .catch(() => {});
+  }, [screenState.screen, currentUserId, profile.userId, syncAfterQuestRewards]);
+
   const activeCheckInPlan = useMemo(() => {
     if (screenState.screen !== 'check-in') return null;
     const mood = screenState.mood ?? MOOD_OPTIONS[2];
@@ -312,8 +433,12 @@ function AppRoot() {
         }
         const userId = currentUserId ?? profile.userId;
         if (userId) {
-          completeCheckInQuests(userId)
-            .then(() => refreshProfileStats())
+          const questKeys: string[] = ['checkin.complete'];
+          if (answers.some((a) => !a.skipped)) {
+            questKeys.push('reflection.checkin_answer');
+          }
+          completeDailyQuestsByTrackKey(userId, questKeys)
+            .then((awarded) => syncAfterQuestRewards(awarded))
             .catch(() => {});
         }
       })
@@ -356,6 +481,13 @@ function AppRoot() {
     setStreak(newStreak);
     saveStreak(newStreak).catch(() => {});
 
+    const userId = currentUserId ?? profile.userId;
+    if (userId && newStreak.current > 1) {
+      completeCheckInStreakQuests(userId)
+        .then((awarded) => syncAfterQuestRewards(awarded))
+        .catch(() => {});
+    }
+
     const updatedProfile = updateProfileAfterCheckIn(
       checkInProfile,
       selectedMood,
@@ -369,7 +501,7 @@ function AppRoot() {
 
     setScreenState({
       screen: 'summary',
-      mood: selectedMood,
+      mood: deriveSummaryMood(answers, phq4, k10, selectedMood),
       phq4,
       k10,
       streak: newStreak,
@@ -454,6 +586,27 @@ function AppRoot() {
       }
       handleAuthSuccess();
     } catch (error) {
+      const offlineDemoAccount =
+        payload.mode === 'email' ? getOfflineDemoAccount(payload.identifier, payload.password) : null;
+
+      if (offlineDemoAccount && isNetworkError(error)) {
+        const offlineUser = {
+          _id: offlineDemoAccount.userId,
+          username: offlineDemoAccount.username,
+          displayName: offlineDemoAccount.displayName,
+          friendCode: offlineDemoAccount.friendCode,
+          points: offlineDemoAccount.points,
+          currentTier: offlineDemoAccount.currentTier,
+          longestStreak: offlineDemoAccount.longestStreak,
+          onboardingCompleted: true,
+        };
+
+        setCurrentUserId(offlineDemoAccount.userId);
+        await applyAuthUser(offlineUser, null);
+        handleAuthSuccess();
+        return;
+      }
+
       Alert.alert('Login failed', error instanceof Error ? error.message : 'Unable to login.');
     }
   };
@@ -650,7 +803,21 @@ function AppRoot() {
             onOpenRewards={() => setScreenState({ screen: 'rewards' })}
           />
         ) : screenState.screen === 'shop' ? (
-          <ShopPage />
+          <ShopPage
+            onNavigate={(navItem) => {
+              if (navItem === 'bag-outline') return;
+              if (navItem === 'shirt-outline') {
+                setScreenState({ screen: 'wardrobe', returnToNav: homeNav });
+                return;
+              }
+              if (navItem === 'trophy-outline') {
+                setHomeNav(navItem);
+                setScreenState({ screen: 'leaderboard' });
+                return;
+              }
+              setScreenState({ screen: 'home', selectedNav: navItem });
+            }}
+          />
         ) : screenState.screen === 'rewards' ? (
           <StatisticPage
             onNavigate={(navItem) => {
@@ -680,6 +847,10 @@ function AppRoot() {
               if (navItem === 'shirt-outline') {
                 setHomeNav(navItem);
                 setScreenState({ screen: 'wardrobe', returnToNav: navItem });
+                return;
+              }
+              if (navItem === 'bag-outline') {
+                setScreenState({ screen: 'shop' });
                 return;
               }
               setHomeNav(navItem);
@@ -722,6 +893,13 @@ function AppRoot() {
             completeLabel="See my summary"
             onBack={() => setScreenState({ screen: 'home', selectedNav: homeNav })}
             onComplete={(answers, mood) => handleCheckInComplete(answers, mood)}
+            onUserMessage={() => {
+              const userId = currentUserId ?? profile.userId;
+              if (!userId) return;
+              completeReflectionCheckInChatQuests(userId)
+                .then((awarded) => syncAfterQuestRewards(awarded))
+                .catch(() => {});
+            }}
           />
         ) : screenState.screen === 'summary' ? (
           <SummaryScreen

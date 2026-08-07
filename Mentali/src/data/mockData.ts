@@ -48,6 +48,13 @@ export type ChatMessage = {
   fileName?: string;
   fileUri?: string;
   sender: 'me' | 'them';
+  createdAt?: string;
+  replyToId?: string;
+  replyToText?: string;
+  replyToSender?: 'me' | 'them';
+  pinned?: boolean;
+  editedAt?: string | null;
+  deletedAt?: string | null;
 };
 
 export type AppNotification = {

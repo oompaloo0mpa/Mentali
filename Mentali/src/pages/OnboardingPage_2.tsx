@@ -106,7 +106,7 @@ export default function OnboardingPage_2({ onContinue, onBack }: OnboardingPage2
           {/* Message */}
           <View style={styles.messageSection}>
             <Text style={styles.messageText}>
-              Don't worry, you can always change your mind later!
+              Don&apos;t worry, you can always change your mind later!
             </Text>
           </View>
 

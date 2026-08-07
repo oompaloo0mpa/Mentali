@@ -23,7 +23,7 @@ async function openResource(resource: SupportResource) {
 export function SupportCard() {
   return (
     <View style={styles.card}>
-      <Text style={styles.title}>You don't have to carry this alone</Text>
+      <Text style={styles.title}>You don&apos;t have to carry this alone</Text>
       <Text style={styles.body}>
         Some of your answers suggest things have felt heavy lately. Talking to someone you
         trust — a friend, family member, or a professional — can really help.

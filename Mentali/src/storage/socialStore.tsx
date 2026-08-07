@@ -8,12 +8,15 @@ import {
   blockFriendship,
   bootstrapFriendsIfEmpty,
   clearNotifications as clearNotificationsApi,
+  deleteChatMessage as deleteChatMessageApi,
+  editChatMessage as editChatMessageApi,
   fetchChatMessages,
   fetchFriendsView,
   fetchNotifications,
   isRemoteMediaUri,
   markAllNotificationsRead as markAllNotificationsReadApi,
   markNotificationRead as markNotificationReadApi,
+  pinChatMessage as pinChatMessageApi,
   rejectFriendRequest,
   removeFriendship,
   requestFriendByCode,
@@ -24,16 +27,14 @@ import {
   type FriendRequestRow,
   type NotificationRow,
 } from '@/services/api';
-import { completeSocialQuests } from '@/services/dailyQuestProgress';
+import { completeSocialFriendAcceptQuests, completeSocialFriendAddQuests, completeSocialMessageQuests } from '@/services/dailyQuestProgress';
 
 import {
   DAILY_QUESTS,
   findDirectoryUser,
   FRIENDS,
   INCOMING_REQUESTS,
-  INITIAL_CHATS,
   MILESTONES,
-  seedGreeting,
   type AppNotification,
   type ChatMessage,
   type Friend,
@@ -42,8 +43,8 @@ import {
 } from '@/data/mockData';
 import { useUserProfile } from '@/storage/userProfileStore';
 
-const STORAGE_KEY = 'mentali.social.v7';
-const LEGACY_STORAGE_KEYS = ['mentali.social.v6', 'mentali.social.v5', 'mentali.social.v4'];
+const STORAGE_KEY = 'mentali.social.v8';
+const LEGACY_STORAGE_KEYS = ['mentali.social.v7', 'mentali.social.v6', 'mentali.social.v5', 'mentali.social.v4'];
 
 function mapNotificationRows(rows: NotificationRow[]): AppNotification[] {
   return rows.map((row) => ({
@@ -124,7 +125,9 @@ function initialState(): SocialState {
   return {
     friends,
     requests: normalizeIncomingRequests(friends, INCOMING_REQUESTS),
-    chats: Object.fromEntries(Object.entries(INITIAL_CHATS).map(([id, msgs]) => [id, msgs.map((m) => ({ ...m }))])),
+    // Start chats empty; real threads load from the server. Seeding placeholder
+    // messages here caused them to flash on open and then vanish once the fetch resolved.
+    chats: {},
     notifications: [],
     quests: freshQuests(),
     questDate: todayKey(),
@@ -192,6 +195,9 @@ async function loadPersistedSocialState(): Promise<SocialState | null> {
     const state = hydrateSocialState(parsed);
 
     if (key !== STORAGE_KEY) {
+      // Migrating from an older version: drop cached chat threads so previously
+      // seeded greeting messages don't linger. Real threads reload from the server.
+      state.chats = {};
       await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(state));
       await AsyncStorage.removeItem(key).catch(() => {});
     }
@@ -253,24 +259,19 @@ function fromApiRequest(row: FriendRequestRow): FriendRequest {
 
 /**
  * Merge a fresh friends list from the server into the current state, preserving
- * existing chat threads and seeding a greeting for any friendship that has no chat yet.
+ * existing chat threads. Chat contents are populated by `refreshChat`; we no longer
+ * seed a placeholder greeting, which previously flashed on open before the fetch resolved.
  */
 function mergeFriendsFromApi(
   prev: SocialState,
   remote: { friends: FriendListRow[]; requests: FriendRequestRow[] },
 ): SocialState {
   const newFriends = remote.friends.map(fromApiFriend);
-  const newChats = { ...prev.chats };
-  for (const f of newFriends) {
-    if (!newChats[f.id]) {
-      newChats[f.id] = seedGreeting();
-    }
-  }
   return {
     ...prev,
     friends: newFriends,
     requests: remote.requests.map(fromApiRequest),
-    chats: newChats,
+    chats: { ...prev.chats },
   };
 }
 
@@ -282,6 +283,17 @@ function fromApiChatMessage(row: ChatMessageRow, viewerUserId: string): ChatMess
     fileName: row.fileName,
     fileUri: row.fileUri,
     sender: row.senderUserId === viewerUserId ? 'me' : 'them',
+    createdAt: row.createdAt,
+    replyToId: row.replyToMessageId ?? undefined,
+    replyToText: row.replyToText ?? undefined,
+    replyToSender: row.replyToSenderUserId
+      ? row.replyToSenderUserId === viewerUserId
+        ? 'me'
+        : 'them'
+      : undefined,
+    pinned: !!row.pinned,
+    editedAt: row.editedAt ?? null,
+    deletedAt: row.deletedAt ?? null,
   };
 }
 
@@ -374,6 +386,9 @@ type SocialContextValue = {
     friendId: string,
     message: Omit<ChatMessage, 'id' | 'sender'> & { sender?: 'me' | 'them' },
   ) => Promise<void> | void;
+  editMessage: (friendId: string, messageId: string, text: string) => Promise<void>;
+  deleteMessage: (friendId: string, messageId: string) => Promise<void>;
+  pinMessage: (friendId: string, messageId: string, pinned: boolean) => Promise<void>;
   refreshChat: (friendId: string) => Promise<void>;
   markChatRead: (friendId: string) => void;
   togglePin: (friendId: string) => void;
@@ -391,7 +406,7 @@ type SocialContextValue = {
 const SocialContext = createContext<SocialContextValue | null>(null);
 
 export function SocialProvider({ children }: { children: React.ReactNode }) {
-  const { profile, refreshProfileStats } = useUserProfile();
+  const { profile, syncAfterQuestRewards } = useUserProfile();
   const [state, setState] = useState<SocialState>(initialState);
   const [hydrated, setHydrated] = useState(false);
 
@@ -507,6 +522,9 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
             const remote = await fetchFriendsView(profile.userId!);
             setState((prev) => mergeFriendsFromApi(prev, remote));
             await refreshNotifications();
+            completeSocialFriendAddQuests(profile.userId!)
+              .then((awarded) => syncAfterQuestRewards(awarded))
+              .catch(() => {});
           })
           .catch(() => {});
         return { ok: true, message: 'Friend request sent.' };
@@ -540,7 +558,7 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
         return {
           ...prev,
           friends: [...prev.friends, friend],
-          chats: { ...prev.chats, [id]: seedGreeting() },
+          chats: { ...prev.chats, [id]: [] },
           notifications: [
             {
               id: uid('n'),
@@ -583,7 +601,7 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
             ...prev,
             requests: prev.requests.filter((r) => r.id !== id),
             friends: [...prev.friends, friend],
-            chats: { ...prev.chats, [id]: prev.chats[id] ?? seedGreeting() },
+            chats: { ...prev.chats, [id]: prev.chats[id] ?? [] },
           };
         });
         // Confirm with the server and sync authoritative state (moods, streaks, etc.).
@@ -592,6 +610,9 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
             const remote = await fetchFriendsView(profile.userId!);
             setState((prev) => mergeFriendsFromApi(prev, remote));
             await refreshNotifications();
+            completeSocialFriendAcceptQuests(profile.userId!)
+              .then((awarded) => syncAfterQuestRewards(awarded))
+              .catch(() => {});
           })
           .catch(() => {});
         return;
@@ -614,7 +635,7 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
           ...prev,
           requests: prev.requests.filter((r) => r.id !== id),
           friends: [...prev.friends, friend],
-          chats: { ...prev.chats, [friendId]: seedGreeting() },
+          chats: { ...prev.chats, [friendId]: [] },
         };
       });
     },
@@ -638,8 +659,17 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
       const friend = stateRef.current.friends.find((f) => f.id === friendId);
       update((prev) => {
         const sender = message.sender ?? 'me';
-        const msg: ChatMessage = { ...message, id: uid('m'), sender };
-        const thread = prev.chats[friendId] ?? seedGreeting();
+        const thread = prev.chats[friendId] ?? [];
+        const reply = message.replyToId ? thread.find((m) => m.id === message.replyToId) : null;
+        const msg: ChatMessage = {
+          ...message,
+          id: uid('m'),
+          sender,
+          createdAt: new Date().toISOString(),
+          pinned: false,
+          replyToText: reply?.text || reply?.fileName || undefined,
+          replyToSender: reply?.sender,
+        };
         const next: SocialState = {
           ...prev,
           chats: { ...prev.chats, [friendId]: [...thread, msg] },
@@ -676,8 +706,11 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
       });
 
       if (me && friend?.userId && (message.sender ?? 'me') === 'me') {
-        completeSocialQuests(me)
-          .then(() => refreshProfileStats())
+        completeSocialMessageQuests(me, {
+          reply: !!message.replyToId,
+          streakAtRisk: friend ? isMessagingStreakAtRisk(friend) : false,
+        })
+          .then((awarded) => syncAfterQuestRewards(awarded))
           .catch(() => {});
         return (async () => {
           let imageUri = message.imageUri;
@@ -700,6 +733,7 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
             imageUri,
             fileName,
             fileUri,
+            replyToMessageId: message.replyToId,
           });
           const [rows, remote] = await Promise.all([
             fetchChatMessages(friendId, me),
@@ -723,18 +757,8 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
         })();
       }
     },
-    [profile.userId, refreshProfileStats, update],
+    [profile.userId, syncAfterQuestRewards, update],
   );
-
-  const refreshFriendsView = useCallback<SocialContextValue['refreshFriendsView']>(async () => {
-    if (!profile.userId) return;
-    try {
-      const remote = await fetchFriendsView(profile.userId);
-      setState((prev) => mergeFriendsFromApi(prev, remote));
-    } catch {
-      // Keep existing state when offline.
-    }
-  }, [profile.userId]);
 
   const refreshChat = useCallback<SocialContextValue['refreshChat']>(
     async (friendId: string) => {
@@ -754,6 +778,75 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
     },
     [profile.userId],
   );
+
+  const editMessage = useCallback<SocialContextValue['editMessage']>(
+    async (friendId, messageId, text) => {
+      const me = profile.userId;
+      if (!me) return;
+      const trimmed = text.trim();
+      if (!trimmed) throw new Error('Message cannot be empty');
+      setState((prev) => ({
+        ...prev,
+        chats: {
+          ...prev.chats,
+          [friendId]: (prev.chats[friendId] ?? []).map((m) =>
+            m.id === messageId ? { ...m, text: trimmed, editedAt: new Date().toISOString() } : m,
+          ),
+        },
+      }));
+      await editChatMessageApi(friendId, messageId, { senderUserId: me, text: trimmed });
+      await refreshChat(friendId);
+    },
+    [profile.userId, refreshChat],
+  );
+
+  const deleteMessage = useCallback<SocialContextValue['deleteMessage']>(
+    async (friendId, messageId) => {
+      const me = profile.userId;
+      if (!me) return;
+      setState((prev) => ({
+        ...prev,
+        chats: {
+          ...prev.chats,
+          [friendId]: (prev.chats[friendId] ?? []).map((m) =>
+            m.id === messageId
+              ? { ...m, text: '', imageUri: undefined, fileName: undefined, fileUri: undefined, deletedAt: new Date().toISOString() }
+              : m,
+          ),
+        },
+      }));
+      await deleteChatMessageApi(friendId, messageId, { senderUserId: me });
+      await refreshChat(friendId);
+    },
+    [profile.userId, refreshChat],
+  );
+
+  const pinMessage = useCallback<SocialContextValue['pinMessage']>(
+    async (friendId, messageId, pinned) => {
+      const me = profile.userId;
+      if (!me) return;
+      setState((prev) => ({
+        ...prev,
+        chats: {
+          ...prev.chats,
+          [friendId]: (prev.chats[friendId] ?? []).map((m) => (m.id === messageId ? { ...m, pinned } : m)),
+        },
+      }));
+      await pinChatMessageApi(friendId, messageId, { senderUserId: me, pinned });
+      await refreshChat(friendId);
+    },
+    [profile.userId, refreshChat],
+  );
+
+  const refreshFriendsView = useCallback<SocialContextValue['refreshFriendsView']>(async () => {
+    if (!profile.userId) return;
+    try {
+      const remote = await fetchFriendsView(profile.userId);
+      setState((prev) => mergeFriendsFromApi(prev, remote));
+    } catch {
+      // Keep existing state when offline.
+    }
+  }, [profile.userId]);
 
   const markChatRead = useCallback(
     (friendId: string) =>
@@ -904,6 +997,9 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
       rejectRequest,
       refreshFriendsView,
       sendMessage,
+      editMessage,
+      deleteMessage,
+      pinMessage,
       refreshChat,
       markChatRead,
       togglePin,
@@ -929,6 +1025,9 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
       rejectRequest,
       refreshFriendsView,
       sendMessage,
+      editMessage,
+      deleteMessage,
+      pinMessage,
       refreshChat,
       markChatRead,
       togglePin,

@@ -21,7 +21,7 @@ export default function NonAnonymousWarningPage({
 
           <Text style={styles.bodyText}>
             Turning off anonymous mode allows you{"\n"}
-            and others to view each other's profiles{"\n"}
+            and others to view each other&apos;s profiles{"\n"}
             and may also enable you to receive help{"\n"}
             from professionals.
           </Text>

@@ -1,4 +1,4 @@
-import { useEffect, useState, type ComponentProps } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Alert,
   Modal,
@@ -38,6 +38,7 @@ import {
   clearNotifications as clearNotificationsApi,
   type NotificationRow,
 } from '@/services/api';
+import { completeNotificationReadQuests } from '@/services/dailyQuestProgress';
 import type { Friend } from '@/data/mockData';
 import type { MoodOption } from '@/logic/checkin';
 import { useUserProfile, type WardrobeSelection } from '@/storage/userProfileStore';
@@ -114,9 +115,10 @@ function MoodButton({ mood, selected, onPress }: MoodButtonProps) {
 
 function QuestCard({ item }: { item: QuestItem }) {
   const rewardText = item.points.replace(/\s*pts$/i, '');
+  const completed = !!item.completed;
 
   return (
-    <View style={[styles.questCard, item.active ? styles.questCardActive : styles.questCardInactive]}>
+    <View style={[styles.questCard, completed ? styles.questCardCompleted : styles.questCardPending]}>
       <View style={styles.questTextWrap}>
         <Text numberOfLines={1} style={styles.questTitle}>
           {item.title}
@@ -176,18 +178,6 @@ function confirmMoodSelection(mood: MoodItem, onConfirm: () => void) {
 }
 function MascotArt({ wardrobe }: { wardrobe: WardrobeSelection }) {
   return <WardrobeMascotPreview wardrobe={wardrobe} size={126} preset="home" />;
-}
-
-function NavPlaceholder({ title, icon }: { title: string; icon: ComponentProps<typeof Ionicons>['name'] }) {
-  return (
-    <View style={styles.placeholderScreen}>
-      <View style={styles.placeholderCard}>
-        <Ionicons name={icon} size={44} color="#FF5DE7" />
-        <Text style={styles.placeholderTitle}>{title}</Text>
-        <Text style={styles.placeholderSubtitle}>Placeholder screen for testing the navigation bar.</Text>
-      </View>
-    </View>
-  );
 }
 
 function NotificationPanel({
@@ -355,7 +345,7 @@ export default function HomePage({
   onOpenRewards,
 }: HomePageProps) {
   const { openSettings, requestLogout } = useSettingsOverlay();
-  const { profile, setCurrentMood } = useUserProfile();
+  const { profile, setCurrentMood, questRevision, syncAfterQuestRewards } = useUserProfile();
   const [selectedNav, setSelectedNav] = useState(initialSelectedNav);
   const [notificationsVisible, setNotificationsVisible] = useState(false);
   const [moreMenuVisible, setMoreMenuVisible] = useState(false);
@@ -372,7 +362,6 @@ export default function HomePage({
     { ...stats[2], value: String(profile.longestStreak) },
   ];
   const unreadCount = notifications.filter((notification) => !notification.read).length;
-  const isHomeSelected = selectedNav === 'home-outline';
   const selectedMood = Math.max(
     0,
     moods.findIndex((m) => m.id === profile.currentMoodId),
@@ -405,7 +394,7 @@ export default function HomePage({
     return () => {
       active = false;
     };
-  }, [profile.userId, profile.points]);
+  }, [profile.userId, profile.points, questRevision]);
 
   useEffect(() => {
     if (!profile.userId) {
@@ -444,14 +433,6 @@ export default function HomePage({
     }
   };
 
-  const navLabels: Record<string, { title: string; icon: ComponentProps<typeof Ionicons>['name'] }> = {
-    'home-outline': { title: 'Home', icon: 'home-outline' },
-    'people-outline': { title: 'Friends', icon: 'people-outline' },
-    'trophy-outline': { title: 'Rewards', icon: 'trophy-outline' },
-    'bag-outline': { title: 'Shop', icon: 'bag-outline' },
-    'shirt-outline': { title: 'Wardrobe', icon: 'shirt-outline' },
-  };
-
   const markNotificationRead = (id: string) => {
     setNotifications((currentNotifications) =>
       currentNotifications.map((notification) =>
@@ -460,6 +441,9 @@ export default function HomePage({
     );
     if (profile.userId) {
       markNotificationReadApi(id).catch(() => {});
+      completeNotificationReadQuests(profile.userId)
+        .then((awarded) => syncAfterQuestRewards(awarded))
+        .catch(() => {});
     }
   };
 
@@ -498,7 +482,14 @@ export default function HomePage({
               <View style={styles.actionGroup}>
                 <Pressable
                   accessibilityLabel={`Notifications, ${unreadCount} unread`}
-                  onPress={() => setNotificationsVisible(true)}
+                  onPress={() => {
+                    setNotificationsVisible(true);
+                    if (profile.userId) {
+                      completeNotificationReadQuests(profile.userId)
+                        .then((awarded) => syncAfterQuestRewards(awarded))
+                        .catch(() => {});
+                    }
+                  }}
                   style={styles.notificationButton}
                 >
                   <Ionicons name="notifications-outline" size={20} color="#fff" />
@@ -539,7 +530,17 @@ export default function HomePage({
               topInset={insets.top}
             />
 
-        {isHomeSelected ? (
+        {selectedNav === 'people-outline' ? (
+          <FriendsScreenContent
+            showHeader={false}
+            checkInStreak={checkInStreak}
+            userPoints={userPoints}
+            longestStreak={profile.longestStreak}
+            onOpenChat={(friend) => onOpenChat?.(friend)}
+          />
+        ) : selectedNav === 'shirt-outline' ? (
+          <WardrobeScreenContent onOpenShop={() => onOpenShop?.()} />
+        ) : (
           <>
             <View style={styles.heroRow}>
               <View style={styles.quoteBubble}>
@@ -665,23 +666,6 @@ export default function HomePage({
               </View>
             </View>
           </>
-        ) : selectedNav === 'people-outline' ? (
-          <FriendsScreenContent
-            showHeader={false}
-            checkInStreak={checkInStreak}
-            userPoints={userPoints}
-            longestStreak={profile.longestStreak}
-            onOpenChat={(friend) => onOpenChat?.(friend)}
-          />
-        ) : selectedNav === 'shirt-outline' ? (
-          <WardrobeScreenContent
-            onOpenShop={() => {
-              setSelectedNav('bag-outline');
-              onSelectedNavChange?.('bag-outline');
-            }}
-          />
-        ) : (
-          <NavPlaceholder title={navLabels[selectedNav].title} icon={navLabels[selectedNav].icon} />
         )}
       </ScrollView>
 
@@ -1291,9 +1275,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     borderWidth: 2,
-    borderColor: '#FF4DEA',
     borderRadius: 12,
-    backgroundColor: '#F7C7F3',
     paddingHorizontal: 12,
     paddingVertical: 8,
     marginBottom: 6,
@@ -1304,12 +1286,13 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 1 },
     elevation: 1,
   },
-  questCardInactive: {
-    backgroundColor: '#fff',
+  questCardPending: {
+    backgroundColor: '#FFFFFF',
     borderColor: '#F2D5F0',
   },
-  questCardActive: {
+  questCardCompleted: {
     backgroundColor: '#F7C7F3',
+    borderColor: '#FF4DEA',
   },
   questTextWrap: {
     flex: 1,
@@ -1522,34 +1505,5 @@ const styles = StyleSheet.create({
   ctaArrowImage: {
     width: 16,
     height: 16,
-  },
-  placeholderScreen: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  placeholderCard: {
-    width: '100%',
-    borderRadius: 18,
-    borderWidth: 2,
-    borderColor: '#FF6DEB',
-    backgroundColor: '#231F21',
-    paddingVertical: 28,
-    paddingHorizontal: 20,
-    alignItems: 'center',
-  },
-  placeholderTitle: {
-    color: '#fff',
-    fontSize: 26,
-    fontWeight: '800',
-    marginTop: 14,
-    marginBottom: 8,
-  },
-  placeholderSubtitle: {
-    color: '#D2C6CC',
-    fontSize: 14,
-    fontWeight: '600',
-    textAlign: 'center',
-    lineHeight: 18,
   },
 });

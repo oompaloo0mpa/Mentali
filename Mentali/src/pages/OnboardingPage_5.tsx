@@ -10,6 +10,8 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import OnboardingProgressDots from '../components/OnboardingProgressDots';
+import { useUserProfile } from '@/storage/userProfileStore';
+import { MOOD_OPTIONS } from '@/data/moods';
 
 const emojiImages = [
   require('../components/Emoji 1.png'),
@@ -54,9 +56,16 @@ type OnboardingPage5Props = {
 
 export default function OnboardingPage_5({ onContinue, onBack }: OnboardingPage5Props): React.ReactElement {
   const router = useRouter();
+  const { setCurrentMood } = useUserProfile();
   const [selectedMood, setSelectedMood] = useState(0);
 
   const handleContinue = (): void => {
+    // The five emoji options line up 1:1 with the homepage mood strip, so persist
+    // the chosen mood before leaving onboarding — otherwise the homepage keeps
+    // showing its default and the selection appears to be ignored.
+    const picked = MOOD_OPTIONS[selectedMood] ?? MOOD_OPTIONS[0];
+    setCurrentMood({ id: picked.id, emoji: picked.emoji });
+
     if (onContinue) {
       onContinue();
       return;

@@ -8,6 +8,14 @@ const SOURCES = {
 
 export type AppIconName = keyof typeof SOURCES;
 
-export function AppIcon({ name, size = 20 }: { name: AppIconName; size?: number }) {
-  return <Image source={SOURCES[name]} style={{ width: size, height: size }} contentFit="contain" />;
+export function AppIcon({
+  name,
+  size = 20,
+  tintColor,
+}: {
+  name: AppIconName;
+  size?: number;
+  tintColor?: string;
+}) {
+  return <Image source={SOURCES[name]} style={{ width: size, height: size, tintColor }} contentFit="contain" />;
 }
