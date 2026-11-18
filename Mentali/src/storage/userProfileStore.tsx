@@ -116,7 +116,7 @@ const UserProfileContext = createContext<UserProfileContextValue | null>(null);
 function parseDisplayNameChangedAt(value: unknown): string | null {
   if (!value) return null;
   if (typeof value === 'string') return value;
-  if (value instanceof Date) return value.toISOString();
+  if (value instanceof Date) return value.toISOString(); 
   return null;
 }
 
